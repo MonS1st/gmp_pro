@@ -78,11 +78,15 @@ void update_led_content_8byte(ht16k33_dev_t* dev, uint16_t ch1, uint16_t ch2, ui
 }
 
 
+
 gmp_task_status_t tsk_LED_flush(gmp_task_t* tsk)
 {
     ht16k33_dev_t* dev = (ht16k33_dev_t*)tsk->user_data;
+    //test
+
 
     // fresh LED buffer here.
+
     ec_gt ret = ht16k33_update_display(dev);
 
     // if meets error, close this task
@@ -99,6 +103,11 @@ extern ctl_lead_t lead_comp;//7
 extern ctl_lead_t lead_comp2;//7
 extern uint16_t current_valid_lead_comp;
 
+//test
+    volatile fast_gt debug_key_id = 0;
+    volatile ec_gt debug_key_ret = 0;
+    volatile uint32_t debug_key_count = 0;
+
 gmp_task_status_t tsk_key_flush(gmp_task_t* tsk)
 {
     ht16k33_dev_t* dev = (ht16k33_dev_t*)tsk->user_data;
@@ -111,6 +120,13 @@ gmp_task_status_t tsk_key_flush(gmp_task_t* tsk)
     {
         tsk->is_enabled = 0;
     }
+    // 调试用：把局部变量保存到全局变量，方便 CCS Watch 观察
+        debug_key_count++;
+        debug_key_ret = ret;
+        debug_key_id = key_id;
+
+
+
 
     if (key_id != 0)
     {
@@ -131,6 +147,8 @@ gmp_task_status_t tsk_key_flush(gmp_task_t* tsk)
         update_led_content_8byte(dev, led_lut[4], led_lut[5], led_lut[0], led_lut[0], led_lut[20], led_lut[key_id / 10],
                                  led_lut[key_id % 10], led_lut[20]);//6
 
+
+        ht16k33_update_display(dev);//新加
         gmp_base_print("Receive Key Message, %d\r\n", key_id);
     }
 
