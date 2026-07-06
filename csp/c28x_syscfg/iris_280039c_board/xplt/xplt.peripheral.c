@@ -82,7 +82,8 @@ void initI2C()
     I2C_enableModule(I2CA_BASE);
 }
 
-
+adc_channel_t input_wave_adc;//2
+pwm_channel_t output_pwm_iris_1;//5
 
 // User should setup all the peripheral in this function.
 void setup_peripheral(void)
@@ -117,6 +118,13 @@ void setup_peripheral(void)
     user_led = SYSTEM_LED;
 
     gpio_beep = IRIS_GPIO1;
+
+
+    //ADC init
+    ctl_init_adc_channel(&input_wave_adc, 4.0f, 12, 24);//2
+
+    ctl_init_pwm_channel(&output_pwm_iris_1, 0, CTRL_PWM_CMP_MAX);//5°¢À¿«¯…Ë÷√
+
 
 }
 

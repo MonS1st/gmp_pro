@@ -94,6 +94,10 @@ gmp_task_status_t tsk_LED_flush(gmp_task_t* tsk)
     return GMP_TASK_DONE;
 }
 
+ctrl_gt target_lead_angle;//2
+extern ctl_lead_t lead_comp;//7
+extern ctl_lead_t lead_comp2;//7
+extern uint16_t current_valid_lead_comp;
 
 gmp_task_status_t tsk_key_flush(gmp_task_t* tsk)
 {
@@ -110,9 +114,22 @@ gmp_task_status_t tsk_key_flush(gmp_task_t* tsk)
 
     if (key_id != 0)
     {
+        //得到输入的结果作为移相角目标/7
+        if(current_valid_lead_comp == 1)
+        {
+            ctl_init_lead_form3(&lead_comp2, target_lead_angle, 100.0f, CONTROLLER_FREQUENCY);//7
+            current_valid_lead_comp = 2;
+        }
+        else
+        {
+            ctl_init_lead_form3(&lead_comp2, target_lead_angle, 100.0f, CONTROLLER_FREQUENCY);//7
+            current_valid_lead_comp = 1;
+        }
+
+
         // response key message
-        update_led_content_8byte(dev, led_lut[2], led_lut[0], led_lut[2], led_lut[6], led_lut[20], led_lut[key_id / 10],
-                                 led_lut[key_id % 10], led_lut[20]);
+        update_led_content_8byte(dev, led_lut[4], led_lut[5], led_lut[0], led_lut[0], led_lut[20], led_lut[key_id / 10],
+                                 led_lut[key_id % 10], led_lut[20]);//6
 
         gmp_base_print("Receive Key Message, %d\r\n", key_id);
     }

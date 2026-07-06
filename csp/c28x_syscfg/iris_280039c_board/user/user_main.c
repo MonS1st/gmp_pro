@@ -153,8 +153,8 @@ gmp_task_status_t tsk_blink(gmp_task_t* tsk)
 
     if (flag_init_cmpt == 1)
     {
-        sprintf(output_msg, "index: %d C", index++);
-        oled_show_str(0,2,output_msg);
+        sprintf(output_msg, "index: %d C", index++);//8
+        oled_show_str(0,2,output_msg);//8 这个函数用于液晶显示，oled
     }
 
     return GMP_TASK_DONE;
