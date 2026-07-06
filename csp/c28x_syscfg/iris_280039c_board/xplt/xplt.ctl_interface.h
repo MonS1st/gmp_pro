@@ -11,6 +11,7 @@
 //
 
 #include <xplt.peripheral.h>
+#include "ctl_main.h"
 
 #ifndef _FILE_CTL_INTERFACE_H_
 #define _FILE_CTL_INTERFACE_H_
@@ -26,18 +27,28 @@ extern "C"
 // Input Callback
 GMP_STATIC_INLINE void ctl_input_callback(void)
 {
-
+    g_adc3_daca_raw = ADC_readResult(ADC_CH3_RESULT_BASE, ADC_CH3);
+    g_adc3_sine_pu = ctl_step_adc_channel(&g_adc3_daca_channel, g_adc3_daca_raw);
 }
 
 // Output Callback
 GMP_STATIC_INLINE void ctl_output_callback(void)
 {
 
-    EPWM_setCounterCompareValue(IRIS_EPWM1_BASE, EPWM_COUNTER_COMPARE_A, 1500);
+    EPWM_setCounterCompareValue(IRIS_EPWM1_BASE,
+                                EPWM_COUNTER_COMPARE_A,
+                                CONTROL_EPWM_CMP_HALF_TICKS);
+    EPWM_setCounterCompareValue(IRIS_EPWM1_BASE,
+                                EPWM_COUNTER_COMPARE_B,
+                                CONTROL_EPWM_CMP_HALF_TICKS);
 
-    g_daca_sine_code = (uint16_t)(2048.0f + 1024.0f * g_daca_sine_value + 0.5f);
+    g_daca_sine_code = ctl_pu_to_dac_code(g_daca_sine_value,
+                                          DACA_SINE_DAC_AMP_CODE_F);
     DAC_setShadowValue(IRIS_DACA_BASE, g_daca_sine_code);
-    DAC_setShadowValue(IRIS_DACB_BASE, iuvw.control_port.value.dat[phase_C] * 2048 + 2048);
+
+    g_dacb_lead_code = ctl_pu_to_dac_code(g_lead_output_pu,
+                                          DACB_LEAD_DAC_AMP_CODE_F);
+    DAC_setShadowValue(IRIS_DACB_BASE, g_dacb_lead_code);
 
 }
 
