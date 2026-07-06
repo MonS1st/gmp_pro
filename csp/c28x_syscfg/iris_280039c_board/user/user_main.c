@@ -13,6 +13,7 @@
 #include <core/dev/mem_presp.h>
 
 #include <oled_driver.h>
+#include <stdio.h>
 
 ctrl_gt kp, ki, kd;
 

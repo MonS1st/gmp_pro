@@ -28,7 +28,6 @@ extern "C"
 
 
 extern adc_channel_t input_wave_adc;
-extern ctrl_gt comp_out;
 extern pwm_channel_t output_pwm_iris_1;//5
 extern ctrl_gt comp_out;//5
 
@@ -56,7 +55,7 @@ GMP_STATIC_INLINE void ctl_output_callback(void)
     //DAC_setShadowValue(IRIS_DACB_BASE, iuvw.control_port.value.dat[phase_C] * 2048 + 2048);
 
     //展示移动相位后的输出，与adcA相差45度
-    DAC_setShadowValue(IRIS_DACA_BASE, comp_out * 1024 + 2048);
+    DAC_setShadowValue(IRIS_DACB_BASE, comp_out * 1024 + 2048);
 
     //死区
     ctl_step_pwm_channel(&output_pwm_iris_1, (comp_out + 1.0f)/2);

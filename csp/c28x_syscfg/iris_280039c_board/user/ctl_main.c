@@ -28,7 +28,9 @@
 // global controller variables
 
 ctl_lead_t lead_comp;//2
-
+ctl_lead_t lead_comp2;
+ctrl_gt comp_out = 0.0f;
+uint16_t current_valid_lead_comp = 1;
 
 
 //=================================================================================================
@@ -36,9 +38,11 @@ ctl_lead_t lead_comp;//2
 
 void ctl_init()
 {
-    //3.初始化lead_comp，控制频率为fs，Controller_frequency位于ctrl_setting
-    //3、对第二步的输出进行45度移相
-    ctl_init_lead_form3 (&lead_comp, 3.1415926f/4, 100.0f, CONTROLLER_FREQUENCY);//3、4
+    ctl_init_lead_form3(&lead_comp, 3.1415926f / 4.0f, 100.0f, CONTROLLER_FREQUENCY);
+    ctl_init_lead_form3(&lead_comp2, 3.1415926f / 4.0f, 100.0f, CONTROLLER_FREQUENCY);
+
+    comp_out = 0.0f;
+    current_valid_lead_comp = 1;
 }
 
 //=================================================================================================

@@ -94,7 +94,7 @@ gmp_task_status_t tsk_LED_flush(gmp_task_t* tsk)
     return GMP_TASK_DONE;
 }
 
-ctrl_gt target_lead_angle;//2
+ctrl_gt target_lead_angle = 3.1415926f / 4.0f;//2，这里顺便进行初始化了
 extern ctl_lead_t lead_comp;//7
 extern ctl_lead_t lead_comp2;//7
 extern uint16_t current_valid_lead_comp;
@@ -122,7 +122,7 @@ gmp_task_status_t tsk_key_flush(gmp_task_t* tsk)
         }
         else
         {
-            ctl_init_lead_form3(&lead_comp2, target_lead_angle, 100.0f, CONTROLLER_FREQUENCY);//7
+            ctl_init_lead_form3(&lead_comp, target_lead_angle, 100.0f, CONTROLLER_FREQUENCY);//7
             current_valid_lead_comp = 1;
         }
 

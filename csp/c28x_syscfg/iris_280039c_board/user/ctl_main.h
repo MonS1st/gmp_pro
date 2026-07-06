@@ -17,7 +17,7 @@
 #include <ctl/component/interface/adc_channel.h>
 #include <ctl/component/interface/pwm_channel.h>
 #include <ctl/component/interface/spwm_modulator.h>
-#include <ctl/component/intrinsic/discrete/lead_lag.h>
+#include <ctl/component/intrinsic/discrete/lead_lag.h>//lead_lag
 
 #include <ctl/framework/cia402_state_machine.h>
 

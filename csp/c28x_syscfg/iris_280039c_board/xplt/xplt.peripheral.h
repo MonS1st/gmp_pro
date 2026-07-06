@@ -22,6 +22,15 @@ extern "C"
 
 // select ADC PTR interface
 #include <ctl/component/interface/adc_ptr_channel.h>
+//建立adc和pwm相关引用
+#include <ctl/component/interface/adc_channel.h>
+#include <ctl/component/interface/pwm_channel.h>
+
+extern adc_channel_t input_wave_adc;
+extern pwm_channel_t output_pwm_iris_1;
+
+void flush_dl_tx_buffer(void);
+void flush_dl_rx_buffer(void);
 
 //=================================================================================================
 // definitions of peripheral

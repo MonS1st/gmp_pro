@@ -121,8 +121,8 @@ void setup_peripheral(void)
 
 
     //ADC init
-    ctl_init_adc_channel(&input_wave_adc, 4.0f, 12, 24);//2
 
+    ctl_init_adc_channel(&input_wave_adc, 4.0f, 0.5f, 12, 24);//2
     ctl_init_pwm_channel(&output_pwm_iris_1, 0, CTRL_PWM_CMP_MAX);//5¡¢ËÀÇøÉèÖÃ
 
 
