@@ -97,16 +97,13 @@ void setup_peripheral(void)
     //
     // Initialize GPIOs for use as SDA A and SCL A respectively
     //
-    // GPIO_setPinConfig(DEVICE_GPIO_CFG_SDAA);
+    GPIO_setPinConfig(DEVICE_GPIO_CFG_SDAA);
     GPIO_setPadConfig(IRIS_IIC_I2CSDA_GPIO, GPIO_PIN_TYPE_PULLUP);
     GPIO_setQualificationMode(IRIS_IIC_I2CSDA_GPIO, GPIO_QUAL_ASYNC);
 
-    // GPIO_setPinConfig(DEVICE_GPIO_CFG_SCLA);
+    GPIO_setPinConfig(DEVICE_GPIO_CFG_SCLA);
     GPIO_setPadConfig(IRIS_IIC_I2CSCL_GPIO, GPIO_PIN_TYPE_PULLUP);
     GPIO_setQualificationMode(IRIS_IIC_I2CSCL_GPIO, GPIO_QUAL_ASYNC);
-
-    GPIO_setPadConfig(IRIS_IIC_I2CSDA_GPIO, GPIO_PIN_TYPE_PULLUP);
-
     //
     // Set I2C use, initializing it for FIFO mode
     //
