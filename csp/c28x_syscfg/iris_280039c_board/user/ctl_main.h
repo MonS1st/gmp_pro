@@ -30,7 +30,13 @@ extern "C"
 
 //=================================================================================================
 // controller modules with extern
+#define DACA_SINE_FREQ_HZ        (100.0f)
+#define DACA_SINE_UPDATE_HZ      (10000.0f)
+#define DACA_SINE_PHASE_STEP_PU  (DACA_SINE_FREQ_HZ / DACA_SINE_UPDATE_HZ)
 
+extern ctrl_gt g_daca_sine_phase_pu;
+extern ctrl_gt g_daca_sine_value;
+extern uint16_t g_daca_sine_code;
 
 
 
@@ -46,10 +52,18 @@ void clear_all_controllers();
 // controller process
 
 // periodic callback function things.
+
 GMP_STATIC_INLINE void ctl_dispatch(void)
 {
+    g_daca_sine_value = ctl_sin(g_daca_sine_phase_pu);
 
+    g_daca_sine_phase_pu += float2ctrl(DACA_SINE_PHASE_STEP_PU);
+    if (g_daca_sine_phase_pu >= float2ctrl(1.0f))
+    {
+        g_daca_sine_phase_pu -= float2ctrl(1.0f);
+    }
 }
+
 
 #ifdef __cplusplus
 }

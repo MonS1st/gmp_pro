@@ -35,7 +35,8 @@ GMP_STATIC_INLINE void ctl_output_callback(void)
 
     EPWM_setCounterCompareValue(IRIS_EPWM1_BASE, EPWM_COUNTER_COMPARE_A, 1500);
 
-    DAC_setShadowValue(IRIS_DACA_BASE, iabc.control_port.value.dat[phase_C] * 2048 + 2048);
+    g_daca_sine_code = (uint16_t)(2048.0f + 1024.0f * g_daca_sine_value + 0.5f);
+    DAC_setShadowValue(IRIS_DACA_BASE, g_daca_sine_code);
     DAC_setShadowValue(IRIS_DACB_BASE, iuvw.control_port.value.dat[phase_C] * 2048 + 2048);
 
 }
