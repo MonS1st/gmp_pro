@@ -37,10 +37,10 @@ GMP_STATIC_INLINE void ctl_output_callback(void)
 
     EPWM_setCounterCompareValue(IRIS_EPWM1_BASE,
                                 EPWM_COUNTER_COMPARE_A,
-                                CONTROL_EPWM_CMP_HALF_TICKS);
+                                g_epwm1_cmpa);
     EPWM_setCounterCompareValue(IRIS_EPWM1_BASE,
                                 EPWM_COUNTER_COMPARE_B,
-                                CONTROL_EPWM_CMP_HALF_TICKS);
+                                g_epwm1_cmpb);
 
     g_daca_sine_code = ctl_pu_to_dac_code(g_daca_sine_value,
                                           DACA_SINE_DAC_AMP_CODE_F);

@@ -42,12 +42,24 @@ float g_lead_mag_at_freq = 1.0f;
 ctrl_gt g_lead_output_pu = float2ctrl(0.0f);
 uint16_t g_dacb_lead_code = 2048U;
 
+pwm_channel_t g_epwm1_pwm_channel;
+ctrl_gt g_epwm1_mod_pu = float2ctrl(0.5f);
+pwm_gt g_epwm1_cmpa = CONTROL_EPWM_CMP_HALF_TICKS;
+pwm_gt g_epwm1_cmpb = CONTROL_EPWM_CMP_HALF_TICKS;
+
+float g_lead_angle_deg = 45.0f;
+uint16_t g_display_angle_value = 450U;
+
 
 //=================================================================================================
 // CTL initialize routine
 
 void ctl_init()
 {
+    ctl_init_pwm_channel(&g_epwm1_pwm_channel,
+                         (pwm_gt)0,
+                         (pwm_gt)CONTROL_EPWM_TBPRD_TICKS);
+
     ctl_init_adc_channel(&g_adc3_daca_channel,
                          float2ctrl(ADC3_DACA_GAIN_PU),
                          float2ctrl(ADC3_DACA_BIAS_PU),

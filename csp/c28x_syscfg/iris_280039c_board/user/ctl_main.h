@@ -32,7 +32,9 @@ extern "C"
 //=================================================================================================
 // controller modules with extern
 #define CONTROL_UPDATE_HZ             (20000.0f)
+#define CONTROL_EPWM_TBPRD_TICKS      (1500U)
 #define CONTROL_EPWM_CMP_HALF_TICKS   (750U)
+#define CONTROL_EPWM_DEADBAND_TICKS   (30U)
 
 #define DACA_SINE_FREQ_HZ             (100.0f)
 #define DACA_SINE_PHASE_STEP_PU       (DACA_SINE_FREQ_HZ / CONTROL_UPDATE_HZ)
@@ -61,6 +63,14 @@ extern ctrl_gt g_lead_output_gain;
 extern float g_lead_mag_at_freq;
 extern ctrl_gt g_lead_output_pu;
 extern uint16_t g_dacb_lead_code;
+
+extern pwm_channel_t g_epwm1_pwm_channel;
+extern ctrl_gt g_epwm1_mod_pu;
+extern pwm_gt g_epwm1_cmpa;
+extern pwm_gt g_epwm1_cmpb;
+
+extern float g_lead_angle_deg;
+extern uint16_t g_display_angle_value;
 
 GMP_STATIC_INLINE uint16_t ctl_pu_to_dac_code(ctrl_gt value_pu, float amp_code)
 {
@@ -96,10 +106,35 @@ void clear_all_controllers();
 
 GMP_STATIC_INLINE void ctl_dispatch(void)
 {
+    ctrl_gt limited_lead;
+
     g_daca_sine_value = ctl_sin(g_daca_sine_phase_pu);
 
     g_lead_output_pu = ctl_mul(g_lead_output_gain,
                                ctl_step_lead(&g_sine_lead, g_adc3_sine_pu));
+
+    limited_lead = g_lead_output_pu;
+    if (limited_lead > float2ctrl(1.0f))
+    {
+        limited_lead = float2ctrl(1.0f);
+    }
+    else if (limited_lead < float2ctrl(-1.0f))
+    {
+        limited_lead = float2ctrl(-1.0f);
+    }
+
+    g_epwm1_mod_pu = float2ctrl(0.5f) + ctl_mul(float2ctrl(0.5f), limited_lead);
+    if (g_epwm1_mod_pu > float2ctrl(1.0f))
+    {
+        g_epwm1_mod_pu = float2ctrl(1.0f);
+    }
+    else if (g_epwm1_mod_pu < float2ctrl(0.0f))
+    {
+        g_epwm1_mod_pu = float2ctrl(0.0f);
+    }
+
+    g_epwm1_cmpa = ctl_step_pwm_channel_inv(&g_epwm1_pwm_channel, g_epwm1_mod_pu);
+    g_epwm1_cmpb = g_epwm1_cmpa;
 
     g_daca_sine_phase_pu += float2ctrl(DACA_SINE_PHASE_STEP_PU);
     if (g_daca_sine_phase_pu >= float2ctrl(1.0f))

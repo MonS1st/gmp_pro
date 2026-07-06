@@ -82,8 +82,7 @@ gmp_task_status_t tsk_LED_flush(gmp_task_t* tsk)
 {
     ht16k33_dev_t* dev = (ht16k33_dev_t*)tsk->user_data;
 
-    // fresh LED buffer here.
-    ec_gt ret = ht16k33_update_display(dev);
+    ec_gt ret = ht16k33_test_all_leds_on(dev);
 
     // if meets error, close this task
     if (ret != GMP_EC_OK)
@@ -110,10 +109,7 @@ gmp_task_status_t tsk_key_flush(gmp_task_t* tsk)
 
     if (key_id != 0)
     {
-        // response key message
-        update_led_content_8byte(dev, led_lut[2], led_lut[0], led_lut[2], led_lut[6], led_lut[20], led_lut[key_id / 10],
-                                 led_lut[key_id % 10], led_lut[20]);
-
+        // Task 6 owns the display buffer; keep key scanning alive for task 7.
         gmp_base_print("Receive Key Message, %d\r\n", key_id);
     }
 

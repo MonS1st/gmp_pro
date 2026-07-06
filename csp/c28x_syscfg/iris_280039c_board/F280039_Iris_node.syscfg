@@ -309,8 +309,8 @@ epwm1.epwmActionQualifier_EPWM_AQ_OUTPUT_A_shadowMode            = true;
 epwm1.epwmCounterCompare_cmpB                                    = 750;
 epwm1.epwmDeadband_polarityFED                                   = "EPWM_DB_POLARITY_ACTIVE_LOW";
 epwm1.epwmEventTrigger_interruptSource                           = "EPWM_INT_TBCTR_PERIOD";
-epwm1.epwmDeadband_delayRED                                      = 50;
-epwm1.epwmDeadband_delayFED                                      = 50;
+epwm1.epwmDeadband_delayRED                                      = 30;
+epwm1.epwmDeadband_delayFED                                      = 30;
 epwm1.epwmTimebase_period                                        = 1500;
 epwm1.epwmCounterCompare_cmpA                                    = 750;
 
