@@ -53,16 +53,23 @@ extern uint16_t current_valid_lead_comp;
 // periodic callback function things.
 GMP_STATIC_INLINE void ctl_dispatch(void)
 {
+    //0.41421356f
+    //0.264f
+    #define LEAD_GAIN_CORR_45DEG 0.264f//进行幅值修正
 
-    if(current_valid_lead_comp == 1){
-        //拿着adc的结果进行超前补偿
-        comp_out = ctl_step_lead(&lead_comp,input_wave_adc.control_port.value);//3
+    if(current_valid_lead_comp == 1)
+    {
+        //第一句是测试
+        //comp_out = input_wave_adc.control_port.value;
+        comp_out = LEAD_GAIN_CORR_45DEG *
+                   ctl_step_lead(&lead_comp, input_wave_adc.control_port.value);
     }
     else
     {
-        comp_out = ctl_step_lead(&lead_comp2,input_wave_adc.control_port.value);//7
+        //comp_out = input_wave_adc.control_port.value;
+        comp_out = LEAD_GAIN_CORR_45DEG *
+                   ctl_step_lead(&lead_comp2, input_wave_adc.control_port.value);
     }
-
 }
 
 #ifdef __cplusplus

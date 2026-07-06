@@ -44,7 +44,8 @@ GMP_STATIC_INLINE void ctl_output_callback(void)
 {
     static uint32_t tick = 0;
 
-    tick += 1;
+
+    tick += 2;
 
     ctrl_gt output_signal = (tick % 20000) / 20000.0f * 100;
 
