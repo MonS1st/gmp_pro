@@ -55,6 +55,20 @@
 #define PSU_VOUT_SENSOR_GAIN           (0.25f)
 #define PSU_IOUT_SENSOR_GAIN_V_PER_A   (20.0f)
 
+// DAC command conversion parameters
+#define PSU_DAC_VREF_MV                (3300UL)
+#define PSU_DAC_RESOLUTION_BITS        (12U)
+#define PSU_DAC_CODE_SCALE             (4096UL)
+#define PSU_DAC_MAX_CODE               (4095U)
+
+#define PSU_VOLTAGE_CMD_MAX_MV         (10000U)
+#define PSU_CURRENT_CMD_MAX_MA         (100U)
+#define PSU_VSET_DIVIDER               (4UL)
+#define PSU_ISET_GAIN_MV_PER_MA        (20UL)
+
+// Use the software resistive-load model instead of ADC measurements.
+#define PSU_SOFT_TEST_MODE             (1)
+
 //=================================================================================================
 // Hardware parameters
 

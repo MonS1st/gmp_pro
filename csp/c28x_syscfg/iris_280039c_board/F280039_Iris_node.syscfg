@@ -250,13 +250,13 @@ cputimer1.timerPeriod = 1000;
 dac1.$name            = "IRIS_DACA";
 dac1.enableOutput     = true;
 dac1.referenceVoltage = "DAC_REF_ADC_VREFHI";
-dac1.shadowValue      = 500;
+dac1.shadowValue      = 0;
 
 dac2.$name            = "IRIS_DACB";
 dac2.dacBase          = "DACB_BASE";
 dac2.enableOutput     = true;
 dac2.referenceVoltage = "DAC_REF_ADC_VREFHI";
-dac2.shadowValue      = 500;
+dac2.shadowValue      = 0;
 
 dac1.analog                                      = analog1;
 dac2.analog                                      = analog1;

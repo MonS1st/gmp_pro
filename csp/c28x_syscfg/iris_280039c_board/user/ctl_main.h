@@ -20,6 +20,8 @@
 
 #include <ctl/framework/cia402_state_machine.h>
 
+#include "power_app.h"
+
 #ifndef _FILE_CTL_MAIN_H_
 #define _FILE_CTL_MAIN_H_
 
@@ -62,6 +64,7 @@ void clear_all_controllers();
 // periodic callback function things.
 GMP_STATIC_INLINE void ctl_dispatch(void)
 {
+    power_app_fast_step();
 }
 
 #ifdef __cplusplus

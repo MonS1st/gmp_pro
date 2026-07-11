@@ -14,6 +14,8 @@
 
 #include <oled_driver.h>
 
+#include "power_app.h"
+
 ctrl_gt kp, ki, kd;
 
 ctrl_gt ram_range[512];
@@ -154,6 +156,14 @@ gmp_task_status_t tsk_blink(gmp_task_t* tsk)
 //
 gmp_scheduler_t sched;
 
+static gmp_task_status_t tsk_power_app(gmp_task_t* tsk)
+{
+    GMP_UNUSED_VAR(tsk);
+
+    power_app_slow_step();
+    return GMP_TASK_DONE;
+}
+
 // All tasks must be non blocking tasks
 gmp_task_t tasks[] = {
     // name,     task,      period(ms),  init_phase, is_enabled, pParam
@@ -161,9 +171,10 @@ gmp_task_t tasks[] = {
     {"flush_key", tsk_key_flush, 200, 10, 0, (void*)&ht16k33},
     {"oled_show", oled_show_task, 1000, 500, 1, NULL},
     {"flush_led", tsk_LED_flush, 500, 200, 0, (void*)&ht16k33},
-    {"fpga_test", fpga_test_task, 1000, 600, 1, NULL},
+    {"fpga_test", fpga_test_task, 1000, 600, 0, NULL},
     {"blink_led", tsk_blink, 1000, 100, 1, NULL},
     {"startup", tsk_startup, 250, 0, 1, NULL},
+    {"power_app", tsk_power_app, 1, 0, 1, NULL},
 };
 
 //=================================================================================================
