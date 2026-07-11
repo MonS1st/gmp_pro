@@ -13,10 +13,22 @@
 
 #include "user_main.h"
 #include <xplt.peripheral.h>
+#include <ctl/component/interface/gain_model.h>
 
 
 //=================================================================================================
 // definitions of peripheral
+
+// DC power supply voltage and current feedback
+adc_channel_t adc_vout;
+adc_channel_t adc_iout;
+
+volatile uint16_t g_adc_vout_raw = 0U;
+volatile uint16_t g_adc_iout_raw = 0U;
+
+volatile float g_vout_meas_v = 0.0f;
+volatile float g_iout_meas_a = 0.0f;
+volatile float g_iout_meas_ma = 0.0f;
 
 // inverter side voltage feedback
 tri_ptr_adc_channel_t uuvw;
@@ -87,6 +99,16 @@ void initI2C()
 // User should setup all the peripheral in this function.
 void setup_peripheral(void)
 {
+    parameter_gt vout_adc_gain = ctl_gain_calc_generic(PSU_ADC_VREF_V, PSU_VOUT_SENSOR_GAIN,
+                                                       PSU_VOUT_BASE_V);
+    parameter_gt iout_adc_gain = ctl_gain_calc_generic(PSU_ADC_VREF_V, PSU_IOUT_SENSOR_GAIN_V_PER_A,
+                                                       PSU_IOUT_BASE_A);
+
+    ctl_init_adc_channel(&adc_vout, float2ctrl(vout_adc_gain), float2ctrl(0.0f),
+                         PSU_ADC_RESOLUTION_BITS, PSU_ADC_IQN);
+    ctl_init_adc_channel(&adc_iout, float2ctrl(iout_adc_gain), float2ctrl(0.0f),
+                         PSU_ADC_RESOLUTION_BITS, PSU_ADC_IQN);
+
     // Setup Debug Uart
     debug_uart = IRIS_UART_USB_BASE;
 

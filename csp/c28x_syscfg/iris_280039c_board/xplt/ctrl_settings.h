@@ -43,6 +43,19 @@
 #define CTRL_ADC_VOLTAGE_REF (3.3f)
 
 //=================================================================================================
+// DC power supply ADC sampling parameters
+
+#define PSU_ADC_VREF_V                 (3.3f)
+#define PSU_ADC_RESOLUTION_BITS        (12U)
+#define PSU_ADC_IQN                    (24U)
+
+#define PSU_VOUT_BASE_V                (10.0f)
+#define PSU_IOUT_BASE_A                (0.100f)
+
+#define PSU_VOUT_SENSOR_GAIN           (0.25f)
+#define PSU_IOUT_SENSOR_GAIN_V_PER_A   (20.0f)
+
+//=================================================================================================
 // Hardware parameters
 
 #define BOOSTXL_3PHGANINV_IS_DEFAULT_PARAM

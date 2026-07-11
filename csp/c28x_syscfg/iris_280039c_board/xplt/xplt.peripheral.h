@@ -22,9 +22,22 @@ extern "C"
 
 // select ADC PTR interface
 #include <ctl/component/interface/adc_ptr_channel.h>
+#include <ctl/component/interface/adc_channel.h>
 
 //=================================================================================================
 // definitions of peripheral
+
+// DC power supply voltage and current feedback
+extern adc_channel_t adc_vout;
+extern adc_channel_t adc_iout;
+
+// Raw ADC results and physical measurements for CCS Expressions
+extern volatile uint16_t g_adc_vout_raw;
+extern volatile uint16_t g_adc_iout_raw;
+
+extern volatile float g_vout_meas_v;
+extern volatile float g_iout_meas_a;
+extern volatile float g_iout_meas_ma;
 
 // inverter side voltage feedback
 extern tri_ptr_adc_channel_t uuvw;

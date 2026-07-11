@@ -26,6 +26,15 @@ extern "C"
 // Input Callback
 GMP_STATIC_INLINE void ctl_input_callback(void)
 {
+    g_adc_vout_raw = ADC_readResult(PSU_VOUT_ADC_RESULT_BASE, PSU_VOUT_ADC);
+    g_adc_iout_raw = ADC_readResult(PSU_IOUT_ADC_RESULT_BASE, PSU_IOUT_ADC);
+
+    ctl_step_adc_channel(&adc_vout, g_adc_vout_raw);
+    ctl_step_adc_channel(&adc_iout, g_adc_iout_raw);
+
+    g_vout_meas_v = ctrl2float(adc_vout.control_port.value) * PSU_VOUT_BASE_V;
+    g_iout_meas_a = ctrl2float(adc_iout.control_port.value) * PSU_IOUT_BASE_A;
+    g_iout_meas_ma = g_iout_meas_a * 1000.0f;
 
 }
 
