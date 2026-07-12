@@ -33,6 +33,8 @@ typedef struct
     uint16_t current_meas_ma;
     uint16_t dac_voltage_code;
     uint16_t dac_current_code;
+    uint16_t cc_confirm_count;
+    uint16_t cv_confirm_count;
     power_state_t state;
     power_fault_t fault;
     bool output_requested;
@@ -43,6 +45,11 @@ typedef struct
 extern volatile power_app_t g_power_app;
 
 void power_app_init(void);
+// UI and communication code should use these APIs instead of writing g_power_app directly.
+void power_app_set_voltage_mv(uint16_t voltage_mv);
+void power_app_set_current_ma(uint16_t current_ma);
+uint16_t power_app_get_voltage_mv(void);
+uint16_t power_app_get_current_ma(void);
 void power_app_request_output(bool enable);
 void power_app_reset_fault(void);
 void power_app_fast_step(void);

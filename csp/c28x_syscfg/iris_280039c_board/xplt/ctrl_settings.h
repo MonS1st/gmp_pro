@@ -66,6 +66,15 @@
 #define PSU_VSET_DIVIDER               (4UL)
 #define PSU_ISET_GAIN_MV_PER_MA        (20UL)
 
+// CV/CC mode hysteresis and consecutive-sample confirmation thresholds.
+#define PSU_CC_ENTER_CURRENT_MARGIN_MA  (1U)
+#define PSU_CC_ENTER_VOLTAGE_DROP_MV    (50U)
+#define PSU_CV_RETURN_CURRENT_MARGIN_MA (3U)
+#define PSU_CV_RETURN_VOLTAGE_MARGIN_MV (20U)
+// Confirmation time is PSU_MODE_CONFIRM_COUNT / CONTROLLER_FREQUENCY:
+// 200 samples are approximately 10 ms at the current 20 kHz controller rate.
+#define PSU_MODE_CONFIRM_COUNT          (200U)
+
 // Use the software resistive-load model instead of ADC measurements.
 #define PSU_SOFT_TEST_MODE             (1)
 

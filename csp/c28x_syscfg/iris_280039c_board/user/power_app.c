@@ -38,6 +38,86 @@ static void power_app_limit_commands(void)
     }
 }
 
+static void power_app_clear_mode_confirmation(void)
+{
+    g_power_app.cc_confirm_count = 0U;
+    g_power_app.cv_confirm_count = 0U;
+}
+
+static void power_app_update_mode(void)
+{
+    uint16_t voltage_meas_mv;
+    uint16_t current_meas_ma;
+    uint16_t voltage_set_mv;
+    uint16_t current_set_ma;
+    bool cc_candidate;
+    bool cv_candidate;
+
+    if (!g_power_app.output_requested || !g_power_app.output_enabled ||
+        g_power_app.fault_latched ||
+        ((g_power_app.state != POWER_STATE_CV) && (g_power_app.state != POWER_STATE_CC)))
+    {
+        power_app_clear_mode_confirmation();
+        return;
+    }
+
+    // Snapshot volatile measurements and commands before evaluating a mode transition.
+    voltage_meas_mv = g_power_app.voltage_meas_mv;
+    current_meas_ma = g_power_app.current_meas_ma;
+    voltage_set_mv = g_power_app.voltage_set_mv;
+    current_set_ma = g_power_app.current_set_ma;
+
+    cc_candidate = (((uint32_t)current_meas_ma + PSU_CC_ENTER_CURRENT_MARGIN_MA) >=
+                    (uint32_t)current_set_ma) &&
+                   (((uint32_t)voltage_meas_mv + PSU_CC_ENTER_VOLTAGE_DROP_MV) <
+                    (uint32_t)voltage_set_mv);
+    cv_candidate = (((uint32_t)current_meas_ma + PSU_CV_RETURN_CURRENT_MARGIN_MA) <
+                    (uint32_t)current_set_ma) ||
+                   (((uint32_t)voltage_meas_mv + PSU_CV_RETURN_VOLTAGE_MARGIN_MV) >=
+                    (uint32_t)voltage_set_mv);
+
+    if (g_power_app.state == POWER_STATE_CV)
+    {
+        g_power_app.cv_confirm_count = 0U;
+        if (cc_candidate)
+        {
+            if (g_power_app.cc_confirm_count < PSU_MODE_CONFIRM_COUNT)
+            {
+                ++g_power_app.cc_confirm_count;
+            }
+            if (g_power_app.cc_confirm_count >= PSU_MODE_CONFIRM_COUNT)
+            {
+                g_power_app.state = POWER_STATE_CC;
+                power_app_clear_mode_confirmation();
+            }
+        }
+        else
+        {
+            g_power_app.cc_confirm_count = 0U;
+        }
+    }
+    else
+    {
+        g_power_app.cc_confirm_count = 0U;
+        if (cv_candidate)
+        {
+            if (g_power_app.cv_confirm_count < PSU_MODE_CONFIRM_COUNT)
+            {
+                ++g_power_app.cv_confirm_count;
+            }
+            if (g_power_app.cv_confirm_count >= PSU_MODE_CONFIRM_COUNT)
+            {
+                g_power_app.state = POWER_STATE_CV;
+                power_app_clear_mode_confirmation();
+            }
+        }
+        else
+        {
+            g_power_app.cv_confirm_count = 0U;
+        }
+    }
+}
+
 static void power_app_set_output_off(power_state_t state)
 {
     power_dac_set_zero();
@@ -46,6 +126,7 @@ static void power_app_set_output_off(power_state_t state)
     g_power_app.dac_current_code = 0U;
     g_power_app.output_enabled = false;
     g_power_app.state = state;
+    power_app_clear_mode_confirmation();
 #if PSU_SOFT_TEST_MODE
     g_power_app.voltage_meas_mv = 0U;
     g_power_app.current_meas_ma = 0U;
@@ -68,6 +149,8 @@ void power_app_init(void)
     g_power_app.current_meas_ma = 0U;
     g_power_app.dac_voltage_code = 0U;
     g_power_app.dac_current_code = 0U;
+    g_power_app.cc_confirm_count = 0U;
+    g_power_app.cv_confirm_count = 0U;
     g_power_app.state = POWER_STATE_OFF;
     g_power_app.fault = POWER_FAULT_NONE;
     g_power_app.output_requested = false;
@@ -76,6 +159,28 @@ void power_app_init(void)
 
     power_dac_set_zero();
     power_output_hw_set(false);
+}
+
+void power_app_set_voltage_mv(uint16_t voltage_mv)
+{
+    g_power_app.voltage_set_mv = (voltage_mv > PSU_VOLTAGE_CMD_MAX_MV) ?
+                                     PSU_VOLTAGE_CMD_MAX_MV : voltage_mv;
+}
+
+void power_app_set_current_ma(uint16_t current_ma)
+{
+    g_power_app.current_set_ma = (current_ma > PSU_CURRENT_CMD_MAX_MA) ?
+                                     PSU_CURRENT_CMD_MAX_MA : current_ma;
+}
+
+uint16_t power_app_get_voltage_mv(void)
+{
+    return g_power_app.voltage_set_mv;
+}
+
+uint16_t power_app_get_current_ma(void)
+{
+    return g_power_app.current_set_ma;
 }
 
 void power_app_request_output(bool enable)
@@ -89,7 +194,6 @@ void power_app_reset_fault(void)
     {
         g_power_app.fault = POWER_FAULT_NONE;
         g_power_app.fault_latched = false;
-        power_app_set_output_off(POWER_STATE_OFF);
     }
 }
 
@@ -122,12 +226,14 @@ void power_app_fast_step(void)
         break;
 
     case POWER_STATE_STARTING:
+        power_app_clear_mode_confirmation();
         power_app_apply_commands();
         power_output_hw_set(true);
         g_power_app.output_enabled = power_output_hw_get();
         if (g_power_app.output_enabled)
         {
             g_power_app.state = POWER_STATE_CV;
+            power_app_clear_mode_confirmation();
         }
         break;
 
@@ -136,6 +242,7 @@ void power_app_fast_step(void)
         power_app_apply_commands();
         power_output_hw_set(true);
         g_power_app.output_enabled = power_output_hw_get();
+        power_app_update_mode();
         break;
 
     case POWER_STATE_FAULT:
