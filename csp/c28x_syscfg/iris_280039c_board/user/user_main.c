@@ -2,6 +2,7 @@
 
 // GMP basic core header
 #include <gmp_core.h>
+#include <ctrl_settings.h>
 
 // user main header
 #include "ctl_main.h"
@@ -168,8 +169,8 @@ static gmp_task_status_t tsk_power_app(gmp_task_t* tsk)
 gmp_task_t tasks[] = {
     // name,     task,      period(ms),  init_phase, is_enabled, pParam
     {"dl_online", tsk_dl_debug_device, 2, 0, 1, NULL},
-    {"flush_key", tsk_key_flush, 200, 10, 0, (void*)&ht16k33},
-    {"oled_show", oled_show_task, 1000, 500, 1, NULL},
+    {"flush_key", tsk_key_flush, PSU_KEY_TASK_PERIOD_MS, 10, 0, (void*)&ht16k33},
+    {"oled_show", oled_show_task, 100, 500, 1, NULL},
     {"flush_led", tsk_LED_flush, 500, 200, 0, (void*)&ht16k33},
     {"fpga_test", fpga_test_task, 1000, 600, 0, NULL},
     {"blink_led", tsk_blink, 1000, 100, 1, NULL},
@@ -232,8 +233,8 @@ gmp_task_status_t tsk_startup(gmp_task_t* tsk)
 
         if (ec == GMP_EC_OK)
         {
+            // Task index 1 is the key task; keep the LED refresh task disabled.
             sched.task_list[1]->is_enabled = 1;
-            sched.task_list[3]->is_enabled = 1;
         }
 
         // init and test the oled.

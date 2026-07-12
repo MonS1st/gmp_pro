@@ -150,10 +150,6 @@ static void power_app_set_output_off(power_state_t state)
     g_power_app.output_enabled = false;
     g_power_app.state = state;
     power_app_clear_mode_confirmation();
-#if PSU_SOFT_TEST_MODE
-    g_power_app.voltage_meas_mv = 0U;
-    g_power_app.current_meas_ma = 0U;
-#endif
 }
 
 static void power_app_trip(power_fault_t fault,
@@ -231,7 +227,20 @@ uint16_t power_app_get_current_ma(void)
 
 void power_app_request_output(bool enable)
 {
-    g_power_app.output_requested = enable;
+    if (enable)
+    {
+        // Write first, then re-check the ISR-owned latch. Whichever side wins
+        // the race leaves the request disabled after a fault is latched.
+        g_power_app.output_requested = true;
+        if (g_power_app.fault_latched)
+        {
+            g_power_app.output_requested = false;
+        }
+    }
+    else
+    {
+        g_power_app.output_requested = false;
+    }
 }
 
 void power_app_reset_fault(void)

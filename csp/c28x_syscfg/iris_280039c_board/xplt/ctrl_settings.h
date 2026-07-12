@@ -85,6 +85,24 @@
 #define PSU_OVP_CONFIRM_COUNT           (5U)
 #define PSU_OCP_CONFIRM_COUNT           (5U)
 
+// Temporary HT16K33 key IDs. The driver reports 1..39 (0 means released),
+// but this board has no authoritative key-to-ID map in the repository.
+// Adjust these values here after observing the actual key_id over serial.
+#define PSU_KEY_VOLTAGE_UP_ID           (1U)
+#define PSU_KEY_VOLTAGE_DOWN_ID         (2U)
+#define PSU_KEY_CURRENT_UP_ID           (3U)
+#define PSU_KEY_CURRENT_DOWN_ID         (4U)
+#define PSU_KEY_OUTPUT_TOGGLE_ID        (5U)
+#define PSU_KEY_FAULT_RESET_ID          (6U)
+
+#define PSU_VOLTAGE_STEP_MV             (100U)
+#define PSU_CURRENT_STEP_MA             (1U)
+
+#define PSU_KEY_TASK_PERIOD_MS          (50U)
+// At 50 ms per scan: 10 samples are about 500 ms, then repeat every 100 ms.
+#define PSU_KEY_REPEAT_DELAY_COUNT      (10U)
+#define PSU_KEY_REPEAT_RATE_COUNT       (2U)
+
 // Use the software resistive-load model instead of ADC measurements.
 #define PSU_SOFT_TEST_MODE             (1)
 

@@ -1,10 +1,13 @@
 
 // GMP basic core header
 #include <gmp_core.h>
+#include <ctrl_settings.h>
 
 // user main header
 #include "ctl_main.h"
+#include "power_app.h"
 #include "user_main.h"
+#include <stdio.h>
 #include <stdlib.h>
 
 // peripheral
@@ -38,6 +41,143 @@ void beep_off()
 iic_halt iic_bus;
 ht16k33_dev_t ht16k33;
 hdc1080_dev_t hdc1080;
+
+// File-local variables remain visible to CCS for key scan debugging.
+static volatile uint16_t s_last_key_id = 0U;
+static volatile uint16_t s_key_hold_count = 0U;
+
+static bool power_ui_key_supports_repeat(uint16_t key_id)
+{
+    return (key_id == PSU_KEY_VOLTAGE_UP_ID) ||
+           (key_id == PSU_KEY_VOLTAGE_DOWN_ID) ||
+           (key_id == PSU_KEY_CURRENT_UP_ID) ||
+           (key_id == PSU_KEY_CURRENT_DOWN_ID);
+}
+
+static void power_ui_execute_key_action(uint16_t key_id)
+{
+    uint16_t current;
+    uint32_t next;
+
+    switch (key_id)
+    {
+    case PSU_KEY_VOLTAGE_UP_ID:
+        current = power_app_get_voltage_mv();
+        next = (uint32_t)current + PSU_VOLTAGE_STEP_MV;
+        if (next > PSU_VOLTAGE_CMD_MAX_MV)
+        {
+            next = PSU_VOLTAGE_CMD_MAX_MV;
+        }
+        power_app_set_voltage_mv((uint16_t)next);
+        break;
+
+    case PSU_KEY_VOLTAGE_DOWN_ID:
+        current = power_app_get_voltage_mv();
+        power_app_set_voltage_mv((current < PSU_VOLTAGE_STEP_MV) ?
+                                     0U : (uint16_t)(current - PSU_VOLTAGE_STEP_MV));
+        break;
+
+    case PSU_KEY_CURRENT_UP_ID:
+        current = power_app_get_current_ma();
+        next = (uint32_t)current + PSU_CURRENT_STEP_MA;
+        if (next > PSU_CURRENT_CMD_MAX_MA)
+        {
+            next = PSU_CURRENT_CMD_MAX_MA;
+        }
+        power_app_set_current_ma((uint16_t)next);
+        break;
+
+    case PSU_KEY_CURRENT_DOWN_ID:
+        current = power_app_get_current_ma();
+        power_app_set_current_ma((current < PSU_CURRENT_STEP_MA) ?
+                                     0U : (uint16_t)(current - PSU_CURRENT_STEP_MA));
+        break;
+
+    case PSU_KEY_OUTPUT_TOGGLE_ID:
+        if (!g_power_app.fault_latched)
+        {
+            power_app_request_output(!g_power_app.output_requested);
+        }
+        break;
+
+    case PSU_KEY_FAULT_RESET_ID:
+        power_app_reset_fault();
+        break;
+
+    default:
+        break;
+    }
+}
+
+static void power_ui_process_key_id(uint16_t key_id)
+{
+    if (key_id == 0U)
+    {
+        s_last_key_id = 0U;
+        s_key_hold_count = 0U;
+        return;
+    }
+
+    if (key_id != s_last_key_id)
+    {
+        s_last_key_id = key_id;
+        s_key_hold_count = 0U;
+        power_ui_execute_key_action(key_id);
+        return;
+    }
+
+    if (s_key_hold_count < UINT16_MAX)
+    {
+        ++s_key_hold_count;
+    }
+
+    if (power_ui_key_supports_repeat(key_id) &&
+        (s_key_hold_count >= PSU_KEY_REPEAT_DELAY_COUNT) &&
+        (((s_key_hold_count - PSU_KEY_REPEAT_DELAY_COUNT) %
+          PSU_KEY_REPEAT_RATE_COUNT) == 0U))
+    {
+        power_ui_execute_key_action(key_id);
+    }
+}
+
+static const char *power_ui_state_text(power_state_t state)
+{
+    switch (state)
+    {
+    case POWER_STATE_OFF:
+        return "OFF";
+    case POWER_STATE_STARTING:
+        return "START";
+    case POWER_STATE_CV:
+        return "CV";
+    case POWER_STATE_CC:
+        return "CC";
+    case POWER_STATE_FAULT:
+        return "FAULT";
+    default:
+        return "UNKNOWN";
+    }
+}
+
+static const char *power_ui_fault_text(power_fault_t fault)
+{
+    switch (fault)
+    {
+    case POWER_FAULT_NONE:
+        return "NONE";
+    case POWER_FAULT_OVERVOLTAGE:
+        return "OVP";
+    case POWER_FAULT_OVERCURRENT:
+        return "OCP";
+    default:
+        return "UNK";
+    }
+}
+
+static uint16_t power_ui_display_current(uint16_t current_ma)
+{
+    return (current_ma > 999U) ? 999U : current_ma;
+}
 
 //
 // Common cathode digital tube segment code table
@@ -105,26 +245,26 @@ gmp_task_status_t tsk_key_flush(gmp_task_t* tsk)
 {
     ht16k33_dev_t* dev = (ht16k33_dev_t*)tsk->user_data;
     fast_gt key_id = 0;
+    bool new_press;
 
     if(flag_init_cmpt)
     {
+        ec_gt ret = ht16k33_read_keys(dev, &key_id);
 
-    ec_gt ret = ht16k33_read_keys(dev, &key_id);
+        // If the key peripheral fails, stop only this background UI task.
+        if (ret != GMP_EC_OK)
+        {
+            tsk->is_enabled = 0;
+            return GMP_TASK_DONE;
+        }
 
-    // if meets error, close this task
-    if (ret != GMP_EC_OK)
-    {
-        tsk->is_enabled = 0;
-    }
+        new_press = (key_id != 0) && ((uint16_t)key_id != s_last_key_id);
+        power_ui_process_key_id((uint16_t)key_id);
 
-    if (key_id != 0)
-    {
-        // response key message
-        update_led_content_8byte(dev, led_lut[2], led_lut[0], led_lut[2], led_lut[6], led_lut[20], led_lut[key_id / 10],
-                                 led_lut[key_id % 10], led_lut[20]);
-
-        gmp_base_print("Receive Key Message, %d\r\n", key_id);
-    }
+        if (new_press)
+        {
+            gmp_base_print("Receive Key Message, %d\r\n", key_id);
+        }
     }
 
     return GMP_TASK_DONE;
@@ -132,14 +272,92 @@ gmp_task_status_t tsk_key_flush(gmp_task_t* tsk)
 
 gmp_task_status_t oled_show_task(gmp_task_t* tsk)
 {
-    static uint16_t index;
+    static bool s_page_initialized = false;
+    static bool s_last_fault_page = false;
+    char line1[32];
+    char line2[32];
+    char line3[32];
+    char line4[32];
+    uint16_t voltage_set_mv;
+    uint16_t current_set_ma;
+    uint16_t voltage_meas_mv;
+    uint16_t current_meas_ma;
+    uint16_t trip_voltage_mv;
+    uint16_t trip_current_ma;
+    power_state_t state;
+    power_fault_t fault;
+    bool output_requested;
+    bool output_enabled;
+    bool fault_latched;
+    bool fault_page;
 
-    char output_msg[32];
+    GMP_UNUSED_VAR(tsk);
 
     if (flag_init_cmpt == 1)
     {
-        sprintf(output_msg, "index: %d C", index++);
-        oled_show_str(0, 2, output_msg);
+        voltage_set_mv = g_power_app.voltage_set_mv;
+        current_set_ma = g_power_app.current_set_ma;
+        voltage_meas_mv = g_power_app.voltage_meas_mv;
+        current_meas_ma = g_power_app.current_meas_ma;
+        trip_voltage_mv = g_power_app.trip_voltage_mv;
+        trip_current_ma = g_power_app.trip_current_ma;
+        state = g_power_app.state;
+        fault = g_power_app.fault;
+        output_requested = g_power_app.output_requested;
+        output_enabled = g_power_app.output_enabled;
+        fault_latched = g_power_app.fault_latched;
+        fault_page = fault_latched || (state == POWER_STATE_FAULT);
+
+        if (!s_page_initialized)
+        {
+            s_page_initialized = true;
+            s_last_fault_page = fault_page;
+        }
+        else if (fault_page != s_last_fault_page)
+        {
+            oled_clear();
+            s_last_fault_page = fault_page;
+        }
+
+        (void)snprintf(line1, sizeof(line1), "SET %02u.%1uV %03umA ",
+                       (unsigned int)(voltage_set_mv / 1000U),
+                       (unsigned int)((voltage_set_mv % 1000U) / 100U),
+                       (unsigned int)power_ui_display_current(current_set_ma));
+        (void)snprintf(line2, sizeof(line2), "OUT%02u.%03uV %03umA",
+                       (unsigned int)(voltage_meas_mv / 1000U),
+                       (unsigned int)(voltage_meas_mv % 1000U),
+                       (unsigned int)power_ui_display_current(current_meas_ma));
+        (void)snprintf(line3, sizeof(line3), "%-7s OUT:%-3s ",
+                       power_ui_state_text(state), output_enabled ? "ON" : "OFF");
+
+        if (!fault_page)
+        {
+            (void)snprintf(line4, sizeof(line4), "READY REQ:%-3s   ",
+                           output_requested ? "ON" : "OFF");
+        }
+        else if (fault == POWER_FAULT_OVERVOLTAGE)
+        {
+            (void)snprintf(line4, sizeof(line4), "FLT %s %02u.%03uV ",
+                           power_ui_fault_text(fault),
+                           (unsigned int)(trip_voltage_mv / 1000U),
+                           (unsigned int)(trip_voltage_mv % 1000U));
+        }
+        else if (fault == POWER_FAULT_OVERCURRENT)
+        {
+            (void)snprintf(line4, sizeof(line4), "FLT %s %03umA   ",
+                           power_ui_fault_text(fault),
+                           (unsigned int)power_ui_display_current(trip_current_ma));
+        }
+        else
+        {
+            (void)snprintf(line4, sizeof(line4), "FAULT %-9s ",
+                           power_ui_fault_text(fault));
+        }
+
+        oled_show_str(0U, 0U, line1);
+        oled_show_str(0U, 2U, line2);
+        oled_show_str(0U, 4U, line3);
+        oled_show_str(0U, 6U, line4);
     }
 
     return GMP_TASK_DONE;
