@@ -44,7 +44,7 @@ hdc1080_dev_t hdc1080;
 
 // File-local variables remain visible to CCS for key scan debugging.
 static volatile uint16_t s_last_key_id = 0U;
-static volatile uint16_t s_key_hold_count = 0U;
+static volatile uint16_t s_key_release_count = 0U;
 
 static bool power_ui_key_supports_repeat(uint16_t key_id)
 {
@@ -109,35 +109,46 @@ static void power_ui_execute_key_action(uint16_t key_id)
     }
 }
 
-static void power_ui_process_key_id(uint16_t key_id)
+static bool power_ui_process_key_id(uint16_t key_id)
 {
-    if (key_id == 0U)
+    if (key_id != 0U)
+    {
+        s_key_release_count = 0U;
+
+        if (key_id != s_last_key_id)
+        {
+            s_last_key_id = key_id;
+            power_ui_execute_key_action(key_id);
+            return true;
+        }
+
+        if (power_ui_key_supports_repeat(key_id))
+        {
+            power_ui_execute_key_action(key_id);
+            return true;
+        }
+
+        return false;
+    }
+
+    if (s_last_key_id == 0U)
+    {
+        s_key_release_count = 0U;
+        return false;
+    }
+
+    if (s_key_release_count < PSU_KEY_RELEASE_FILTER_COUNT)
+    {
+        ++s_key_release_count;
+    }
+
+    if (s_key_release_count >= PSU_KEY_RELEASE_FILTER_COUNT)
     {
         s_last_key_id = 0U;
-        s_key_hold_count = 0U;
-        return;
+        s_key_release_count = 0U;
     }
 
-    if (key_id != s_last_key_id)
-    {
-        s_last_key_id = key_id;
-        s_key_hold_count = 0U;
-        power_ui_execute_key_action(key_id);
-        return;
-    }
-
-    if (s_key_hold_count < UINT16_MAX)
-    {
-        ++s_key_hold_count;
-    }
-
-    if (power_ui_key_supports_repeat(key_id) &&
-        (s_key_hold_count >= PSU_KEY_REPEAT_DELAY_COUNT) &&
-        (((s_key_hold_count - PSU_KEY_REPEAT_DELAY_COUNT) %
-          PSU_KEY_REPEAT_RATE_COUNT) == 0U))
-    {
-        power_ui_execute_key_action(key_id);
-    }
+    return false;
 }
 
 static const char *power_ui_state_text(power_state_t state)
@@ -245,7 +256,7 @@ gmp_task_status_t tsk_key_flush(gmp_task_t* tsk)
 {
     ht16k33_dev_t* dev = (ht16k33_dev_t*)tsk->user_data;
     fast_gt key_id = 0;
-    bool new_press;
+    bool action_executed;
 
     if(flag_init_cmpt)
     {
@@ -258,12 +269,11 @@ gmp_task_status_t tsk_key_flush(gmp_task_t* tsk)
             return GMP_TASK_DONE;
         }
 
-        new_press = (key_id != 0) && ((uint16_t)key_id != s_last_key_id);
-        power_ui_process_key_id((uint16_t)key_id);
+        action_executed = power_ui_process_key_id((uint16_t)key_id);
 
-        if (new_press)
+        if (action_executed)
         {
-            gmp_base_print("Receive Key Message, %d\r\n", key_id);
+            gmp_base_print("Power key action, id=%d\r\n", key_id);
         }
     }
 
@@ -310,6 +320,7 @@ gmp_task_status_t oled_show_task(gmp_task_t* tsk)
 
         if (!s_page_initialized)
         {
+            oled_clear();
             s_page_initialized = true;
             s_last_fault_page = fault_page;
         }

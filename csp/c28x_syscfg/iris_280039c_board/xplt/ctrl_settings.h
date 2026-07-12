@@ -99,9 +99,11 @@
 #define PSU_CURRENT_STEP_MA             (1U)
 
 #define PSU_KEY_TASK_PERIOD_MS          (50U)
-// At 50 ms per scan: 10 samples are about 500 ms, then repeat every 100 ms.
-#define PSU_KEY_REPEAT_DELAY_COUNT      (10U)
-#define PSU_KEY_REPEAT_RATE_COUNT       (2U)
+// The HT16K33 driver suppresses same-key events for about 120 ms. At a 50 ms
+// task period, a held key therefore usually reappears about every 150 ms with
+// zero events between reports. Four consecutive zero scans (about 200 ms) are
+// required to confirm release; +/- repetition follows the driver's event rate.
+#define PSU_KEY_RELEASE_FILTER_COUNT    (4U)
 
 // Use the software resistive-load model instead of ADC measurements.
 #define PSU_SOFT_TEST_MODE             (1)
