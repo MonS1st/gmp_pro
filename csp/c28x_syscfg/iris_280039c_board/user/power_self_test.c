@@ -26,6 +26,31 @@ static uint16_t power_self_test_to_u16(float value)
     return (uint16_t)(value + 0.5f);
 }
 
+void power_self_test_set_load_ohm(uint16_t load_ohm)
+{
+    g_virtual_load_ohm = (float)load_ohm;
+}
+
+uint16_t power_self_test_get_load_ohm(void)
+{
+    return power_self_test_to_u16(g_virtual_load_ohm);
+}
+
+void power_self_test_set_measurement_override(uint16_t voltage_mv,
+                                              uint16_t current_ma)
+{
+    // Publish both 16-bit values before enabling the override.
+    g_virtual_measurement_override_enable = false;
+    g_virtual_override_voltage_mv = voltage_mv;
+    g_virtual_override_current_ma = current_ma;
+    g_virtual_measurement_override_enable = true;
+}
+
+void power_self_test_clear_measurement_override(void)
+{
+    g_virtual_measurement_override_enable = false;
+}
+
 void power_self_test_step(void)
 {
     uint16_t next_voltage_mv;

@@ -105,6 +105,14 @@
 // required to confirm release; +/- repetition follows the driver's event rate.
 #define PSU_KEY_RELEASE_FILTER_COUNT    (4U)
 
+// User-interface feature switches. Set a switch to 1 to restore the
+// corresponding physical peripheral or software debug interface.
+#define PSU_ENABLE_HT16K33_KEY          (0)
+#define PSU_ENABLE_HT16K33_DISPLAY      (0)
+#define PSU_ENABLE_OLED_DISPLAY         (0)
+#define PSU_ENABLE_CONSOLE_UI           (1)
+#define PSU_ENABLE_MANUAL_COMMAND       (1)
+
 // Use the software resistive-load model instead of ADC measurements.
 #define PSU_SOFT_TEST_MODE             (1)
 

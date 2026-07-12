@@ -16,6 +16,7 @@
 #include <oled_driver.h>
 
 #include "power_app.h"
+#include "power_debug.h"
 
 ctrl_gt kp, ki, kd;
 
@@ -135,8 +136,6 @@ gmp_task_status_t tsk_blink(gmp_task_t* tsk)
 {
     GMP_UNUSED_VAR(tsk);
 
-    gmp_base_print(TEXT_STRING("Hello World!\r\n"));
-
     static fast_gt led_stat = 0;
     if (led_stat == 0)
     {
@@ -165,17 +164,61 @@ static gmp_task_status_t tsk_power_app(gmp_task_t* tsk)
     return GMP_TASK_DONE;
 }
 
-// All tasks must be non blocking tasks
-gmp_task_t tasks[] = {
-    // name,     task,      period(ms),  init_phase, is_enabled, pParam
-    {"dl_online", tsk_dl_debug_device, 2, 0, 1, NULL},
-    {"flush_key", tsk_key_flush, PSU_KEY_TASK_PERIOD_MS, 10, 0, (void*)&ht16k33},
-    {"oled_show", oled_show_task, 100, 500, 1, NULL},
-    {"flush_led", tsk_LED_flush, 500, 200, 0, (void*)&ht16k33},
-    {"fpga_test", fpga_test_task, 1000, 600, 0, NULL},
-    {"blink_led", tsk_blink, 1000, 100, 1, NULL},
-    {"startup", tsk_startup, 250, 0, 1, NULL},
-    {"power_app", tsk_power_app, 1, 0, 1, NULL},
+static gmp_task_status_t tsk_power_debug_command(gmp_task_t* tsk)
+{
+    GMP_UNUSED_VAR(tsk);
+
+    power_debug_process_command();
+    return GMP_TASK_DONE;
+}
+
+static gmp_task_status_t tsk_power_console_status(gmp_task_t* tsk)
+{
+    GMP_UNUSED_VAR(tsk);
+
+    power_debug_print_status();
+    return GMP_TASK_DONE;
+}
+
+// Keep named task objects so startup/error handling never depends on a
+// scheduler-list index. All tasks must be non-blocking.
+static gmp_task_t task_dl_online =
+    {"dl_online", tsk_dl_debug_device, 2, 0, 1, NULL};
+static gmp_task_t task_flush_key =
+    {"flush_key", tsk_key_flush, PSU_KEY_TASK_PERIOD_MS, 10,
+     PSU_ENABLE_HT16K33_KEY, (void*)&ht16k33};
+static gmp_task_t task_oled_show =
+    {"oled_show", oled_show_task, 100, 500,
+     PSU_ENABLE_OLED_DISPLAY, NULL};
+static gmp_task_t task_flush_led =
+    {"flush_led", tsk_LED_flush, 500, 200,
+     PSU_ENABLE_HT16K33_DISPLAY, (void*)&ht16k33};
+static gmp_task_t task_fpga_test =
+    {"fpga_test", fpga_test_task, 1000, 600, 0, NULL};
+static gmp_task_t task_blink_led =
+    {"blink_led", tsk_blink, 1000, 100, 1, NULL};
+static gmp_task_t task_startup =
+    {"startup", tsk_startup, 250, 0, 1, NULL};
+static gmp_task_t task_power_app =
+    {"power_app", tsk_power_app, 1, 0, 1, NULL};
+static gmp_task_t task_power_command =
+    {"power_cmd", tsk_power_debug_command, 10, 0,
+     PSU_ENABLE_MANUAL_COMMAND, NULL};
+static gmp_task_t task_power_console =
+    {"power_console", tsk_power_console_status, 500, 500,
+     PSU_ENABLE_CONSOLE_UI, NULL};
+
+static gmp_task_t *const tasks[] = {
+    &task_dl_online,
+    &task_flush_key,
+    &task_oled_show,
+    &task_flush_led,
+    &task_fpga_test,
+    &task_blink_led,
+    &task_startup,
+    &task_power_app,
+    &task_power_command,
+    &task_power_console,
 };
 
 //=================================================================================================
@@ -189,8 +232,8 @@ void init(void) GMP_NO_OPT_SUFFIX
     // init scheduler
     gmp_scheduler_init(&sched);
 
-    for (i = 0; i < sizeof(tasks) / sizeof(gmp_task_t); ++i)
-        gmp_scheduler_add_task(&sched, &tasks[i]);
+    for (i = 0; i < sizeof(tasks) / sizeof(tasks[0]); ++i)
+        gmp_scheduler_add_task(&sched, tasks[i]);
 
     // init datalink protocol
     gmp_dev_dl_init(&dl);
@@ -224,21 +267,31 @@ gmp_task_status_t tsk_startup(gmp_task_t* tsk)
     // if program is complete, init all the peripherals, and close this routine.
     if (beep_counter >= 4)
     {
+#if PSU_ENABLE_HT16K33_KEY || PSU_ENABLE_HT16K33_DISPLAY
         ht16k33_init_t ht16k33_init_struct = {.brightness = 15, .blink_rate = 0, .int_enable = 0, .int_act_high = 0};
 
         ec_gt ec = ht16k33_init(&ht16k33, iic_bus, HT16K33_DEFAULT_DEV_ADDR, &ht16k33_init_struct);
 
+#if PSU_ENABLE_HT16K33_DISPLAY
         update_led_content_8byte(&ht16k33, led_lut[2], led_lut[0], led_lut[2], led_lut[6], led_lut[20], led_lut[7],
                                          led_lut[7], led_lut[20]);
+#endif
 
-        if (ec == GMP_EC_OK)
+        if (ec != GMP_EC_OK)
         {
-            // Task index 1 is the key task; keep the LED refresh task disabled.
-            sched.task_list[1]->is_enabled = 1;
+#if PSU_ENABLE_HT16K33_KEY
+            task_flush_key.is_enabled = 0;
+#endif
+#if PSU_ENABLE_HT16K33_DISPLAY
+            task_flush_led.is_enabled = 0;
+#endif
         }
+#endif
 
         // init and test the oled.
+#if PSU_ENABLE_OLED_DISPLAY
         oled_init();
+#endif
 
         //        hdc1080_config_reg_t hdc1080_cfg = {.all = 0};
         //        hdc1080_cfg.bits.mode = 1; // continuous acquisition data
