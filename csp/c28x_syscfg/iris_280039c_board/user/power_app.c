@@ -10,6 +10,8 @@
 #endif
 
 volatile power_app_t g_power_app;
+static uint16_t s_last_voltage_set_mv;
+static uint16_t s_last_current_set_ma;
 
 #if !PSU_SOFT_TEST_MODE
 static uint16_t power_float_to_u16(float value)
@@ -42,6 +44,26 @@ static void power_app_clear_mode_confirmation(void)
 {
     g_power_app.cc_confirm_count = 0U;
     g_power_app.cv_confirm_count = 0U;
+}
+
+static bool power_app_check_command_change(void)
+{
+    uint16_t voltage_set_mv;
+    uint16_t current_set_ma;
+
+    voltage_set_mv = g_power_app.voltage_set_mv;
+    current_set_ma = g_power_app.current_set_ma;
+
+    if ((voltage_set_mv != s_last_voltage_set_mv) ||
+        (current_set_ma != s_last_current_set_ma))
+    {
+        s_last_voltage_set_mv = voltage_set_mv;
+        s_last_current_set_ma = current_set_ma;
+        power_app_clear_mode_confirmation();
+        return true;
+    }
+
+    return false;
 }
 
 static void power_app_update_mode(void)
@@ -156,6 +178,8 @@ void power_app_init(void)
     g_power_app.output_requested = false;
     g_power_app.output_enabled = false;
     g_power_app.fault_latched = false;
+    s_last_voltage_set_mv = g_power_app.voltage_set_mv;
+    s_last_current_set_ma = g_power_app.current_set_ma;
 
     power_dac_set_zero();
     power_output_hw_set(false);
@@ -199,9 +223,23 @@ void power_app_reset_fault(void)
 
 void power_app_fast_step(void)
 {
-    power_app_limit_commands();
+    bool command_changed;
+    bool update_mode = false;
+#if PSU_SOFT_TEST_MODE
+    uint16_t virtual_voltage_mv;
+    uint16_t virtual_current_ma;
+#endif
 
-#if !PSU_SOFT_TEST_MODE
+    power_app_limit_commands();
+    command_changed = power_app_check_command_change();
+
+#if PSU_SOFT_TEST_MODE
+    if (power_self_test_get_measurement(&virtual_voltage_mv, &virtual_current_ma))
+    {
+        g_power_app.voltage_meas_mv = virtual_voltage_mv;
+        g_power_app.current_meas_ma = virtual_current_ma;
+    }
+#else
     g_power_app.voltage_meas_mv = power_float_to_u16(g_vout_meas_v * 1000.0f);
     g_power_app.current_meas_ma = power_float_to_u16(g_iout_meas_ma);
 #endif
@@ -242,13 +280,25 @@ void power_app_fast_step(void)
         power_app_apply_commands();
         power_output_hw_set(true);
         g_power_app.output_enabled = power_output_hw_get();
-        power_app_update_mode();
+        if (g_power_app.output_enabled)
+        {
+            update_mode = true;
+        }
+        else
+        {
+            power_app_set_output_off(POWER_STATE_STARTING);
+        }
         break;
 
     case POWER_STATE_FAULT:
     default:
         power_app_set_output_off(POWER_STATE_FAULT);
         break;
+    }
+
+    if (update_mode && !command_changed)
+    {
+        power_app_update_mode();
     }
 }
 
