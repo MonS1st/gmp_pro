@@ -9,6 +9,9 @@ volatile float g_virtual_load_ohm = 200.0f;
 volatile uint16_t g_virtual_voltage_mv = 0U;
 volatile uint16_t g_virtual_current_ma = 0U;
 volatile uint16_t g_virtual_measurement_seq = 0U;
+volatile bool g_virtual_measurement_override_enable = false;
+volatile uint16_t g_virtual_override_voltage_mv = 0U;
+volatile uint16_t g_virtual_override_current_ma = 0U;
 
 static uint16_t power_self_test_to_u16(float value)
 {
@@ -63,6 +66,14 @@ void power_self_test_step(void)
             next_current_ma = current_set_ma;
             next_voltage_mv = power_self_test_to_u16((float)current_set_ma * load_ohm);
         }
+    }
+
+    // The override remains active with the output disabled so unsafe FAULT
+    // release conditions can be exercised without hardware.
+    if (g_virtual_measurement_override_enable)
+    {
+        next_voltage_mv = g_virtual_override_voltage_mv;
+        next_current_ma = g_virtual_override_current_ma;
     }
 
     // Odd means an update is in progress; the following even value publishes the pair.

@@ -75,6 +75,16 @@
 // 200 samples are approximately 10 ms at the current 20 kHz controller rate.
 #define PSU_MODE_CONFIRM_COUNT          (200U)
 
+// Fast OVP/OCP confirmation: 20 kHz is approximately 50 us per sample, so
+// five consecutive samples are approximately 250 us, well below the 10 ms
+// CV/CC mode-confirmation interval.
+#define PSU_OVP_TRIP_MV                 (10300U)
+#define PSU_OCP_TRIP_MA                 (103U)
+#define PSU_OVP_RELEASE_MV              (10000U)
+#define PSU_OCP_RELEASE_MA              (100U)
+#define PSU_OVP_CONFIRM_COUNT           (5U)
+#define PSU_OCP_CONFIRM_COUNT           (5U)
+
 // Use the software resistive-load model instead of ADC measurements.
 #define PSU_SOFT_TEST_MODE             (1)
 

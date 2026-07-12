@@ -1,6 +1,7 @@
 #include "power_app.h"
 
 #include "power_hal.h"
+#include "power_protection.h"
 #include "power_self_test.h"
 
 #include <ctrl_settings.h>
@@ -142,8 +143,8 @@ static void power_app_update_mode(void)
 
 static void power_app_set_output_off(power_state_t state)
 {
-    power_dac_set_zero();
     power_output_hw_set(false);
+    power_dac_set_zero();
     g_power_app.dac_voltage_code = 0U;
     g_power_app.dac_current_code = 0U;
     g_power_app.output_enabled = false;
@@ -153,6 +154,23 @@ static void power_app_set_output_off(power_state_t state)
     g_power_app.voltage_meas_mv = 0U;
     g_power_app.current_meas_ma = 0U;
 #endif
+}
+
+static void power_app_trip(power_fault_t fault,
+                           uint16_t voltage_mv,
+                           uint16_t current_ma)
+{
+    if (!g_power_app.fault_latched)
+    {
+        g_power_app.fault = fault;
+        g_power_app.fault_latched = true;
+        g_power_app.trip_voltage_mv = voltage_mv;
+        g_power_app.trip_current_ma = current_ma;
+    }
+
+    g_power_app.output_requested = false;
+    g_power_app.fault_reset_requested = false;
+    power_app_set_output_off(POWER_STATE_FAULT);
 }
 
 static void power_app_apply_commands(void)
@@ -169,6 +187,8 @@ void power_app_init(void)
     g_power_app.current_set_ma = 0U;
     g_power_app.voltage_meas_mv = 0U;
     g_power_app.current_meas_ma = 0U;
+    g_power_app.trip_voltage_mv = 0U;
+    g_power_app.trip_current_ma = 0U;
     g_power_app.dac_voltage_code = 0U;
     g_power_app.dac_current_code = 0U;
     g_power_app.cc_confirm_count = 0U;
@@ -178,11 +198,13 @@ void power_app_init(void)
     g_power_app.output_requested = false;
     g_power_app.output_enabled = false;
     g_power_app.fault_latched = false;
+    g_power_app.fault_reset_requested = false;
     s_last_voltage_set_mv = g_power_app.voltage_set_mv;
     s_last_current_set_ma = g_power_app.current_set_ma;
 
-    power_dac_set_zero();
     power_output_hw_set(false);
+    power_dac_set_zero();
+    power_protection_init();
 }
 
 void power_app_set_voltage_mv(uint16_t voltage_mv)
@@ -214,17 +236,17 @@ void power_app_request_output(bool enable)
 
 void power_app_reset_fault(void)
 {
-    if (!g_power_app.output_requested)
-    {
-        g_power_app.fault = POWER_FAULT_NONE;
-        g_power_app.fault_latched = false;
-    }
+    g_power_app.fault_reset_requested = true;
 }
 
 void power_app_fast_step(void)
 {
     bool command_changed;
+    bool protection_enabled;
     bool update_mode = false;
+    uint16_t voltage_meas_mv;
+    uint16_t current_meas_ma;
+    power_protection_result_t protection_result;
 #if PSU_SOFT_TEST_MODE
     uint16_t virtual_voltage_mv;
     uint16_t virtual_current_ma;
@@ -244,16 +266,57 @@ void power_app_fast_step(void)
     g_power_app.current_meas_ma = power_float_to_u16(g_iout_meas_ma);
 #endif
 
-    if (g_power_app.fault_latched || (g_power_app.fault != POWER_FAULT_NONE))
+    voltage_meas_mv = g_power_app.voltage_meas_mv;
+    current_meas_ma = g_power_app.current_meas_ma;
+
+    if (g_power_app.fault_latched)
     {
-        g_power_app.fault_latched = true;
         power_app_set_output_off(POWER_STATE_FAULT);
+
+        if (!g_power_app.fault_reset_requested)
+        {
+            return;
+        }
+
+        g_power_app.fault_reset_requested = false;
+        if (!g_power_app.output_requested &&
+            power_protection_release_safe(voltage_meas_mv, current_meas_ma))
+        {
+            g_power_app.fault = POWER_FAULT_NONE;
+            g_power_app.fault_latched = false;
+            g_power_app.trip_voltage_mv = 0U;
+            g_power_app.trip_current_ma = 0U;
+            power_protection_reset();
+            power_app_set_output_off(POWER_STATE_OFF);
+        }
         return;
     }
 
+    // A reset request made without a latched fault must not arm a future reset.
+    g_power_app.fault_reset_requested = false;
+
     if (!g_power_app.output_requested)
     {
+        power_protection_reset();
         power_app_set_output_off(POWER_STATE_OFF);
+        return;
+    }
+
+    protection_enabled = (g_power_app.state == POWER_STATE_STARTING) ||
+                         (g_power_app.state == POWER_STATE_CV) ||
+                         (g_power_app.state == POWER_STATE_CC);
+    protection_result = power_protection_step(voltage_meas_mv,
+                                              current_meas_ma,
+                                              protection_enabled);
+
+    if (protection_result == POWER_PROTECTION_RESULT_OVERVOLTAGE)
+    {
+        power_app_trip(POWER_FAULT_OVERVOLTAGE, voltage_meas_mv, current_meas_ma);
+        return;
+    }
+    if (protection_result == POWER_PROTECTION_RESULT_OVERCURRENT)
+    {
+        power_app_trip(POWER_FAULT_OVERCURRENT, voltage_meas_mv, current_meas_ma);
         return;
     }
 

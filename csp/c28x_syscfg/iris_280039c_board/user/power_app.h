@@ -31,6 +31,8 @@ typedef struct
     uint16_t current_set_ma;
     uint16_t voltage_meas_mv;
     uint16_t current_meas_ma;
+    uint16_t trip_voltage_mv;
+    uint16_t trip_current_ma;
     uint16_t dac_voltage_code;
     uint16_t dac_current_code;
     uint16_t cc_confirm_count;
@@ -40,6 +42,7 @@ typedef struct
     bool output_requested;
     bool output_enabled;
     bool fault_latched;
+    bool fault_reset_requested;
 } power_app_t;
 
 extern volatile power_app_t g_power_app;
