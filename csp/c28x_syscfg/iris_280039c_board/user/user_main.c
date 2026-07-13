@@ -434,11 +434,31 @@ gmp_task_status_t tsk_startup(gmp_task_t* tsk)
     }
 #endif
 
-    // init and test the oled.
+    // Initialize commands first, then probe one short checked text write. This
+    // distinguishes command/address NACK from position or page-data NACK.
 #if PSU_ENABLE_OLED_DISPLAY
-    oled_init();
-    // oled_init() performs many back-to-back writes on the same I2C bus used
-    // by HT16K33. Apply the same recovery window as a dynamic line commit.
+    // An init-command failure leaves fail_stage at NONE because no page
+    // position/data transaction has started; probe_result keeps its raw code.
+    g_oled_probe_result = oled_init_checked();
+    if (g_oled_probe_result == GMP_EC_OK)
+    {
+        g_oled_probe_result = oled_show_line_checked(0U, 0U, "TEST");
+    }
+
+    g_oled_last_result = g_oled_probe_result;
+    if (g_oled_probe_result == GMP_EC_OK)
+    {
+        ++g_oled_probe_ok_count;
+    }
+    else
+    {
+        ++g_oled_probe_error_count;
+        g_oled_dynamic_update_enabled = 0U;
+        g_oled_pending_mask = 0U;
+    }
+
+    // Startup OLED traffic shares I2C with HT16K33. Preserve the existing
+    // two-period key guard regardless of which checked probe step failed.
     g_key_i2c_holdoff_count = 2U;
 #endif
 

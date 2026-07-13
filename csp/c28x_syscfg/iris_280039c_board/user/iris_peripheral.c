@@ -498,6 +498,7 @@ gmp_task_status_t tsk_key_flush(gmp_task_t* tsk)
         // Ten good key reads may recover a key-timeout suspension, but an
         // OLED write failure keeps dynamic updates latched off for diagnosis.
         if ((g_oled_dynamic_update_enabled == 0U) &&
+            (g_oled_probe_error_count == 0U) &&
             (g_oled_update_error_count == 0U) &&
             (g_key_consecutive_ok_count >= 10U))
         {
@@ -550,8 +551,30 @@ gmp_task_status_t oled_show_task(gmp_task_t* tsk)
 
         if (!s_page_initialized)
         {
-            oled_clear();
-            oled_show_str(0U, 0U, "BOARD TEST");
+            if ((g_oled_probe_result != GMP_EC_OK) ||
+                (g_oled_dynamic_update_enabled == 0U))
+            {
+                g_oled_pending_mask = 0U;
+                return GMP_TASK_DONE;
+            }
+
+            // Long checked clear pages run only after the short TEST probe.
+            // A failure leaves page/length diagnostics from the first NACK.
+            ret = oled_clear_checked();
+            if (ret == GMP_EC_OK)
+            {
+                ret = oled_show_line_checked(0U, 0U, "BOARD TEST");
+            }
+
+            g_oled_last_result = ret;
+            if (ret != GMP_EC_OK)
+            {
+                ++g_oled_update_error_count;
+                g_oled_dynamic_update_enabled = 0U;
+                g_oled_pending_mask = 0U;
+                return GMP_TASK_DONE;
+            }
+
             s_page_initialized = true;
             g_oled_pending_mask = OLED_PENDING_VOLTAGE |
                                   OLED_PENDING_CURRENT |

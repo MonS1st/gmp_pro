@@ -9,6 +9,23 @@
 /* Global IIC bus handle declared in your repository */
 extern iic_halt iic_bus;
 
+#define OLED_FAIL_STAGE_NONE       0U
+#define OLED_FAIL_STAGE_POSITION   1U
+#define OLED_FAIL_STAGE_DATA       2U
+#define OLED_FAIL_STAGE_PARAMETER  3U
+
+extern volatile ec_gt g_oled_position_result;
+extern volatile ec_gt g_oled_data_result;
+extern volatile uint16_t g_oled_fail_stage;
+extern volatile uint16_t g_oled_fail_x;
+extern volatile uint16_t g_oled_fail_page;
+// Pixel-data bytes attempted; excludes the leading 0x40 control byte.
+extern volatile uint16_t g_oled_fail_length;
+extern volatile uint16_t g_oled_last_slave_address;
+extern volatile ec_gt g_oled_probe_result;
+extern volatile uint32_t g_oled_probe_ok_count;
+extern volatile uint32_t g_oled_probe_error_count;
+
 /**
  * @brief  Set the OLED page/column position and return the raw I2C result.
  */
@@ -26,6 +43,17 @@ ec_gt oled_write_page_checked(uint8_t x, uint8_t y_page,
  * @note   Uses two I2C transactions for 8-pixel text and four for 16-pixel text.
  */
 ec_gt oled_show_line_checked(uint8_t x, uint8_t y_page, const char *str);
+
+/**
+ * @brief  Clear all OLED pages and return the first failed page transaction.
+ */
+ec_gt oled_clear_checked(void);
+
+/**
+ * @brief  Send the OLED controller initialization command sequence with error checks.
+ * @note   This function does not clear RAM or render demo text.
+ */
+ec_gt oled_init_checked(void);
 
 /**
  * @brief  Optimized, low-overhead positional command function.
@@ -92,8 +120,8 @@ void oled_show_bmp(unsigned char x0, unsigned char y0, unsigned char x1, unsigne
  */
 void oled_init(void);
 
-#define OLED_CMD  0 //Ð´ÃüÁî
-#define OLED_DATA 1 //Ð´Êý¾Ý
+#define OLED_CMD  0 // Command byte
+#define OLED_DATA 1 // Display data byte
 #define OLED_MODE 0
 
 #define FONT_SIZE 8
