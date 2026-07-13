@@ -148,6 +148,8 @@ volatile uint16_t g_key_candidate_count = 0U;
 volatile uint16_t g_key_scan_ready = 0U;
 volatile uint32_t g_key_confirmed_count = 0U;
 volatile uint32_t g_key_action_count = 0U;
+volatile uint16_t g_last_confirmed_key_id = 0U;
+volatile uint32_t g_unmapped_confirmed_count = 0U;
 volatile uint16_t g_key_ignore_scan_count = 0U;
 volatile uint32_t g_led_update_count = 0U;
 volatile ec_gt g_led_update_result = GMP_EC_OK;
@@ -164,6 +166,13 @@ volatile uint16_t g_key_consecutive_ok_count = 0U;
 volatile ec_gt g_oled_last_result = GMP_EC_NOT_READY;
 volatile uint32_t g_oled_update_ok_count = 0U;
 volatile uint32_t g_oled_update_error_count = 0U;
+volatile uint16_t g_oled_init_state = OLED_INIT_WAIT_POWER;
+volatile uint16_t g_oled_init_retry_count = 0U;
+volatile uint32_t g_oled_init_attempt_count = 0U;
+volatile uint32_t g_oled_init_success_count = 0U;
+volatile uint32_t g_oled_init_failure_count = 0U;
+volatile uint16_t g_oled_clear_page_index = 0U;
+volatile time_gt g_oled_next_action_tick = 0U;
 
 gmp_task_status_t tsk_blink(gmp_task_t* tsk)
 {
@@ -435,43 +444,23 @@ gmp_task_status_t tsk_startup(gmp_task_t* tsk)
 #endif
 
 #if PSU_ENABLE_OLED_DISPLAY
-    // Let the shared bus settle after the one-time HT16K33 RAM clear and
-    // DISPLAY OFF command. OLED transactions remain fully checked below.
-    DEVICE_DELAY_US(1000U);
-
+    // The periodic OLED task owns all OLED I2C traffic. Startup only arms its
+    // non-blocking power-wait state after the other peripherals are ready.
     g_oled_dynamic_update_enabled = 0U;
     g_oled_pending_mask = 0U;
-
-    ec = oled_init_checked();
-    if (ec == GMP_EC_OK)
-    {
-        ec = oled_show_line_checked(0U, 0U, "TEST");
-    }
-    if (ec == GMP_EC_OK)
-    {
-        ec = oled_clear_checked();
-    }
-    if (ec == GMP_EC_OK)
-    {
-        ec = oled_show_line_checked(0U, 0U, "BOARD TEST");
-    }
-
-    g_oled_probe_result = ec;
-    g_oled_last_result = g_oled_probe_result;
-    if (g_oled_probe_result == GMP_EC_OK)
-    {
-        ++g_oled_probe_ok_count;
-        g_oled_dynamic_update_enabled = 1U;
-    }
-    else
-    {
-        ++g_oled_probe_error_count;
-        g_oled_dynamic_update_enabled = 0U;
-    }
-
-    // Startup OLED traffic shares I2C with HT16K33. Preserve the existing
-    // two-period key guard regardless of which checked probe step failed.
-    g_key_i2c_holdoff_count = 2U;
+    g_oled_probe_result = GMP_EC_NOT_READY;
+    g_oled_last_result = GMP_EC_NOT_READY;
+    g_oled_probe_ok_count = 0U;
+    g_oled_probe_error_count = 0U;
+    g_oled_init_state = OLED_INIT_WAIT_POWER;
+    g_oled_init_retry_count = 0U;
+    g_oled_init_attempt_count = 0U;
+    g_oled_init_success_count = 0U;
+    g_oled_init_failure_count = 0U;
+    g_oled_clear_page_index = 0U;
+    g_oled_next_action_tick =
+        gmp_base_get_system_tick() + (time_gt)100U;
+    g_key_i2c_holdoff_count = 0U;
 #endif
 
     //        hdc1080_config_reg_t hdc1080_cfg = {.all = 0};
