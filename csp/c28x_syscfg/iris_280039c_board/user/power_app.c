@@ -11,6 +11,7 @@
 #endif
 
 volatile power_app_t g_power_app;
+volatile uint32_t g_blocked_output_request_count = 0U;
 static uint16_t s_last_voltage_set_mv;
 static uint16_t s_last_current_set_ma;
 
@@ -230,7 +231,7 @@ void power_app_request_output(bool enable)
 #if PSU_SAFE_BRINGUP || !PSU_ALLOW_OUTPUT_REQUEST
     if (enable)
     {
-        gmp_base_print("SAFE_BRINGUP: physical output command blocked\r\n");
+        ++g_blocked_output_request_count;
     }
     g_power_app.output_requested = false;
     return;
@@ -287,21 +288,56 @@ void power_app_fast_step(void)
     if (PSU_SAFE_BRINGUP || !PSU_ALLOW_OUTPUT_REQUEST ||
         !PSU_ALLOW_PHYSICAL_OUTPUT_ENABLE)
     {
-        // This barrier is evaluated in every fast control step. It sanitizes
-        // even direct debugger or memory writes before the application can
-        // enter an output state or apply a physical command.
+        // Keep every physical path off while the software model, measurement
+        // override, protection counters, fault latch, and reset remain active.
         power_output_hw_set(false);
         power_dac_set_zero();
         g_power_app.output_requested = false;
         g_power_app.output_enabled = false;
-        g_power_app.fault_reset_requested = false;
-        g_power_app.state = POWER_STATE_OFF;
         g_power_app.dac_voltage_code = power_voltage_mv_to_dac(g_power_app.voltage_set_mv);
         g_power_app.dac_current_code = power_current_ma_to_dac(g_power_app.current_set_ma);
+
+        voltage_meas_mv = g_power_app.voltage_meas_mv;
+        current_meas_ma = g_power_app.current_meas_ma;
+
+        if (g_power_app.fault_latched)
+        {
+            if (g_power_app.fault_reset_requested &&
+                power_protection_release_safe(voltage_meas_mv, current_meas_ma))
+            {
+                g_power_app.fault = POWER_FAULT_NONE;
+                g_power_app.fault_latched = false;
+                g_power_app.trip_voltage_mv = 0U;
+                g_power_app.trip_current_ma = 0U;
+                power_protection_reset();
+            }
+            g_power_app.fault_reset_requested = false;
+        }
+        else
+        {
+            g_power_app.fault_reset_requested = false;
+            protection_result = power_protection_step(voltage_meas_mv,
+                                                      current_meas_ma,
+                                                      true);
+            if (protection_result == POWER_PROTECTION_RESULT_OVERVOLTAGE)
+            {
+                g_power_app.fault = POWER_FAULT_OVERVOLTAGE;
+                g_power_app.fault_latched = true;
+                g_power_app.trip_voltage_mv = voltage_meas_mv;
+                g_power_app.trip_current_ma = current_meas_ma;
+            }
+            else if (protection_result == POWER_PROTECTION_RESULT_OVERCURRENT)
+            {
+                g_power_app.fault = POWER_FAULT_OVERCURRENT;
+                g_power_app.fault_latched = true;
+                g_power_app.trip_voltage_mv = voltage_meas_mv;
+                g_power_app.trip_current_ma = current_meas_ma;
+            }
+        }
+
+        g_power_app.state = g_power_app.fault_latched ?
+                                POWER_STATE_FAULT : POWER_STATE_OFF;
         power_app_clear_mode_confirmation();
-        (void)power_protection_step(g_power_app.voltage_meas_mv,
-                                    g_power_app.current_meas_ma,
-                                    false);
     }
     else
     {

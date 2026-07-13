@@ -271,20 +271,39 @@ void update_led_content_8byte(ht16k33_dev_t* dev, uint16_t ch1, uint16_t ch2, ui
     dev->is_dirty = 1;
 }
 
+static void power_ui_update_led_setpoints(ht16k33_dev_t* dev)
+{
+    uint16_t voltage_set_mv = g_power_app.voltage_set_mv;
+    uint16_t current_set_ma = g_power_app.current_set_ma;
+
+    update_led_content_8byte(
+        dev,
+        led_lut[(voltage_set_mv / 10000U) % 10U],
+        led_lut[(voltage_set_mv / 1000U) % 10U],
+        led_lut[(voltage_set_mv / 100U) % 10U],
+        led_lut[(voltage_set_mv / 10U) % 10U],
+        led_lut[voltage_set_mv % 10U],
+        led_lut[(current_set_ma / 100U) % 10U],
+        led_lut[(current_set_ma / 10U) % 10U],
+        led_lut[current_set_ma % 10U]);
+}
+
 gmp_task_status_t tsk_LED_flush(gmp_task_t* tsk)
 {
     ht16k33_dev_t* dev = (ht16k33_dev_t*)tsk->user_data;
 
     if(flag_init_cmpt)
     {
-    // fresh LED buffer here.
-    ec_gt ret = ht16k33_update_display(dev);
+        ec_gt ret;
 
-    // if meets error, close this task
-    if (ret != GMP_EC_OK)
-    {
-        tsk->is_enabled = 0;
-    }
+        power_ui_update_led_setpoints(dev);
+        ret = ht16k33_update_display(dev);
+
+        // If the display peripheral fails, stop only this background UI task.
+        if (ret != GMP_EC_OK)
+        {
+            tsk->is_enabled = 0;
+        }
     }
 
     return GMP_TASK_DONE;
@@ -310,22 +329,17 @@ gmp_task_status_t tsk_key_flush(gmp_task_t* tsk)
             return GMP_TASK_DONE;
         }
 
-        if (key_id != 0U)
-        {
-            gmp_base_print("RAW KEY id=%u\r\n",
-                           (unsigned int)key_id);
-        }
-
         action_executed = power_ui_process_key_id((uint16_t)key_id);
 
-        if (action_executed)
+#if PSU_ENABLE_KEY_EVENT_LOG
+        if (action_executed && (key_id != 0U))
         {
-            gmp_base_print("KEY id=%u Vset=%u Iset=%u req=%u\r\n",
+            gmp_base_print("KEY %u V=%u I=%u\r\n",
                            (unsigned int)key_id,
                            (unsigned int)g_power_app.voltage_set_mv,
-                           (unsigned int)g_power_app.current_set_ma,
-                           (unsigned int)g_power_app.output_requested);
+                           (unsigned int)g_power_app.current_set_ma);
         }
+#endif
     }
 
     return GMP_TASK_DONE;
@@ -334,17 +348,33 @@ gmp_task_status_t tsk_key_flush(gmp_task_t* tsk)
 gmp_task_status_t oled_show_task(gmp_task_t* tsk)
 {
     static bool s_page_initialized = false;
+#if PSU_SAFE_BRINGUP
+    char line2[16];
+    char line3[16];
+    char line4[16];
+#endif
     GMP_UNUSED_VAR(tsk);
 
 #if PSU_SAFE_BRINGUP
-    if ((flag_init_cmpt == 1) && !s_page_initialized)
+    if (flag_init_cmpt == 1U)
     {
-        oled_clear();
-        oled_show_str(0U, 0U, "SAFE MODE");
-        oled_show_str(0U, 2U, "PWM OFF");
-        oled_show_str(0U, 4U, "DAC 0");
-        oled_show_str(0U, 6U, "OUTPUT OFF");
-        s_page_initialized = true;
+        if (!s_page_initialized)
+        {
+            oled_clear();
+            s_page_initialized = true;
+        }
+
+        (void)snprintf(line2, sizeof(line2), "V %-5u mV    ",
+                       (unsigned int)g_power_app.voltage_set_mv);
+        (void)snprintf(line3, sizeof(line3), "I %-3u mA      ",
+                       (unsigned int)g_power_app.current_set_ma);
+        (void)snprintf(line4, sizeof(line4), "KEY %-2u       ",
+                       (unsigned int)g_last_raw_key_id);
+
+        oled_show_str(0U, 0U, "BOARD TEST");
+        oled_show_str(0U, 2U, line2);
+        oled_show_str(0U, 4U, line3);
+        oled_show_str(0U, 6U, line4);
     }
 
     return GMP_TASK_DONE;

@@ -47,6 +47,7 @@ extern volatile uint16_t g_ui_init_stage;
 extern volatile uint16_t g_ui_init_result;
 extern volatile uint16_t g_last_raw_key_id;
 extern volatile uint16_t g_key_read_result;
+extern volatile uint32_t g_blocked_output_request_count;
 
 //=================================================================================================
 // global functions
@@ -57,6 +58,8 @@ extern volatile uint16_t g_key_read_result;
 void init(void);
 void mainloop(void);
 void setup_peripheral(void);
+void flush_dl_tx_buffer(void);
+void flush_dl_rx_buffer(void);
 
 //
 // For Controller projects user should implement the following functions

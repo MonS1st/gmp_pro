@@ -137,7 +137,7 @@ volatile uint16_t g_power_safe_bringup_self_test_failures = 0U;
 volatile uint32_t g_main_isr_count = 0U;
 volatile uint32_t g_scheduler_loop_count = 0U;
 volatile uint16_t g_ui_init_stage = 0U;
-volatile uint16_t g_ui_init_result = 0U;
+volatile uint16_t g_ui_init_result = 0xFFFFU;
 volatile uint16_t g_last_raw_key_id = 0U;
 volatile uint16_t g_key_read_result = 0U;
 
@@ -189,7 +189,7 @@ static gmp_task_status_t tsk_power_console_status(gmp_task_t* tsk)
     return GMP_TASK_DONE;
 }
 
-#if PSU_SAFE_BRINGUP
+#if PSU_SAFE_BRINGUP && PSU_ENABLE_SAFE_SELF_TEST
 #define PSU_SAFE_TEST_HAL_OUTPUTS  (1U << 0)
 #define PSU_SAFE_TEST_APP_REQUEST  (1U << 1)
 #define PSU_SAFE_TEST_DEBUG_TOGGLE (1U << 2)
@@ -245,16 +245,6 @@ static void power_safe_bringup_run_self_test(void)
     power_app_init();
     ctl_fast_disable_output();
     g_power_safe_bringup_self_test_failures = failures;
-
-    if (failures == 0U)
-    {
-        gmp_base_print("SAFE_BRINGUP SELF TEST: PASS\r\n");
-    }
-    else
-    {
-        gmp_base_print("SAFE_BRINGUP SELF TEST: FAIL mask=0x%04x\r\n",
-                       (unsigned int)failures);
-    }
 }
 #endif
 
@@ -283,8 +273,9 @@ static gmp_task_t task_power_command =
     {"power_cmd", tsk_power_debug_command, 10, 0,
      PSU_ENABLE_MANUAL_COMMAND, NULL};
 static gmp_task_t task_power_console =
-    {"power_console", tsk_power_console_status, 500, 500,
-     PSU_ENABLE_CONSOLE_UI, NULL};
+    {"power_console", tsk_power_console_status,
+     PSU_PERIODIC_STATUS_PERIOD_MS, PSU_PERIODIC_STATUS_PERIOD_MS,
+     PSU_ENABLE_CONSOLE_UI && PSU_ENABLE_PERIODIC_STATUS_LOG, NULL};
 
 static gmp_task_t *const tasks[] = {
     &task_dl_online,
@@ -330,6 +321,7 @@ gmp_task_status_t tsk_startup(gmp_task_t* tsk)
     ec_gt ec = GMP_EC_OK;
 
     g_ui_init_stage = 1U;
+    g_ui_init_result = 0xFFFFU;
 
 #if PSU_ENABLE_BEEP && !PSU_SAFE_BRINGUP
     static uint16_t beep_counter = 0;
@@ -351,15 +343,7 @@ gmp_task_status_t tsk_startup(gmp_task_t* tsk)
     }
 #endif
 
-#if PSU_SAFE_BRINGUP
-    gmp_base_print("================================\r\n"
-                   "GMP IRIS SAFE BRINGUP MODE\r\n"
-                   "PWM OUTPUT: BLOCKED\r\n"
-                   "DAC OUTPUT: FORCED TO ZERO\r\n"
-                   "OUTPUT ENABLE: BLOCKED\r\n"
-                   "KEY OUTPUT CONTROL: BLOCKED\r\n"
-                   "BEEP GPIO: BLOCKED\r\n"
-                   "================================\r\n");
+#if PSU_SAFE_BRINGUP && PSU_ENABLE_SAFE_SELF_TEST
     power_safe_bringup_run_self_test();
 #endif
 
@@ -370,14 +354,7 @@ gmp_task_status_t tsk_startup(gmp_task_t* tsk)
     g_ui_init_stage = 2U;
     g_ui_init_result = (uint16_t)ec;
 
-    if (ec == GMP_EC_OK)
-    {
-#if PSU_ENABLE_HT16K33_DISPLAY
-        update_led_content_8byte(&ht16k33, led_lut[2], led_lut[0], led_lut[2], led_lut[6], led_lut[20], led_lut[7],
-                                         led_lut[7], led_lut[20]);
-#endif
-    }
-    else
+    if (ec != GMP_EC_OK)
     {
 #if PSU_ENABLE_HT16K33_KEY
         task_flush_key.is_enabled = 0;
@@ -393,41 +370,23 @@ gmp_task_status_t tsk_startup(gmp_task_t* tsk)
     oled_init();
 #endif
 
-#if PSU_ENABLE_HT16K33_KEY || PSU_ENABLE_HT16K33_DISPLAY
-    if (ec == GMP_EC_OK)
-    {
-        gmp_base_print("UI INIT HT16K33 ret=%lu key=%u led=%u oled=%u\r\n",
-                       (unsigned long)ec,
-                       (unsigned int)task_flush_key.is_enabled,
-                       (unsigned int)task_flush_led.is_enabled,
-                       (unsigned int)task_oled_show.is_enabled);
-    }
-    else
-    {
-        gmp_base_print("UI INIT HT16K33 FAILED ret=%lu\r\n", (unsigned long)ec);
-    }
-#endif
-
     //        hdc1080_config_reg_t hdc1080_cfg = {.all = 0};
     //        hdc1080_cfg.bits.mode = 1; // continuous acquisition data
     //
     //        hdc1080_init(&hdc1080, iic_bus, HDC1080_I2C_ADDR_DEFAULT, hdc1080_cfg);
     //        hdc1080_trigger_temp_hum_sequence(&hdc1080);
 
-    flag_init_cmpt = 1;
+    flag_init_cmpt = 1U;
     g_ui_init_stage = 3U;
 
-    gmp_base_print("UI CHAIN STATUS:\r\n"
-                   "EPWM1 SOCA ENABLED\r\n"
-                   "ADCA INT1 ENABLED\r\n"
-                   "MAIN ISR ACTIVE\r\n"
-                   "SYSTEM TICK ACTIVE\r\n"
-                   "SCHEDULER ACTIVE\r\n"
-                   "HT16K33 INIT ret=%lu\r\n"
-                   "%s\r\n",
-                   (unsigned long)ec,
-                   task_flush_key.is_enabled ?
-                       "KEY TASK ENABLED" : "KEY TASK DISABLED");
+#if PSU_ENABLE_STARTUP_LOG
+    gmp_base_print(
+        "UI ht=%u key=%u led=%u oled=%u\r\n",
+        (unsigned int)g_ui_init_result,
+        (unsigned int)task_flush_key.is_enabled,
+        (unsigned int)task_flush_led.is_enabled,
+        (unsigned int)task_oled_show.is_enabled);
+#endif
 
     // startup process is complete.
     tsk->is_enabled = 0;

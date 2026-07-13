@@ -12,40 +12,6 @@ volatile uint16_t g_power_debug_arg1 = 0U;
 volatile uint16_t g_power_debug_command_count = 0U;
 volatile uint16_t g_power_debug_ack_count = 0U;
 
-static const char *power_debug_state_text(power_state_t state)
-{
-    switch (state)
-    {
-    case POWER_STATE_OFF:
-        return "OFF";
-    case POWER_STATE_STARTING:
-        return "START";
-    case POWER_STATE_CV:
-        return "CV";
-    case POWER_STATE_CC:
-        return "CC";
-    case POWER_STATE_FAULT:
-        return "FAULT";
-    default:
-        return "UNKNOWN";
-    }
-}
-
-static const char *power_debug_fault_text(power_fault_t fault)
-{
-    switch (fault)
-    {
-    case POWER_FAULT_NONE:
-        return "NONE";
-    case POWER_FAULT_OVERVOLTAGE:
-        return "OVP";
-    case POWER_FAULT_OVERCURRENT:
-        return "OCP";
-    default:
-        return "UNKNOWN";
-    }
-}
-
 void power_debug_process_command(void)
 {
     uint16_t pending_count;
@@ -97,8 +63,7 @@ void power_debug_process_command(void)
 
     case POWER_DEBUG_CMD_OUTPUT_TOGGLE:
 #if PSU_SAFE_BRINGUP || !PSU_ALLOW_OUTPUT_REQUEST
-        // Exercise the common request barrier so the rejected operation is
-        // visible on the console and can never leave a pending true request.
+        // Exercise the common request barrier without producing repeated logs.
         power_app_request_output(true);
 #else
         power_app_request_output(!g_power_app.output_requested);
@@ -156,35 +121,28 @@ bool power_debug_safe_bringup_self_test(void)
 
 void power_debug_print_status(void)
 {
-    power_app_t app;
-    uint16_t load_ohm;
+    power_state_t state;
+    power_fault_t fault;
+    uint16_t voltage_set_mv;
+    uint16_t voltage_meas_mv;
+    uint16_t current_set_ma;
+    uint16_t current_meas_ma;
 
     // Take a field-by-field snapshot of the ISR-owned volatile application
     // state so formatting happens only in this background task.
-    app.voltage_set_mv = g_power_app.voltage_set_mv;
-    app.current_set_ma = g_power_app.current_set_ma;
-    app.voltage_meas_mv = g_power_app.voltage_meas_mv;
-    app.current_meas_ma = g_power_app.current_meas_ma;
-    app.dac_voltage_code = g_power_app.dac_voltage_code;
-    app.dac_current_code = g_power_app.dac_current_code;
-    app.state = g_power_app.state;
-    app.fault = g_power_app.fault;
-    app.output_requested = g_power_app.output_requested;
-    app.output_enabled = g_power_app.output_enabled;
-    app.fault_latched = g_power_app.fault_latched;
-    load_ohm = power_self_test_get_load_ohm();
+    state = g_power_app.state;
+    fault = g_power_app.fault;
+    voltage_set_mv = g_power_app.voltage_set_mv;
+    voltage_meas_mv = g_power_app.voltage_meas_mv;
+    current_set_ma = g_power_app.current_set_ma;
+    current_meas_ma = g_power_app.current_meas_ma;
 
-    gmp_base_print("PWR state=%s fault=%s latch=%u req=%u en=%u Vset=%u Vmeas=%u Iset=%u Imeas=%u DACV=%u DACI=%u load=%u\r\n",
-                   power_debug_state_text(app.state),
-                   power_debug_fault_text(app.fault),
-                   (unsigned int)app.fault_latched,
-                   (unsigned int)app.output_requested,
-                   (unsigned int)app.output_enabled,
-                   (unsigned int)app.voltage_set_mv,
-                   (unsigned int)app.voltage_meas_mv,
-                   (unsigned int)app.current_set_ma,
-                   (unsigned int)app.current_meas_ma,
-                   (unsigned int)app.dac_voltage_code,
-                   (unsigned int)app.dac_current_code,
-                   (unsigned int)load_ohm);
+    gmp_base_print(
+        "PWR S=%u F=%u V=%u/%u I=%u/%u\r\n",
+        (unsigned int)state,
+        (unsigned int)fault,
+        (unsigned int)voltage_set_mv,
+        (unsigned int)voltage_meas_mv,
+        (unsigned int)current_set_ma,
+        (unsigned int)current_meas_ma);
 }

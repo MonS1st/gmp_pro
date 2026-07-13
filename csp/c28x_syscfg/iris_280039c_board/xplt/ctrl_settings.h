@@ -106,17 +106,35 @@
 #define PSU_KEY_RELEASE_FILTER_COUNT    (4U)
 
 //=================================================================================================
-// SAFE BRINGUP CONFIGURATION
-//
-// SAFE_BRINGUP mode is only for basic control-board validation.
-// Do not disable it until the DAC, PWM, relay, beeper, and power-interface
-// pin mappings have all been confirmed against the actual hardware.
-#define PSU_SAFE_BRINGUP                  (1)
-#define PSU_ALLOW_PHYSICAL_DAC            (0)
-#define PSU_ALLOW_PHYSICAL_PWM            (0)
-#define PSU_ALLOW_PHYSICAL_OUTPUT_ENABLE  (0)
-#define PSU_ALLOW_OUTPUT_REQUEST          (0)
-#define PSU_ENABLE_BEEP                   (0)
+// Complete control-board functional test profile
+#define PSU_FULL_BOARD_TEST_PROFILE       (1)
+
+#if PSU_FULL_BOARD_TEST_PROFILE
+
+#define PSU_ENABLE_HT16K33_KEY             (1)
+#define PSU_ENABLE_HT16K33_DISPLAY         (1)
+#define PSU_ENABLE_OLED_DISPLAY            (1)
+#define PSU_ENABLE_CONSOLE_UI              (1)
+#define PSU_ENABLE_MANUAL_COMMAND          (1)
+
+#define PSU_ENABLE_STARTUP_LOG             (1)
+#define PSU_ENABLE_KEY_EVENT_LOG           (1)
+#define PSU_ENABLE_PERIODIC_STATUS_LOG     (1)
+#define PSU_ENABLE_SAFE_SELF_TEST          (0)
+
+#define PSU_PERIODIC_STATUS_PERIOD_MS      (1000U)
+
+#define PSU_SAFE_BRINGUP                    (1)
+#define PSU_SOFT_TEST_MODE                  (1)
+
+#define PSU_ALLOW_PHYSICAL_DAC              (0)
+#define PSU_ALLOW_PHYSICAL_PWM              (0)
+#define PSU_ALLOW_PHYSICAL_OUTPUT_ENABLE    (0)
+#define PSU_ALLOW_OUTPUT_REQUEST            (0)
+
+#define PSU_ENABLE_BEEP                     (0)
+
+#endif
 
 #if (PSU_SAFE_BRINGUP == 1) && \
     ((PSU_ALLOW_PHYSICAL_DAC == 1) || \
@@ -125,17 +143,6 @@
      (PSU_ALLOW_OUTPUT_REQUEST == 1))
 #error "SAFE_BRINGUP forbids all physical power-output permissions"
 #endif
-
-// User-interface feature switches. Keep input actions disabled until the
-// board key IDs and all output-control paths have been verified.
-#define PSU_ENABLE_HT16K33_KEY          (1)
-#define PSU_ENABLE_HT16K33_DISPLAY      (1)
-#define PSU_ENABLE_OLED_DISPLAY         (1)
-#define PSU_ENABLE_CONSOLE_UI           (1)
-#define PSU_ENABLE_MANUAL_COMMAND       (0)
-
-// Use the software resistive-load model instead of ADC measurements.
-#define PSU_SOFT_TEST_MODE             (1)
 
 //=================================================================================================
 // Hardware parameters
