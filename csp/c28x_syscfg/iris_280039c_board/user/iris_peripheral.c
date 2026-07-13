@@ -67,83 +67,10 @@ static uint16_t s_key_consecutive_timeout_count = 0U;
 #define OLED_INIT_RETRY_FAST_MS     (200U)
 #define OLED_INIT_RETRY_SLOW_MS     (1000U)
 #define OLED_KEY_DEFER_MS            (100U)
-#define OLED_TRANSFER_CHUNK_BYTES     (15U)
-#define OLED_LINE_TRANSFER_NONE        (0U)
-#define OLED_LINE_TRANSFER_TEST        (8U)
-#define OLED_LINE_TRANSFER_TITLE      (16U)
 #define HT16K33_DISPLAY_TEST_HOLD_MS (1000U)
 
 static data_gt s_oled_blank_page[OLED_CLEAR_PAGE_BYTES] = {0U};
 static data_gt s_oled_probe_payload[2] = {0x00U, 0xAEU};
-static uint16_t s_oled_line_transfer_kind = OLED_LINE_TRANSFER_NONE;
-static uint16_t s_oled_line_transfer_used_length = 0U;
-static uint16_t s_oled_line_transfer_value = 0U;
-
-static void power_ui_reset_oled_transfer_progress(void)
-{
-    g_oled_transfer_page = 0U;
-    g_oled_transfer_offset = 0U;
-    g_oled_transfer_chunk_length = 0U;
-    s_oled_line_transfer_kind = OLED_LINE_TRANSFER_NONE;
-    s_oled_line_transfer_used_length = 0U;
-    s_oled_line_transfer_value = 0U;
-}
-
-static ec_gt power_ui_prepare_oled_line_transfer(
-    uint16_t kind, uint8_t page, const char *text, uint16_t value)
-{
-    uint16_t used_length = 0U;
-    ec_gt result;
-
-    result = oled_prepare_line_checked(text, &used_length);
-    if (result != GMP_EC_OK)
-    {
-        return result;
-    }
-
-    s_oled_line_transfer_kind = kind;
-    s_oled_line_transfer_used_length = used_length;
-    s_oled_line_transfer_value = value;
-    g_oled_transfer_page = page;
-    g_oled_transfer_offset = 0U;
-    g_oled_transfer_chunk_length = 0U;
-    return GMP_EC_OK;
-}
-
-static ec_gt power_ui_write_oled_prepared_line_chunk(void)
-{
-    uint16_t remaining;
-    uint16_t written_length = 0U;
-    ec_gt result;
-
-    if ((s_oled_line_transfer_kind == OLED_LINE_TRANSFER_NONE) ||
-        (g_oled_transfer_offset >= s_oled_line_transfer_used_length))
-    {
-        return GMP_EC_INVALID_PARAM;
-    }
-
-    remaining = (uint16_t)(s_oled_line_transfer_used_length -
-                           g_oled_transfer_offset);
-    g_oled_transfer_chunk_length =
-        (remaining > OLED_TRANSFER_CHUNK_BYTES) ?
-            OLED_TRANSFER_CHUNK_BYTES : remaining;
-
-    result = oled_write_prepared_line_chunk_checked(
-        0U, (uint8_t)g_oled_transfer_page,
-        g_oled_transfer_offset, &written_length);
-    if (result == GMP_EC_OK)
-    {
-        g_oled_transfer_offset =
-            (uint16_t)(g_oled_transfer_offset + written_length);
-        ++g_oled_transfer_chunk_ok_count;
-    }
-    else
-    {
-        ++g_oled_transfer_chunk_error_count;
-    }
-
-    return result;
-}
 
 static bool power_ui_oled_action_due(void)
 {
@@ -190,8 +117,8 @@ static void power_ui_record_oled_action_result(ec_gt result)
 {
     g_oled_probe_result = result;
     g_oled_last_result = result;
-    // Each scheduled OLED data step performs at most one position/data pair.
-    // Protect the key reader once, and only after that step succeeds.
+    // A complete checked operation can contain multiple FIFO-safe transfers.
+    // Protect the key reader once, and only after the whole operation succeeds.
     if (result == GMP_EC_OK)
     {
         g_key_i2c_holdoff_count = 1U;
@@ -203,7 +130,6 @@ static void power_ui_schedule_oled_retry(uint32_t delay_ms)
     g_oled_dynamic_update_enabled = 0U;
     g_oled_pending_mask = 0U;
     g_oled_clear_page_index = 0U;
-    power_ui_reset_oled_transfer_progress();
     g_oled_selected_address = 0U;
     oled_set_active_address(0U);
     g_oled_init_state = OLED_INIT_RETRY_WAIT;
@@ -254,7 +180,6 @@ static void power_ui_prepare_oled_address_scan(void)
     g_oled_fail_length = 0U;
     g_oled_clear_page_index = 0U;
     g_oled_pending_mask = 0U;
-    power_ui_reset_oled_transfer_progress();
     oled_set_active_address(0U);
     oled_reset_init_sequence();
 }
@@ -326,7 +251,6 @@ static void power_ui_run_oled_commands(void)
     }
     else if (g_oled_init_command_index >= OLED_INIT_COMMAND_COUNT)
     {
-        power_ui_reset_oled_transfer_progress();
         g_oled_init_state = OLED_INIT_TEST;
     }
 }
@@ -858,8 +782,8 @@ gmp_task_status_t tsk_key_flush(gmp_task_t* tsk)
     {
         ec_gt ret;
 
-        // A successful OLED chunk contains one position transaction followed
-        // by one data transaction. Skip at most one 20 ms key period.
+        // A successful OLED step may contain several FIFO-safe transactions.
+        // Skip one 20 ms key period before accessing HT16K33 again.
         if (g_key_i2c_holdoff_count != 0U)
         {
             --g_key_i2c_holdoff_count;
@@ -993,40 +917,22 @@ gmp_task_status_t oled_show_task(gmp_task_t* tsk)
         {
             return GMP_TASK_DONE;
         }
-
-        if (s_oled_line_transfer_kind != OLED_LINE_TRANSFER_TEST)
-        {
-            power_ui_reset_oled_transfer_progress();
-            ret = power_ui_prepare_oled_line_transfer(
-                OLED_LINE_TRANSFER_TEST, 0U, "TEST", 0U);
-            if (ret != GMP_EC_OK)
-            {
-                power_ui_record_oled_action_result(ret);
-                power_ui_handle_oled_failure(ret);
-                return GMP_TASK_DONE;
-            }
-        }
-
-        ret = power_ui_write_oled_prepared_line_chunk();
+        ret = oled_show_line_checked(0U, 0U, "TEST");
         power_ui_record_oled_action_result(ret);
-        if (ret != GMP_EC_OK)
+        if (ret == GMP_EC_OK)
         {
-            power_ui_handle_oled_failure(ret);
-            return GMP_TASK_DONE;
-        }
-
-        if (g_oled_transfer_offset >= s_oled_line_transfer_used_length)
-        {
-            power_ui_reset_oled_transfer_progress();
             g_oled_clear_page_index = 0U;
             g_oled_init_state = OLED_INIT_CLEAR_PAGE;
+        }
+        else
+        {
+            power_ui_handle_oled_failure(ret);
         }
         return GMP_TASK_DONE;
 
     case OLED_INIT_CLEAR_PAGE:
-        if (g_oled_transfer_page >= OLED_CLEAR_PAGE_COUNT)
+        if (g_oled_clear_page_index >= OLED_CLEAR_PAGE_COUNT)
         {
-            power_ui_reset_oled_transfer_progress();
             g_oled_init_state = OLED_INIT_TITLE;
             return GMP_TASK_DONE;
         }
@@ -1036,39 +942,19 @@ gmp_task_status_t oled_show_task(gmp_task_t* tsk)
             return GMP_TASK_DONE;
         }
 
-        g_oled_transfer_chunk_length =
-            (uint16_t)(OLED_CLEAR_PAGE_BYTES - g_oled_transfer_offset);
-        if (g_oled_transfer_chunk_length > OLED_TRANSFER_CHUNK_BYTES)
-        {
-            g_oled_transfer_chunk_length = OLED_TRANSFER_CHUNK_BYTES;
-        }
-
-        ret = oled_write_chunk_checked(
-            (uint8_t)g_oled_transfer_offset,
-            (uint8_t)g_oled_transfer_page,
-            &s_oled_blank_page[g_oled_transfer_offset],
-            g_oled_transfer_chunk_length);
+        ret = oled_write_page_checked(
+            0U, (uint8_t)g_oled_clear_page_index,
+            s_oled_blank_page, OLED_CLEAR_PAGE_BYTES);
         power_ui_record_oled_action_result(ret);
         if (ret != GMP_EC_OK)
         {
-            ++g_oled_transfer_chunk_error_count;
             power_ui_handle_oled_failure(ret);
             return GMP_TASK_DONE;
         }
 
-        ++g_oled_transfer_chunk_ok_count;
-        g_oled_transfer_offset =
-            (uint16_t)(g_oled_transfer_offset +
-                       g_oled_transfer_chunk_length);
-        if (g_oled_transfer_offset >= OLED_CLEAR_PAGE_BYTES)
+        ++g_oled_clear_page_index;
+        if (g_oled_clear_page_index >= OLED_CLEAR_PAGE_COUNT)
         {
-            g_oled_transfer_offset = 0U;
-            ++g_oled_transfer_page;
-            g_oled_clear_page_index = g_oled_transfer_page;
-        }
-        if (g_oled_transfer_page >= OLED_CLEAR_PAGE_COUNT)
-        {
-            power_ui_reset_oled_transfer_progress();
             g_oled_init_state = OLED_INIT_TITLE;
         }
         return GMP_TASK_DONE;
@@ -1078,21 +964,7 @@ gmp_task_status_t oled_show_task(gmp_task_t* tsk)
         {
             return GMP_TASK_DONE;
         }
-
-        if (s_oled_line_transfer_kind != OLED_LINE_TRANSFER_TITLE)
-        {
-            power_ui_reset_oled_transfer_progress();
-            ret = power_ui_prepare_oled_line_transfer(
-                OLED_LINE_TRANSFER_TITLE, 0U, "BOARD TEST", 0U);
-            if (ret != GMP_EC_OK)
-            {
-                power_ui_record_oled_action_result(ret);
-                power_ui_handle_oled_failure(ret);
-                return GMP_TASK_DONE;
-            }
-        }
-
-        ret = power_ui_write_oled_prepared_line_chunk();
+        ret = oled_show_line_checked(0U, 0U, "BOARD TEST");
         power_ui_record_oled_action_result(ret);
         if (ret != GMP_EC_OK)
         {
@@ -1100,12 +972,6 @@ gmp_task_status_t oled_show_task(gmp_task_t* tsk)
             return GMP_TASK_DONE;
         }
 
-        if (g_oled_transfer_offset < s_oled_line_transfer_used_length)
-        {
-            return GMP_TASK_DONE;
-        }
-
-        power_ui_reset_oled_transfer_progress();
         g_oled_dynamic_update_enabled = 1U;
         ++g_oled_probe_ok_count;
         ++g_oled_init_success_count;
@@ -1130,7 +996,6 @@ gmp_task_status_t oled_show_task(gmp_task_t* tsk)
         g_oled_dynamic_update_enabled = 0U;
         g_oled_pending_mask = 0U;
         g_oled_clear_page_index = 0U;
-        power_ui_reset_oled_transfer_progress();
         g_oled_selected_address = 0U;
         oled_set_active_address(0U);
         g_oled_init_state = OLED_INIT_WAIT_POWER;
@@ -1158,8 +1023,7 @@ gmp_task_status_t oled_show_task(gmp_task_t* tsk)
         g_oled_pending_mask |= OLED_PENDING_KEY;
     }
 
-    if ((g_oled_pending_mask == 0U) &&
-        (s_oled_line_transfer_kind == OLED_LINE_TRANSFER_NONE))
+    if (g_oled_pending_mask == 0U)
     {
         return GMP_TASK_DONE;
     }
@@ -1169,40 +1033,40 @@ gmp_task_status_t oled_show_task(gmp_task_t* tsk)
         return GMP_TASK_DONE;
     }
 
-    if (s_oled_line_transfer_kind == OLED_LINE_TRANSFER_NONE)
+    // Commit at most one pending line per scheduled OLED task.
+    if ((g_oled_pending_mask & OLED_PENDING_VOLTAGE) != 0U)
     {
-        if ((g_oled_pending_mask & OLED_PENDING_VOLTAGE) != 0U)
+        (void)snprintf(line2, sizeof(line2), "V %-5u mV    ",
+                       (unsigned int)voltage_set_mv);
+        ret = oled_show_line_checked(0U, 2U, line2);
+        if (ret == GMP_EC_OK)
         {
-            (void)snprintf(line2, sizeof(line2), "V %-5u mV    ",
-                           (unsigned int)voltage_set_mv);
-            ret = power_ui_prepare_oled_line_transfer(
-                OLED_PENDING_VOLTAGE, 2U, line2, voltage_set_mv);
-        }
-        else if ((g_oled_pending_mask & OLED_PENDING_CURRENT) != 0U)
-        {
-            (void)snprintf(line3, sizeof(line3), "I %-3u mA      ",
-                           (unsigned int)current_set_ma);
-            ret = power_ui_prepare_oled_line_transfer(
-                OLED_PENDING_CURRENT, 4U, line3, current_set_ma);
-        }
-        else
-        {
-            (void)snprintf(line4, sizeof(line4), "KEY %-2u       ",
-                           (unsigned int)key_id);
-            ret = power_ui_prepare_oled_line_transfer(
-                OLED_PENDING_KEY, 6U, line4, key_id);
-        }
-
-        if (ret != GMP_EC_OK)
-        {
-            power_ui_record_oled_action_result(ret);
-            ++g_oled_update_error_count;
-            power_ui_handle_oled_failure(ret);
-            return GMP_TASK_DONE;
+            s_oled_last_voltage_mv = voltage_set_mv;
+            g_oled_pending_mask &= (uint16_t)(~OLED_PENDING_VOLTAGE);
         }
     }
-
-    ret = power_ui_write_oled_prepared_line_chunk();
+    else if ((g_oled_pending_mask & OLED_PENDING_CURRENT) != 0U)
+    {
+        (void)snprintf(line3, sizeof(line3), "I %-3u mA      ",
+                       (unsigned int)current_set_ma);
+        ret = oled_show_line_checked(0U, 4U, line3);
+        if (ret == GMP_EC_OK)
+        {
+            s_oled_last_current_ma = current_set_ma;
+            g_oled_pending_mask &= (uint16_t)(~OLED_PENDING_CURRENT);
+        }
+    }
+    else if ((g_oled_pending_mask & OLED_PENDING_KEY) != 0U)
+    {
+        (void)snprintf(line4, sizeof(line4), "KEY %-2u       ",
+                       (unsigned int)key_id);
+        ret = oled_show_line_checked(0U, 6U, line4);
+        if (ret == GMP_EC_OK)
+        {
+            s_oled_last_key_id = key_id;
+            g_oled_pending_mask &= (uint16_t)(~OLED_PENDING_KEY);
+        }
+    }
     power_ui_record_oled_action_result(ret);
     if (ret != GMP_EC_OK)
     {
@@ -1211,28 +1075,6 @@ gmp_task_status_t oled_show_task(gmp_task_t* tsk)
         return GMP_TASK_DONE;
     }
 
-    if (g_oled_transfer_offset < s_oled_line_transfer_used_length)
-    {
-        return GMP_TASK_DONE;
-    }
-
-    if (s_oled_line_transfer_kind == OLED_PENDING_VOLTAGE)
-    {
-        s_oled_last_voltage_mv = s_oled_line_transfer_value;
-        g_oled_pending_mask &= (uint16_t)(~OLED_PENDING_VOLTAGE);
-    }
-    else if (s_oled_line_transfer_kind == OLED_PENDING_CURRENT)
-    {
-        s_oled_last_current_ma = s_oled_line_transfer_value;
-        g_oled_pending_mask &= (uint16_t)(~OLED_PENDING_CURRENT);
-    }
-    else
-    {
-        s_oled_last_key_id = s_oled_line_transfer_value;
-        g_oled_pending_mask &= (uint16_t)(~OLED_PENDING_KEY);
-    }
-
-    power_ui_reset_oled_transfer_progress();
     ++g_oled_update_ok_count;
     ++g_oled_line_update_count;
     return GMP_TASK_DONE;

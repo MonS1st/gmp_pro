@@ -102,7 +102,7 @@
 #define PSU_KEY_TASK_INITIAL_DELAY_MS             (10U)
 #define PSU_HT16K33_DISPLAY_PERIOD_MS             (500U)
 #define PSU_HT16K33_DISPLAY_INITIAL_DELAY_MS      (250U)
-#define PSU_OLED_TASK_PERIOD_MS                   (50U)
+#define PSU_OLED_TASK_PERIOD_MS                   (100U)
 #define PSU_OLED_TASK_INITIAL_DELAY_MS            (100U)
 
 #define PSU_KEY_RELEASE_FILTER_COUNT              (2U)
