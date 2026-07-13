@@ -29,6 +29,12 @@ extern "C"
 //=================================================================================================
 // global variables
 
+#define HT16K33_DISPLAY_TEST_WAIT_INIT     (0U)
+#define HT16K33_DISPLAY_TEST_PREPARE_ALL   (1U)
+#define HT16K33_DISPLAY_TEST_HOLD_ALL      (2U)
+#define HT16K33_DISPLAY_TEST_RESTORE       (3U)
+#define HT16K33_DISPLAY_TEST_NORMAL        (4U)
+
 #ifndef SPECIFY_PC_TEST_ENV
 
 #endif // SPECIFY_PC_TEST_ENV
@@ -69,6 +75,12 @@ extern volatile ec_gt g_led_update_result;
 extern volatile ec_gt g_ht16k33_clear_result;
 extern volatile uint32_t g_ht16k33_clear_count;
 extern volatile ec_gt g_ht16k33_display_off_result;
+extern volatile ec_gt g_ht16k33_osc_on_result;
+extern volatile ec_gt g_ht16k33_brightness_result;
+extern volatile ec_gt g_ht16k33_display_on_result;
+extern volatile ec_gt g_ht16k33_all_on_result;
+extern volatile uint16_t g_ht16k33_display_test_state;
+extern volatile uint32_t g_ht16k33_display_test_count;
 extern volatile uint16_t g_oled_pending_mask;
 extern volatile uint32_t g_oled_line_update_count;
 extern volatile uint16_t g_key_i2c_holdoff_count;

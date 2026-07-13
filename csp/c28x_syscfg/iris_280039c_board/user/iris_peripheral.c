@@ -55,6 +55,7 @@ static uint16_t s_key_vote_age = 0U;
 #if PSU_ENABLE_HT16K33_DISPLAY
 static uint16_t s_led_last_voltage_mv = 0xFFFFU;
 static uint16_t s_led_last_current_ma = 0xFFFFU;
+static time_gt s_ht16k33_display_test_start_tick = 0U;
 #endif
 static uint16_t s_oled_last_voltage_mv = 0xFFFFU;
 static uint16_t s_oled_last_current_ma = 0xFFFFU;
@@ -66,6 +67,7 @@ static uint16_t s_key_consecutive_timeout_count = 0U;
 #define OLED_INIT_RETRY_FAST_MS     (200U)
 #define OLED_INIT_RETRY_SLOW_MS     (1000U)
 #define OLED_KEY_DEFER_MS            (100U)
+#define HT16K33_DISPLAY_TEST_HOLD_MS (1000U)
 
 static data_gt s_oled_blank_page[OLED_CLEAR_PAGE_BYTES] = {0U};
 static data_gt s_oled_probe_payload[2] = {0x00U, 0xAEU};
@@ -619,9 +621,10 @@ void update_led_content_8byte(ht16k33_dev_t* dev, uint16_t ch1, uint16_t ch2, ui
     dev->is_dirty = 1;
 }
 
-static void power_ui_request_led_setpoint_update(void)
+static void power_ui_render_led_setpoints(bool force_update)
 {
 #if !PSU_ENABLE_HT16K33_DISPLAY
+    GMP_UNUSED_VAR(force_update);
     return;
 #else
     uint16_t voltage_set_mv = g_power_app.voltage_set_mv;
@@ -629,7 +632,8 @@ static void power_ui_request_led_setpoint_update(void)
     uint32_t display_voltage_mv = voltage_set_mv;
     uint16_t display_current_ma = current_set_ma;
 
-    if ((voltage_set_mv == s_led_last_voltage_mv) &&
+    if ((!force_update) &&
+        (voltage_set_mv == s_led_last_voltage_mv) &&
         (current_set_ma == s_led_last_current_ma))
     {
         return;
@@ -662,6 +666,11 @@ static void power_ui_request_led_setpoint_update(void)
 #endif
 }
 
+static void power_ui_request_led_setpoint_update(void)
+{
+    power_ui_render_led_setpoints(false);
+}
+
 void power_ui_request_led_setpoint_update_from_command(void)
 {
     power_ui_request_led_setpoint_update();
@@ -677,6 +686,8 @@ gmp_task_status_t tsk_LED_flush(gmp_task_t* tsk)
 
     if(flag_init_cmpt)
     {
+        uint16_t display_test_state;
+        uint16_t i;
         ec_gt ret;
 
         if (g_key_scan_ready == 0U)
@@ -684,7 +695,42 @@ gmp_task_status_t tsk_LED_flush(gmp_task_t* tsk)
             return GMP_TASK_DONE;
         }
 
-        power_ui_request_led_setpoint_update();
+        display_test_state = g_ht16k33_display_test_state;
+
+        if (display_test_state == HT16K33_DISPLAY_TEST_PREPARE_ALL)
+        {
+            for (i = 0U; i < HT16K33_CFG_DISP_RAM_SIZE; ++i)
+            {
+                dev->display_ram[i] = 0xFFU;
+            }
+            dev->is_dirty = 1;
+        }
+        else if (display_test_state == HT16K33_DISPLAY_TEST_HOLD_ALL)
+        {
+            if ((time_gt)(gmp_base_get_system_tick() -
+                          s_ht16k33_display_test_start_tick) <
+                (time_gt)HT16K33_DISPLAY_TEST_HOLD_MS)
+            {
+                return GMP_TASK_DONE;
+            }
+
+            g_ht16k33_display_test_state = HT16K33_DISPLAY_TEST_RESTORE;
+            display_test_state = HT16K33_DISPLAY_TEST_RESTORE;
+        }
+
+        if (display_test_state == HT16K33_DISPLAY_TEST_RESTORE)
+        {
+            power_ui_render_led_setpoints(true);
+        }
+        else if (display_test_state == HT16K33_DISPLAY_TEST_NORMAL)
+        {
+            power_ui_request_led_setpoint_update();
+        }
+        else if (display_test_state != HT16K33_DISPLAY_TEST_PREPARE_ALL)
+        {
+            return GMP_TASK_DONE;
+        }
+
         if (dev->is_dirty == 0)
         {
             return GMP_TASK_DONE;
@@ -695,11 +741,31 @@ gmp_task_status_t tsk_LED_flush(gmp_task_t* tsk)
 
         if (ret != GMP_EC_OK)
         {
+            dev->is_dirty = 1;
+            if (display_test_state == HT16K33_DISPLAY_TEST_PREPARE_ALL)
+            {
+                g_ht16k33_all_on_result = ret;
+            }
             return GMP_TASK_DONE;
         }
 
         g_key_ignore_scan_count = 1U;
         ++g_led_update_count;
+
+        if (display_test_state == HT16K33_DISPLAY_TEST_PREPARE_ALL)
+        {
+            g_ht16k33_all_on_result = GMP_EC_OK;
+            ++g_ht16k33_display_test_count;
+            s_ht16k33_display_test_start_tick =
+                gmp_base_get_system_tick();
+            g_ht16k33_display_test_state =
+                HT16K33_DISPLAY_TEST_HOLD_ALL;
+        }
+        else if (display_test_state == HT16K33_DISPLAY_TEST_RESTORE)
+        {
+            g_ht16k33_display_test_state =
+                HT16K33_DISPLAY_TEST_NORMAL;
+        }
     }
 
     return GMP_TASK_DONE;

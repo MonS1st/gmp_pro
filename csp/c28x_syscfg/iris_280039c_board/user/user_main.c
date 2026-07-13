@@ -162,6 +162,12 @@ volatile ec_gt g_led_update_result = GMP_EC_OK;
 volatile ec_gt g_ht16k33_clear_result = GMP_EC_NOT_READY;
 volatile uint32_t g_ht16k33_clear_count = 0U;
 volatile ec_gt g_ht16k33_display_off_result = GMP_EC_NOT_READY;
+volatile ec_gt g_ht16k33_osc_on_result = GMP_EC_NOT_READY;
+volatile ec_gt g_ht16k33_brightness_result = GMP_EC_NOT_READY;
+volatile ec_gt g_ht16k33_display_on_result = GMP_EC_NOT_READY;
+volatile ec_gt g_ht16k33_all_on_result = GMP_EC_NOT_READY;
+volatile uint16_t g_ht16k33_display_test_state = HT16K33_DISPLAY_TEST_WAIT_INIT;
+volatile uint32_t g_ht16k33_display_test_count = 0U;
 volatile uint16_t g_oled_pending_mask = 0U;
 volatile uint32_t g_oled_line_update_count = 0U;
 volatile uint16_t g_key_i2c_holdoff_count = 0U;
@@ -395,6 +401,25 @@ static void power_ui_clear_and_disable_ht16k33_display(void)
 }
 #endif
 
+#if PSU_ENABLE_HT16K33_DISPLAY
+static void power_ui_reassert_ht16k33_display_control(void)
+{
+    // Keep the raw result of each independent display-control transaction.
+    g_ht16k33_osc_on_result = gmp_hal_iic_write_cmd(
+        ht16k33.bus, ht16k33.dev_addr,
+        HT16K33_CMD_OSC_ON, 1U, HT16K33_CFG_TIMEOUT);
+
+    g_ht16k33_brightness_result = gmp_hal_iic_write_cmd(
+        ht16k33.bus, ht16k33.dev_addr,
+        HT16K33_REG_BRIGHTNESS | 0x0FU, 1U,
+        HT16K33_CFG_TIMEOUT);
+
+    g_ht16k33_display_on_result = gmp_hal_iic_write_cmd(
+        ht16k33.bus, ht16k33.dev_addr,
+        HT16K33_CMD_DISPLAY_ON, 1U, HT16K33_CFG_TIMEOUT);
+}
+#endif
+
 gmp_task_status_t tsk_startup(gmp_task_t* tsk)
 {
     ec_gt ec = GMP_EC_OK;
@@ -442,10 +467,8 @@ gmp_task_status_t tsk_startup(gmp_task_t* tsk)
 #else
     if (ec == GMP_EC_OK)
     {
-        // Initialization clears the complete local display RAM. Rebuild the
-        // eight active digits from the current setpoints and leave it dirty so
-        // the periodic display task owns the first RAM transaction.
-        power_ui_request_led_setpoint_update_from_command();
+        power_ui_reassert_ht16k33_display_control();
+        g_ht16k33_display_test_state = HT16K33_DISPLAY_TEST_PREPARE_ALL;
     }
     else
     {
