@@ -111,6 +111,10 @@
 #define PSU_I2C_RECOVERY_RETRY_MS                  (500U)
 #define PSU_I2C_RECOVERY_VERIFY_PERIOD_MS          (50U)
 #define PSU_I2C_RECOVERY_VERIFY_OK_COUNT           (2U)
+#define PSU_I2C_CLEAR_EDGE_DELAY_MS                 (1U)
+#define PSU_I2C_CLEAR_MAX_CLOCKS                    (9U)
+#define PSU_I2C_CLEAR_SETTLE_MS                     (2U)
+#define PSU_I2C_CLEAR_RETRY_MS                      (1000U)
 
 #define PSU_KEY_RELEASE_FILTER_COUNT              (2U)
 #define PSU_KEY_ENABLE_REPEAT                     (0)

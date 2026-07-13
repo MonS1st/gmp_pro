@@ -327,6 +327,17 @@ static void power_ui_schedule_i2c_recovery_retry(void)
     g_i2c_recovery_state = PSU_I2C_RECOVERY_WAIT;
 }
 
+static void power_ui_schedule_i2c_clear_retry(void)
+{
+    ++g_i2c_clear_failure_count;
+    g_i2c_recovery_verify_ok_count = 0U;
+    g_key_consecutive_ok_count = 0U;
+    s_i2c_recovery_ht_stage = PSU_I2C_RECOVERY_HT_INIT_STAGE;
+    g_i2c_recovery_next_tick =
+        gmp_base_get_system_tick() + (time_gt)PSU_I2C_CLEAR_RETRY_MS;
+    g_i2c_recovery_state = PSU_I2C_RECOVERY_WAIT;
+}
+
 static void power_ui_begin_i2c_recovery(void)
 {
     g_i2c_sda_level_before = board_i2c_read_sda_level();
@@ -352,14 +363,38 @@ static void power_ui_advance_i2c_recovery(ht16k33_dev_t* dev)
 {
     ec_gt result;
     fast_gt key_id = 0U;
+    board_i2c_clear_result_t clear_result;
 
     switch (g_i2c_recovery_state)
     {
     case PSU_I2C_RECOVERY_WAIT:
         if (power_ui_tick_due(g_i2c_recovery_next_tick))
         {
-            g_i2c_recovery_state = PSU_I2C_RECOVERY_RESET_MODULE;
+            board_i2c_bus_clear_begin();
+            g_i2c_recovery_state = PSU_I2C_RECOVERY_BUS_CLEAR;
         }
+        return;
+
+    case PSU_I2C_RECOVERY_BUS_CLEAR:
+        clear_result = board_i2c_bus_clear_step();
+        if (clear_result == BOARD_I2C_CLEAR_IN_PROGRESS)
+        {
+            return;
+        }
+
+        if ((clear_result == BOARD_I2C_CLEAR_RELEASED) &&
+            (g_i2c_clear_sda_final != 0U) &&
+            (g_i2c_clear_scl_final != 0U) &&
+            (g_i2c_clear_stop_generated != 0U) &&
+            (g_i2c_clear_pinmux_restored != 0U))
+        {
+            ++g_i2c_clear_success_count;
+            g_i2c_recovery_next_tick = gmp_base_get_system_tick();
+            g_i2c_recovery_state = PSU_I2C_RECOVERY_RESET_MODULE;
+            return;
+        }
+
+        power_ui_schedule_i2c_clear_retry();
         return;
 
     case PSU_I2C_RECOVERY_RESET_MODULE:

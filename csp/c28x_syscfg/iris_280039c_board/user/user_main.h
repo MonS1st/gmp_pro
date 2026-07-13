@@ -37,10 +37,11 @@ extern "C"
 
 #define PSU_I2C_RECOVERY_IDLE               (0U)
 #define PSU_I2C_RECOVERY_WAIT               (1U)
-#define PSU_I2C_RECOVERY_RESET_MODULE       (2U)
-#define PSU_I2C_RECOVERY_REINIT_HT          (3U)
-#define PSU_I2C_RECOVERY_VERIFY             (4U)
-#define PSU_I2C_RECOVERY_COMPLETE           (5U)
+#define PSU_I2C_RECOVERY_BUS_CLEAR          (2U)
+#define PSU_I2C_RECOVERY_RESET_MODULE       (3U)
+#define PSU_I2C_RECOVERY_REINIT_HT          (4U)
+#define PSU_I2C_RECOVERY_VERIFY             (5U)
+#define PSU_I2C_RECOVERY_COMPLETE           (6U)
 
 #ifndef SPECIFY_PC_TEST_ENV
 
@@ -109,6 +110,16 @@ extern volatile uint16_t g_i2c_sda_level_after;
 extern volatile uint16_t g_i2c_scl_level_after;
 extern volatile uint32_t g_i2c_key_backoff_skip_count;
 extern volatile time_gt g_i2c_recovery_next_tick;
+extern volatile uint16_t g_i2c_clear_state;
+extern volatile uint16_t g_i2c_clear_clock_count;
+extern volatile uint32_t g_i2c_clear_attempt_count;
+extern volatile uint32_t g_i2c_clear_success_count;
+extern volatile uint32_t g_i2c_clear_failure_count;
+extern volatile uint16_t g_i2c_clear_sda_initial;
+extern volatile uint16_t g_i2c_clear_sda_final;
+extern volatile uint16_t g_i2c_clear_scl_final;
+extern volatile uint16_t g_i2c_clear_stop_generated;
+extern volatile uint16_t g_i2c_clear_pinmux_restored;
 extern volatile ec_gt g_oled_last_result;
 extern volatile uint32_t g_oled_update_ok_count;
 extern volatile uint32_t g_oled_update_error_count;

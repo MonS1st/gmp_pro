@@ -63,6 +63,17 @@ extern adc_gt idc_src;
 
 void reset_controller(void);
 
+typedef enum
+{
+    BOARD_I2C_CLEAR_NOT_RUN = 0,
+    BOARD_I2C_CLEAR_IN_PROGRESS = 1,
+    BOARD_I2C_CLEAR_RELEASED = 2,
+    BOARD_I2C_CLEAR_STILL_LOW = 3
+} board_i2c_clear_result_t;
+
+void board_i2c_bus_clear_begin(void);
+board_i2c_clear_result_t board_i2c_bus_clear_step(void);
+void board_i2c_restore_peripheral_mode(void);
 void board_i2c_controller_reinit(void);
 uint16_t board_i2c_read_sda_level(void);
 uint16_t board_i2c_read_scl_level(void);

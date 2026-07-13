@@ -95,6 +95,188 @@ void initI2C(void)
     I2C_enableModule(I2CA_BASE);
 }
 
+typedef enum
+{
+    BOARD_I2C_CLEAR_PHASE_IDLE = 0,
+    BOARD_I2C_CLEAR_PHASE_SETTLE,
+    BOARD_I2C_CLEAR_PHASE_CLOCK_LOW_WAIT,
+    BOARD_I2C_CLEAR_PHASE_CLOCK_HIGH_WAIT,
+    BOARD_I2C_CLEAR_PHASE_STOP_LOW_WAIT,
+    BOARD_I2C_CLEAR_PHASE_STOP_HIGH_WAIT,
+    BOARD_I2C_CLEAR_PHASE_RESTORE,
+    BOARD_I2C_CLEAR_PHASE_DONE
+} board_i2c_clear_phase_t;
+
+static board_i2c_clear_phase_t s_board_i2c_clear_phase =
+    BOARD_I2C_CLEAR_PHASE_IDLE;
+static board_i2c_clear_result_t s_board_i2c_clear_result =
+    BOARD_I2C_CLEAR_NOT_RUN;
+static time_gt s_board_i2c_clear_next_tick = 0U;
+
+static bool board_i2c_clear_tick_due(time_gt deadline)
+{
+    time_gt now = gmp_base_get_system_tick();
+
+    return ((int32_t)(now - deadline) >= 0);
+}
+
+void board_i2c_restore_peripheral_mode(void)
+{
+    GPIO_setPinConfig(IRIS_IIC_I2CSDA_PIN_CONFIG);
+    GPIO_setPadConfig(IRIS_IIC_I2CSDA_GPIO, GPIO_PIN_TYPE_PULLUP);
+    GPIO_setQualificationMode(IRIS_IIC_I2CSDA_GPIO, GPIO_QUAL_ASYNC);
+
+    GPIO_setPinConfig(IRIS_IIC_I2CSCL_PIN_CONFIG);
+    GPIO_setPadConfig(IRIS_IIC_I2CSCL_GPIO, GPIO_PIN_TYPE_PULLUP);
+    GPIO_setQualificationMode(IRIS_IIC_I2CSCL_GPIO, GPIO_QUAL_ASYNC);
+
+    g_i2c_clear_pinmux_restored = 1U;
+}
+
+void board_i2c_bus_clear_begin(void)
+{
+    I2C_disableModule(I2CA_BASE);
+
+    // Preload released levels before GPIO takes ownership of the pins. With
+    // open-drain enabled, writing one releases the line to the pull-up.
+    GPIO_writePin(IRIS_IIC_I2CSDA_GPIO, 1U);
+    GPIO_writePin(IRIS_IIC_I2CSCL_GPIO, 1U);
+
+    GPIO_setPadConfig(IRIS_IIC_I2CSDA_GPIO,
+                      GPIO_PIN_TYPE_OD | GPIO_PIN_TYPE_PULLUP);
+    GPIO_setQualificationMode(IRIS_IIC_I2CSDA_GPIO, GPIO_QUAL_ASYNC);
+    GPIO_setDirectionMode(IRIS_IIC_I2CSDA_GPIO, GPIO_DIR_MODE_OUT);
+    GPIO_setPinConfig(GPIO_56_GPIO56);
+
+    GPIO_setPadConfig(IRIS_IIC_I2CSCL_GPIO,
+                      GPIO_PIN_TYPE_OD | GPIO_PIN_TYPE_PULLUP);
+    GPIO_setQualificationMode(IRIS_IIC_I2CSCL_GPIO, GPIO_QUAL_ASYNC);
+    GPIO_setDirectionMode(IRIS_IIC_I2CSCL_GPIO, GPIO_DIR_MODE_OUT);
+    GPIO_setPinConfig(GPIO_57_GPIO57);
+
+    ++g_i2c_clear_attempt_count;
+    g_i2c_clear_state = BOARD_I2C_CLEAR_IN_PROGRESS;
+    g_i2c_clear_clock_count = 0U;
+    g_i2c_clear_sda_initial = 0U;
+    g_i2c_clear_sda_final = 0U;
+    g_i2c_clear_scl_final = 0U;
+    g_i2c_clear_stop_generated = 0U;
+    g_i2c_clear_pinmux_restored = 0U;
+
+    s_board_i2c_clear_result = BOARD_I2C_CLEAR_IN_PROGRESS;
+    s_board_i2c_clear_phase = BOARD_I2C_CLEAR_PHASE_SETTLE;
+    s_board_i2c_clear_next_tick =
+        gmp_base_get_system_tick() + (time_gt)PSU_I2C_CLEAR_SETTLE_MS;
+}
+
+board_i2c_clear_result_t board_i2c_bus_clear_step(void)
+{
+    if (s_board_i2c_clear_phase == BOARD_I2C_CLEAR_PHASE_IDLE)
+    {
+        return BOARD_I2C_CLEAR_NOT_RUN;
+    }
+
+    if (s_board_i2c_clear_phase == BOARD_I2C_CLEAR_PHASE_DONE)
+    {
+        return s_board_i2c_clear_result;
+    }
+
+    if (!board_i2c_clear_tick_due(s_board_i2c_clear_next_tick))
+    {
+        return BOARD_I2C_CLEAR_IN_PROGRESS;
+    }
+
+    switch (s_board_i2c_clear_phase)
+    {
+    case BOARD_I2C_CLEAR_PHASE_SETTLE:
+        g_i2c_clear_sda_initial = board_i2c_read_sda_level();
+        if (g_i2c_clear_sda_initial != 0U)
+        {
+            // SCL is already released high. Pull SDA low to begin STOP.
+            GPIO_writePin(IRIS_IIC_I2CSDA_GPIO, 0U);
+            s_board_i2c_clear_phase = BOARD_I2C_CLEAR_PHASE_STOP_LOW_WAIT;
+        }
+        else
+        {
+            // Begin the first recovery clock with one active-low edge.
+            GPIO_writePin(IRIS_IIC_I2CSCL_GPIO, 0U);
+            s_board_i2c_clear_phase = BOARD_I2C_CLEAR_PHASE_CLOCK_LOW_WAIT;
+        }
+        s_board_i2c_clear_next_tick =
+            gmp_base_get_system_tick() +
+            (time_gt)PSU_I2C_CLEAR_EDGE_DELAY_MS;
+        return BOARD_I2C_CLEAR_IN_PROGRESS;
+
+    case BOARD_I2C_CLEAR_PHASE_CLOCK_LOW_WAIT:
+        // Open-drain one releases SCL; count each released high phase once.
+        GPIO_writePin(IRIS_IIC_I2CSCL_GPIO, 1U);
+        ++g_i2c_clear_clock_count;
+        s_board_i2c_clear_phase = BOARD_I2C_CLEAR_PHASE_CLOCK_HIGH_WAIT;
+        s_board_i2c_clear_next_tick =
+            gmp_base_get_system_tick() +
+            (time_gt)PSU_I2C_CLEAR_EDGE_DELAY_MS;
+        return BOARD_I2C_CLEAR_IN_PROGRESS;
+
+    case BOARD_I2C_CLEAR_PHASE_CLOCK_HIGH_WAIT:
+        if ((board_i2c_read_sda_level() != 0U) ||
+            (g_i2c_clear_clock_count >= PSU_I2C_CLEAR_MAX_CLOCKS))
+        {
+            // Leave SCL released high and pull SDA low to begin STOP.
+            GPIO_writePin(IRIS_IIC_I2CSDA_GPIO, 0U);
+            s_board_i2c_clear_phase = BOARD_I2C_CLEAR_PHASE_STOP_LOW_WAIT;
+        }
+        else
+        {
+            GPIO_writePin(IRIS_IIC_I2CSCL_GPIO, 0U);
+            s_board_i2c_clear_phase = BOARD_I2C_CLEAR_PHASE_CLOCK_LOW_WAIT;
+        }
+        s_board_i2c_clear_next_tick =
+            gmp_base_get_system_tick() +
+            (time_gt)PSU_I2C_CLEAR_EDGE_DELAY_MS;
+        return BOARD_I2C_CLEAR_IN_PROGRESS;
+
+    case BOARD_I2C_CLEAR_PHASE_STOP_LOW_WAIT:
+        // Releasing SDA while SCL is released high is the STOP edge.
+        GPIO_writePin(IRIS_IIC_I2CSDA_GPIO, 1U);
+        g_i2c_clear_stop_generated = 1U;
+        s_board_i2c_clear_phase = BOARD_I2C_CLEAR_PHASE_STOP_HIGH_WAIT;
+        s_board_i2c_clear_next_tick =
+            gmp_base_get_system_tick() +
+            (time_gt)PSU_I2C_CLEAR_EDGE_DELAY_MS;
+        return BOARD_I2C_CLEAR_IN_PROGRESS;
+
+    case BOARD_I2C_CLEAR_PHASE_STOP_HIGH_WAIT:
+        // Keep pinmux restoration in its own scheduler step.
+        s_board_i2c_clear_phase = BOARD_I2C_CLEAR_PHASE_RESTORE;
+        return BOARD_I2C_CLEAR_IN_PROGRESS;
+
+    case BOARD_I2C_CLEAR_PHASE_RESTORE:
+        board_i2c_restore_peripheral_mode();
+        g_i2c_clear_sda_final = board_i2c_read_sda_level();
+        g_i2c_clear_scl_final = board_i2c_read_scl_level();
+
+        if ((g_i2c_clear_sda_final != 0U) &&
+            (g_i2c_clear_scl_final != 0U) &&
+            (g_i2c_clear_stop_generated != 0U) &&
+            (g_i2c_clear_pinmux_restored != 0U))
+        {
+            s_board_i2c_clear_result = BOARD_I2C_CLEAR_RELEASED;
+        }
+        else
+        {
+            s_board_i2c_clear_result = BOARD_I2C_CLEAR_STILL_LOW;
+        }
+        g_i2c_clear_state = (uint16_t)s_board_i2c_clear_result;
+        s_board_i2c_clear_phase = BOARD_I2C_CLEAR_PHASE_DONE;
+        return s_board_i2c_clear_result;
+
+    case BOARD_I2C_CLEAR_PHASE_IDLE:
+    case BOARD_I2C_CLEAR_PHASE_DONE:
+    default:
+        return s_board_i2c_clear_result;
+    }
+}
+
 void board_i2c_controller_reinit(void)
 {
     initI2C();
