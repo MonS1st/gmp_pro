@@ -48,17 +48,39 @@ void oled_reset_init_sequence(void);
 ec_gt oled_set_position_checked(uint8_t x, uint8_t y_page);
 
 /**
- * @brief  Write one bounded page segment using FIFO-safe 15-byte data chunks.
- * @note   Data beyond the 128-pixel display width is truncated.
+ * @brief  Write exactly one FIFO-safe OLED page chunk.
+ * @note   Performs one position transaction followed by one data transaction.
+ *         Length must be between 1 and 15 pixel bytes.
+ */
+ec_gt oled_write_chunk_checked(uint8_t x, uint8_t page,
+                               const data_gt *data, uint16_t length);
+
+/**
+ * @brief  Compatibility writer for one page segment.
+ * @note   This synchronous helper may send multiple position/data pairs. Data
+ *         beyond the 128-pixel display width is truncated. Scheduled OLED
+ *         state machines must use oled_write_chunk_checked() instead.
  */
 ec_gt oled_write_page_checked(uint8_t x, uint8_t y_page,
                               const data_gt *data, uint16_t length);
 
 /**
- * @brief  Render one text line into page buffers and return the first I2C error.
- * @note   Each page is automatically split into position and bounded data transactions.
+ * @brief  Compatibility writer that renders and sends one complete text line.
+ * @note   This synchronous helper may send multiple position/data pairs.
+ *         Scheduled OLED state machines must use the prepared-line chunk API.
  */
 ec_gt oled_show_line_checked(uint8_t x, uint8_t y_page, const char *str);
+
+/** Render one text line once into the board-local static line buffer. */
+ec_gt oled_prepare_line_checked(const char *str, uint16_t *used_length);
+
+/**
+ * @brief  Send one prepared-line chunk of at most 15 pixel bytes.
+ * @param  written_length Receives the number of pixel bytes sent on success.
+ */
+ec_gt oled_write_prepared_line_chunk_checked(
+    uint8_t x, uint8_t page, uint16_t offset,
+    uint16_t *written_length);
 
 /**
  * @brief  Clear all OLED pages and return the first failed page transaction.

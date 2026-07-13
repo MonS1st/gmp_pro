@@ -19,6 +19,7 @@ static data_gt s_oled_line_upper[OLED_DISPLAY_WIDTH];
 #if FONT_SIZE == 16
 static data_gt s_oled_line_lower[OLED_DISPLAY_WIDTH];
 #endif
+static uint16_t s_oled_prepared_line_length = 0U;
 static uint16_t s_oled_active_address = 0U;
 
 volatile ec_gt g_oled_position_result = GMP_EC_NOT_READY;
@@ -175,6 +176,54 @@ ec_gt oled_set_position_checked(uint8_t x, uint8_t y_page)
     return ret;
 }
 
+ec_gt oled_write_chunk_checked(uint8_t x, uint8_t page,
+                               const data_gt *data, uint16_t length)
+{
+    uint16_t i;
+    ec_gt ret;
+
+    oled_prepare_diagnostics();
+    if (!oled_active_address_is_valid())
+    {
+        g_oled_position_result = GMP_EC_NOT_READY;
+        return GMP_EC_NOT_READY;
+    }
+    if ((data == NULL) || (length == 0U) ||
+        (length > OLED_I2C_MAX_PAYLOAD_BYTES) ||
+        (x >= OLED_DISPLAY_WIDTH) || (page >= OLED_PAGE_COUNT) ||
+        (length > (uint16_t)(OLED_DISPLAY_WIDTH - x)))
+    {
+        g_oled_position_result = GMP_EC_INVALID_PARAM;
+        oled_record_failure(OLED_FAIL_STAGE_PARAMETER, x, page, length);
+        return GMP_EC_INVALID_PARAM;
+    }
+
+    ret = oled_set_position_raw(x, page);
+    g_oled_position_result = ret;
+    if (ret != GMP_EC_OK)
+    {
+        oled_record_failure(OLED_FAIL_STAGE_POSITION, x, page, length);
+        return ret;
+    }
+
+    s_oled_i2c_payload[0] = 0x40U;
+    for (i = 0U; i < length; ++i)
+    {
+        s_oled_i2c_payload[i + 1U] = data[i];
+    }
+
+    ret = oled_write_active(
+        s_oled_i2c_payload, (size_gt)(length + 1U));
+    g_oled_data_result = ret;
+    if (ret != GMP_EC_OK)
+    {
+        oled_record_failure(OLED_FAIL_STAGE_DATA, x, page, length);
+        return ret;
+    }
+
+    return GMP_EC_OK;
+}
+
 ec_gt oled_write_page_checked(uint8_t x, uint8_t y_page,
                               const data_gt *data, uint16_t length)
 {
@@ -183,8 +232,6 @@ ec_gt oled_write_page_checked(uint8_t x, uint8_t y_page,
     uint16_t offset;
     uint16_t remaining;
     uint16_t chunk;
-    uint16_t chunk_x;
-    uint16_t i;
     ec_gt ret;
 
     oled_prepare_diagnostics();
@@ -210,40 +257,11 @@ ec_gt oled_write_page_checked(uint8_t x, uint8_t y_page,
         remaining = (uint16_t)(write_length - offset);
         chunk = (remaining > OLED_I2C_MAX_PAYLOAD_BYTES) ?
                     OLED_I2C_MAX_PAYLOAD_BYTES : remaining;
-        chunk_x = (uint16_t)x + offset;
-        g_oled_position_result = GMP_EC_NOT_READY;
-        g_oled_data_result = GMP_EC_NOT_READY;
-
-        if (chunk_x >= OLED_DISPLAY_WIDTH)
-        {
-            g_oled_position_result = GMP_EC_INVALID_PARAM;
-            oled_record_failure(
-                OLED_FAIL_STAGE_PARAMETER, chunk_x, y_page, chunk);
-            return GMP_EC_INVALID_PARAM;
-        }
-
-        ret = oled_set_position_raw((uint8_t)chunk_x, y_page);
-        g_oled_position_result = ret;
+        ret = oled_write_chunk_checked(
+            (uint8_t)((uint16_t)x + offset), y_page,
+            &data[offset], chunk);
         if (ret != GMP_EC_OK)
         {
-            oled_record_failure(
-                OLED_FAIL_STAGE_POSITION, chunk_x, y_page, chunk);
-            return ret;
-        }
-
-        s_oled_i2c_payload[0] = 0x40U;
-        for (i = 0U; i < chunk; ++i)
-        {
-            s_oled_i2c_payload[i + 1U] = data[offset + i];
-        }
-
-        ret = oled_write_active(
-            s_oled_i2c_payload, (size_gt)(chunk + 1U));
-        g_oled_data_result = ret;
-        if (ret != GMP_EC_OK)
-        {
-            oled_record_failure(
-                OLED_FAIL_STAGE_DATA, chunk_x, y_page, chunk);
             return ret;
         }
 
@@ -253,16 +271,13 @@ ec_gt oled_write_page_checked(uint8_t x, uint8_t y_page,
     return GMP_EC_OK;
 }
 
-ec_gt oled_show_line_checked(uint8_t x, uint8_t y_page, const char *str)
+ec_gt oled_prepare_line_checked(const char *str, uint16_t *used_length)
 {
-    uint16_t max_width;
     uint16_t used = 0U;
     uint16_t char_index = 0U;
     uint16_t glyph_column;
     uint16_t font_index;
     uint8_t chr;
-    ec_gt ret;
-
     if (!oled_active_address_is_valid())
     {
         oled_prepare_diagnostics();
@@ -270,32 +285,27 @@ ec_gt oled_show_line_checked(uint8_t x, uint8_t y_page, const char *str)
         return GMP_EC_NOT_READY;
     }
 
-    if ((str == NULL) || (x >= OLED_DISPLAY_WIDTH) ||
-        (y_page >= OLED_PAGE_COUNT))
+    if (used_length != NULL)
+    {
+        *used_length = 0U;
+    }
+    s_oled_prepared_line_length = 0U;
+    if ((str == NULL) || (used_length == NULL))
     {
         oled_prepare_diagnostics();
         g_oled_position_result = GMP_EC_INVALID_PARAM;
-        oled_record_failure(OLED_FAIL_STAGE_PARAMETER, x, y_page, 0U);
+        oled_record_failure(OLED_FAIL_STAGE_PARAMETER, 0U, 0U, 0U);
         return GMP_EC_INVALID_PARAM;
     }
-#if FONT_SIZE == 16
-    if ((uint16_t)y_page + 1U >= OLED_PAGE_COUNT)
-    {
-        oled_prepare_diagnostics();
-        g_oled_position_result = GMP_EC_INVALID_PARAM;
-        oled_record_failure(OLED_FAIL_STAGE_PARAMETER, x, y_page, 0U);
-        return GMP_EC_INVALID_PARAM;
-    }
-#endif
 
-    max_width = (uint16_t)(OLED_DISPLAY_WIDTH - x);
-    while ((str[char_index] != '\0') && (used < max_width))
+    while ((str[char_index] != '\0') && (used < OLED_DISPLAY_WIDTH))
     {
         chr = oled_checked_printable_char((uint8_t)str[char_index]);
         font_index = (uint16_t)(chr - (uint8_t)' ');
 
         for (glyph_column = 0U;
-             (glyph_column < OLED_TEXT_CELL_WIDTH) && (used < max_width);
+             (glyph_column < OLED_TEXT_CELL_WIDTH) &&
+             (used < OLED_DISPLAY_WIDTH);
              ++glyph_column)
         {
 #if FONT_SIZE == 16
@@ -318,11 +328,105 @@ ec_gt oled_show_line_checked(uint8_t x, uint8_t y_page, const char *str)
     {
         oled_prepare_diagnostics();
         g_oled_position_result = GMP_EC_INVALID_PARAM;
-        oled_record_failure(OLED_FAIL_STAGE_PARAMETER, x, y_page, 0U);
+        oled_record_failure(OLED_FAIL_STAGE_PARAMETER, 0U, 0U, 0U);
         return GMP_EC_INVALID_PARAM;
     }
 
-    ret = oled_write_page_checked(x, y_page, s_oled_line_upper, used);
+    s_oled_prepared_line_length = used;
+    *used_length = used;
+    return GMP_EC_OK;
+}
+
+ec_gt oled_write_prepared_line_chunk_checked(
+    uint8_t x, uint8_t page, uint16_t offset,
+    uint16_t *written_length)
+{
+    uint16_t chunk_x;
+    uint16_t remaining;
+    uint16_t available;
+    uint16_t chunk;
+    ec_gt ret;
+
+    if (written_length != NULL)
+    {
+        *written_length = 0U;
+    }
+    if ((written_length == NULL) ||
+        (s_oled_prepared_line_length == 0U) ||
+        (offset >= s_oled_prepared_line_length) ||
+        (x >= OLED_DISPLAY_WIDTH) || (page >= OLED_PAGE_COUNT))
+    {
+        oled_prepare_diagnostics();
+        g_oled_position_result = GMP_EC_INVALID_PARAM;
+        oled_record_failure(OLED_FAIL_STAGE_PARAMETER, x, page, 0U);
+        return GMP_EC_INVALID_PARAM;
+    }
+
+    chunk_x = (uint16_t)x + offset;
+    if (chunk_x >= OLED_DISPLAY_WIDTH)
+    {
+        oled_prepare_diagnostics();
+        g_oled_position_result = GMP_EC_INVALID_PARAM;
+        oled_record_failure(OLED_FAIL_STAGE_PARAMETER, chunk_x, page, 0U);
+        return GMP_EC_INVALID_PARAM;
+    }
+
+    remaining = (uint16_t)(s_oled_prepared_line_length - offset);
+    available = (uint16_t)(OLED_DISPLAY_WIDTH - chunk_x);
+    chunk = (remaining > OLED_I2C_MAX_PAYLOAD_BYTES) ?
+                OLED_I2C_MAX_PAYLOAD_BYTES : remaining;
+    if (chunk > available)
+    {
+        chunk = available;
+    }
+
+    ret = oled_write_chunk_checked(
+        (uint8_t)chunk_x, page, &s_oled_line_upper[offset], chunk);
+    if (ret == GMP_EC_OK)
+    {
+        *written_length = chunk;
+    }
+
+    return ret;
+}
+
+ec_gt oled_show_line_checked(uint8_t x, uint8_t y_page, const char *str)
+{
+    uint16_t used;
+    uint16_t write_length;
+    ec_gt ret;
+
+    if ((x >= OLED_DISPLAY_WIDTH) || (y_page >= OLED_PAGE_COUNT))
+    {
+        oled_prepare_diagnostics();
+        g_oled_position_result = GMP_EC_INVALID_PARAM;
+        oled_record_failure(OLED_FAIL_STAGE_PARAMETER, x, y_page, 0U);
+        return GMP_EC_INVALID_PARAM;
+    }
+#if FONT_SIZE == 16
+    if ((uint16_t)y_page + 1U >= OLED_PAGE_COUNT)
+    {
+        oled_prepare_diagnostics();
+        g_oled_position_result = GMP_EC_INVALID_PARAM;
+        oled_record_failure(OLED_FAIL_STAGE_PARAMETER, x, y_page, 0U);
+        return GMP_EC_INVALID_PARAM;
+    }
+#endif
+
+    ret = oled_prepare_line_checked(str, &used);
+    if (ret != GMP_EC_OK)
+    {
+        return ret;
+    }
+
+    write_length = used;
+    if (write_length > (uint16_t)(OLED_DISPLAY_WIDTH - x))
+    {
+        write_length = (uint16_t)(OLED_DISPLAY_WIDTH - x);
+    }
+
+    ret = oled_write_page_checked(
+        x, y_page, s_oled_line_upper, write_length);
     if (ret != GMP_EC_OK)
     {
         return ret;
@@ -330,7 +434,7 @@ ec_gt oled_show_line_checked(uint8_t x, uint8_t y_page, const char *str)
 
 #if FONT_SIZE == 16
     ret = oled_write_page_checked(
-        x, (uint8_t)(y_page + 1U), s_oled_line_lower, used);
+        x, (uint8_t)(y_page + 1U), s_oled_line_lower, write_length);
     if (ret != GMP_EC_OK)
     {
         return ret;
