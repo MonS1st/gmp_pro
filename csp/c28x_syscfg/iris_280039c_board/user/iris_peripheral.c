@@ -192,12 +192,24 @@ static void power_ui_run_oled_probe_3c(void)
     result = power_ui_probe_oled_address(OLED_IIC_7BIT_ADDR_3C);
     g_oled_probe_3c_result = result;
     power_ui_record_oled_action_result(result);
+
+    if (result == GMP_EC_OK)
+    {
+        g_oled_selected_address = OLED_IIC_7BIT_ADDR_3C;
+        oled_set_active_address(OLED_IIC_7BIT_ADDR_3C);
+        oled_reset_init_sequence();
+        ++g_oled_init_attempt_count;
+        g_oled_probe_result = GMP_EC_OK;
+        g_oled_last_result = GMP_EC_OK;
+        g_oled_init_state = OLED_INIT_COMMANDS;
+        return;
+    }
+
     g_oled_init_state = OLED_INIT_PROBE_3D;
 }
 
 static void power_ui_run_oled_probe_3d(void)
 {
-    uint16_t selected_address;
     ec_gt result;
 
     g_oled_init_state = OLED_INIT_PROBE_3D;
@@ -205,27 +217,23 @@ static void power_ui_run_oled_probe_3d(void)
     g_oled_probe_3d_result = result;
     power_ui_record_oled_action_result(result);
 
-    if (g_oled_probe_3c_result == GMP_EC_OK)
+    if (result == GMP_EC_OK)
     {
-        selected_address = OLED_IIC_7BIT_ADDR_3C;
-    }
-    else if (g_oled_probe_3d_result == GMP_EC_OK)
-    {
-        selected_address = OLED_IIC_7BIT_ADDR_3D;
-    }
-    else
-    {
-        ++g_oled_no_device_count;
-        power_ui_handle_oled_failure_with_delay(
-            result, OLED_INIT_RETRY_SLOW_MS);
+        g_oled_selected_address = OLED_IIC_7BIT_ADDR_3D;
+        oled_set_active_address(OLED_IIC_7BIT_ADDR_3D);
+        oled_reset_init_sequence();
+        ++g_oled_init_attempt_count;
+        g_oled_probe_result = GMP_EC_OK;
+        g_oled_last_result = GMP_EC_OK;
+        g_oled_init_state = OLED_INIT_COMMANDS;
         return;
     }
 
-    g_oled_selected_address = selected_address;
-    oled_set_active_address(selected_address);
-    oled_reset_init_sequence();
-    ++g_oled_init_attempt_count;
-    g_oled_init_state = OLED_INIT_COMMANDS;
+    g_oled_probe_result = result;
+    g_oled_last_result = result;
+    ++g_oled_no_device_count;
+    power_ui_handle_oled_failure_with_delay(
+        result, OLED_INIT_RETRY_SLOW_MS);
 }
 
 static void power_ui_run_oled_commands(void)
