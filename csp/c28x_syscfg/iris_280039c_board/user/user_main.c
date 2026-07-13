@@ -151,6 +151,16 @@ volatile uint32_t g_key_action_count = 0U;
 volatile uint16_t g_key_ignore_scan_count = 0U;
 volatile uint32_t g_led_update_count = 0U;
 volatile ec_gt g_led_update_result = GMP_EC_OK;
+volatile ec_gt g_ht16k33_clear_result = GMP_EC_NOT_READY;
+volatile uint32_t g_ht16k33_clear_count = 0U;
+volatile ec_gt g_ht16k33_display_off_result = GMP_EC_NOT_READY;
+volatile uint16_t g_oled_pending_mask = 0U;
+volatile uint32_t g_oled_line_update_count = 0U;
+volatile uint16_t g_key_i2c_holdoff_count = 0U;
+volatile uint32_t g_key_i2c_holdoff_skip_count = 0U;
+volatile uint16_t g_oled_dynamic_update_enabled = 1U;
+volatile uint32_t g_oled_disabled_due_i2c_count = 0U;
+volatile uint16_t g_key_consecutive_ok_count = 0U;
 
 gmp_task_status_t tsk_blink(gmp_task_t* tsk)
 {
@@ -331,6 +341,33 @@ void init(void) GMP_NO_OPT_SUFFIX
 }
 
 // Initialization tasks after all peripherals have been initialized
+#if PSU_ENABLE_HT16K33_KEY && !PSU_ENABLE_HT16K33_DISPLAY
+static void power_ui_clear_and_disable_ht16k33_display(void)
+{
+    uint16_t i;
+
+    // Clear the controller's local shadow and the HT16K33 display RAM once.
+    // Do not mark the shadow dirty: periodic display flushing is disabled.
+    for (i = 0U; i < HT16K33_CFG_DISP_RAM_SIZE; ++i)
+    {
+        ht16k33.display_ram[i] = 0U;
+    }
+
+    ++g_ht16k33_clear_count;
+    g_ht16k33_clear_result = gmp_hal_iic_write_mem(
+        ht16k33.bus, ht16k33.dev_addr, 0x00U, 1U,
+        ht16k33.display_ram, HT16K33_CFG_DISP_RAM_SIZE,
+        HT16K33_CFG_TIMEOUT);
+
+    // Fail dark: attempt DISPLAY OFF even if the preceding clear reports an
+    // error. The oscillator remains enabled for key-matrix scanning.
+    g_ht16k33_display_off_result = gmp_hal_iic_write_cmd(
+        ht16k33.bus, ht16k33.dev_addr,
+        HT16K33_REG_DISPLAY_SETUP, 1U, HT16K33_CFG_TIMEOUT);
+    ht16k33.is_dirty = 0;
+}
+#endif
+
 gmp_task_status_t tsk_startup(gmp_task_t* tsk)
 {
     ec_gt ec = GMP_EC_OK;
@@ -366,9 +403,20 @@ gmp_task_status_t tsk_startup(gmp_task_t* tsk)
     ht16k33_init_t ht16k33_init_struct = {.brightness = 15, .blink_rate = 0, .int_enable = 0, .int_act_high = 0};
 
     ec = ht16k33_init(&ht16k33, iic_bus, HT16K33_DEFAULT_DEV_ADDR, &ht16k33_init_struct);
+#if PSU_ENABLE_HT16K33_KEY && !PSU_ENABLE_HT16K33_DISPLAY
+    if (ec == GMP_EC_OK)
+    {
+        power_ui_clear_and_disable_ht16k33_display();
+    }
+    else
+    {
+        ht16k33.is_dirty = 0;
+    }
+#else
     // The driver's initialization clears local RAM and marks it dirty. Keep
     // display flushing blocked until four successful idle key scans complete.
     ht16k33.is_dirty = 0;
+#endif
     g_ui_init_stage = 2U;
     g_ui_init_result = (uint16_t)ec;
 
@@ -386,6 +434,9 @@ gmp_task_status_t tsk_startup(gmp_task_t* tsk)
     // init and test the oled.
 #if PSU_ENABLE_OLED_DISPLAY
     oled_init();
+    // oled_init() performs many back-to-back writes on the same I2C bus used
+    // by HT16K33. Apply the same recovery window as a dynamic line commit.
+    g_key_i2c_holdoff_count = 2U;
 #endif
 
     //        hdc1080_config_reg_t hdc1080_cfg = {.all = 0};

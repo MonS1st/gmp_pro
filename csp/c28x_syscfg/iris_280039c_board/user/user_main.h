@@ -58,9 +58,23 @@ extern volatile uint32_t g_key_action_count;
 extern volatile uint16_t g_key_ignore_scan_count;
 extern volatile uint32_t g_led_update_count;
 extern volatile ec_gt g_led_update_result;
+extern volatile ec_gt g_ht16k33_clear_result;
+extern volatile uint32_t g_ht16k33_clear_count;
+extern volatile ec_gt g_ht16k33_display_off_result;
+extern volatile uint16_t g_oled_pending_mask;
+extern volatile uint32_t g_oled_line_update_count;
+extern volatile uint16_t g_key_i2c_holdoff_count;
+extern volatile uint32_t g_key_i2c_holdoff_skip_count;
+extern volatile uint16_t g_oled_dynamic_update_enabled;
+extern volatile uint32_t g_oled_disabled_due_i2c_count;
+extern volatile uint16_t g_key_consecutive_ok_count;
 extern volatile uint32_t g_blocked_output_request_count;
 extern volatile uint16_t s_last_key_id;
 extern volatile uint16_t s_key_release_count;
+
+#define OLED_PENDING_VOLTAGE (1U << 0)
+#define OLED_PENDING_CURRENT (1U << 1)
+#define OLED_PENDING_KEY     (1U << 2)
 
 //=================================================================================================
 // global functions

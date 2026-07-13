@@ -49,11 +49,14 @@ hdc1080_dev_t hdc1080;
 // Global volatile state remains directly observable in CCS Expressions.
 volatile uint16_t s_last_key_id = 0U;
 volatile uint16_t s_key_release_count = 0U;
+#if PSU_ENABLE_HT16K33_DISPLAY
 static uint16_t s_led_last_voltage_mv = 0xFFFFU;
 static uint16_t s_led_last_current_ma = 0xFFFFU;
+#endif
 static uint16_t s_oled_last_voltage_mv = 0xFFFFU;
 static uint16_t s_oled_last_current_ma = 0xFFFFU;
 static uint16_t s_oled_last_key_id = 0xFFFFU;
+static uint16_t s_key_consecutive_timeout_count = 0U;
 
 static void power_ui_request_led_setpoint_update(void);
 
@@ -255,8 +258,10 @@ bool power_ui_safe_bringup_self_test(void)
     power_ui_reset_key_candidate();
     g_key_scan_ready = 0U;
     g_key_ignore_scan_count = 0U;
+#if PSU_ENABLE_HT16K33_DISPLAY
     s_led_last_voltage_mv = 0xFFFFU;
     s_led_last_current_ma = 0xFFFFU;
+#endif
     return passed;
 #else
     return true;
@@ -349,6 +354,9 @@ void update_led_content_8byte(ht16k33_dev_t* dev, uint16_t ch1, uint16_t ch2, ui
 
 static void power_ui_request_led_setpoint_update(void)
 {
+#if !PSU_ENABLE_HT16K33_DISPLAY
+    return;
+#else
     uint16_t voltage_set_mv = g_power_app.voltage_set_mv;
     uint16_t current_set_ma = g_power_app.current_set_ma;
 
@@ -373,6 +381,7 @@ static void power_ui_request_led_setpoint_update(void)
 
     s_led_last_voltage_mv = voltage_set_mv;
     s_led_last_current_ma = current_set_ma;
+#endif
 }
 
 void power_ui_request_led_setpoint_update_from_command(void)
@@ -382,6 +391,10 @@ void power_ui_request_led_setpoint_update_from_command(void)
 
 gmp_task_status_t tsk_LED_flush(gmp_task_t* tsk)
 {
+#if !PSU_ENABLE_HT16K33_DISPLAY
+    GMP_UNUSED_VAR(tsk);
+    return GMP_TASK_DONE;
+#else
     ht16k33_dev_t* dev = (ht16k33_dev_t*)tsk->user_data;
 
     if(flag_init_cmpt)
@@ -411,6 +424,7 @@ gmp_task_status_t tsk_LED_flush(gmp_task_t* tsk)
     }
 
     return GMP_TASK_DONE;
+#endif
 }
 
 gmp_task_status_t tsk_key_flush(gmp_task_t* tsk)
@@ -422,6 +436,16 @@ gmp_task_status_t tsk_key_flush(gmp_task_t* tsk)
     if(flag_init_cmpt)
     {
         ec_gt ret;
+
+        // An OLED line consists of many back-to-back I2C transactions. Leave
+        // two complete 50 ms key periods idle before accessing HT16K33 again.
+        if (g_key_i2c_holdoff_count != 0U)
+        {
+            --g_key_i2c_holdoff_count;
+            ++g_key_i2c_holdoff_skip_count;
+            power_ui_reset_key_candidate();
+            return GMP_TASK_DONE;
+        }
 
         // The common driver suppresses repeated reports of the same key for
         // 120 ms. This board-level state machine needs the current matrix
@@ -437,12 +461,45 @@ gmp_task_status_t tsk_key_flush(gmp_task_t* tsk)
         {
             ++g_key_read_error_count;
             ++g_key_consecutive_error_count;
+            g_key_consecutive_ok_count = 0U;
+
+            if (ret == GMP_EC_TIMEOUT)
+            {
+                if (s_key_consecutive_timeout_count < 0xFFFFU)
+                {
+                    ++s_key_consecutive_timeout_count;
+                }
+            }
+            else
+            {
+                s_key_consecutive_timeout_count = 0U;
+            }
+
+            if ((s_key_consecutive_timeout_count >= 3U) &&
+                (g_oled_dynamic_update_enabled != 0U))
+            {
+                g_oled_dynamic_update_enabled = 0U;
+                g_oled_pending_mask = 0U;
+                ++g_oled_disabled_due_i2c_count;
+            }
+
             power_ui_handle_key_read_error();
             return GMP_TASK_DONE;
         }
 
         ++g_key_read_ok_count;
         g_key_consecutive_error_count = 0U;
+        s_key_consecutive_timeout_count = 0U;
+
+        if (g_key_consecutive_ok_count < 0xFFFFU)
+        {
+            ++g_key_consecutive_ok_count;
+        }
+        if ((g_oled_dynamic_update_enabled == 0U) &&
+            (g_key_consecutive_ok_count >= 10U))
+        {
+            g_oled_dynamic_update_enabled = 1U;
+        }
 
         if (g_key_ignore_scan_count != 0U)
         {
@@ -492,31 +549,67 @@ gmp_task_status_t oled_show_task(gmp_task_t* tsk)
             oled_clear();
             oled_show_str(0U, 0U, "BOARD TEST");
             s_page_initialized = true;
+            g_oled_pending_mask = OLED_PENDING_VOLTAGE |
+                                  OLED_PENDING_CURRENT |
+                                  OLED_PENDING_KEY;
+            g_key_i2c_holdoff_count = 2U;
+            ++g_oled_line_update_count;
+            return GMP_TASK_DONE;
+        }
+
+        if (g_oled_dynamic_update_enabled == 0U)
+        {
+            g_oled_pending_mask = 0U;
+            return GMP_TASK_DONE;
         }
 
         if (voltage_set_mv != s_oled_last_voltage_mv)
+        {
+            g_oled_pending_mask |= OLED_PENDING_VOLTAGE;
+        }
+
+        if (current_set_ma != s_oled_last_current_ma)
+        {
+            g_oled_pending_mask |= OLED_PENDING_CURRENT;
+        }
+
+        if (key_id != s_oled_last_key_id)
+        {
+            g_oled_pending_mask |= OLED_PENDING_KEY;
+        }
+
+        // Commit at most one pending line per scheduled OLED task.
+        if ((g_oled_pending_mask & OLED_PENDING_VOLTAGE) != 0U)
         {
             (void)snprintf(line2, sizeof(line2), "V %-5u mV    ",
                            (unsigned int)voltage_set_mv);
             oled_show_str(0U, 2U, line2);
             s_oled_last_voltage_mv = voltage_set_mv;
+            g_oled_pending_mask &= (uint16_t)(~OLED_PENDING_VOLTAGE);
         }
-
-        if (current_set_ma != s_oled_last_current_ma)
+        else if ((g_oled_pending_mask & OLED_PENDING_CURRENT) != 0U)
         {
             (void)snprintf(line3, sizeof(line3), "I %-3u mA      ",
                            (unsigned int)current_set_ma);
             oled_show_str(0U, 4U, line3);
             s_oled_last_current_ma = current_set_ma;
+            g_oled_pending_mask &= (uint16_t)(~OLED_PENDING_CURRENT);
         }
-
-        if (key_id != s_oled_last_key_id)
+        else if ((g_oled_pending_mask & OLED_PENDING_KEY) != 0U)
         {
             (void)snprintf(line4, sizeof(line4), "KEY %-2u       ",
                            (unsigned int)key_id);
             oled_show_str(0U, 6U, line4);
             s_oled_last_key_id = key_id;
+            g_oled_pending_mask &= (uint16_t)(~OLED_PENDING_KEY);
         }
+        else
+        {
+            return GMP_TASK_DONE;
+        }
+
+        g_key_i2c_holdoff_count = 2U;
+        ++g_oled_line_update_count;
     }
 
     return GMP_TASK_DONE;
