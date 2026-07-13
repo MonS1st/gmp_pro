@@ -49,9 +49,13 @@ hdc1080_dev_t hdc1080;
 // Global volatile state remains directly observable in CCS Expressions.
 volatile uint16_t s_last_key_id = 0U;
 volatile uint16_t s_key_release_count = 0U;
+static uint16_t s_led_last_voltage_mv = 0xFFFFU;
+static uint16_t s_led_last_current_ma = 0xFFFFU;
 static uint16_t s_oled_last_voltage_mv = 0xFFFFU;
 static uint16_t s_oled_last_current_ma = 0xFFFFU;
 static uint16_t s_oled_last_key_id = 0xFFFFU;
+
+static void power_ui_request_led_setpoint_update(void);
 
 static void power_ui_reset_key_candidate(void)
 {
@@ -81,12 +85,14 @@ static bool power_ui_execute_key_action(uint16_t key_id)
             next = PSU_VOLTAGE_CMD_MAX_MV;
         }
         power_app_set_voltage_mv((uint16_t)next);
+        power_ui_request_led_setpoint_update();
         break;
 
     case PSU_KEY_VOLTAGE_DOWN_ID:
         current = power_app_get_voltage_mv();
         power_app_set_voltage_mv((current < PSU_VOLTAGE_STEP_MV) ?
                                      0U : (uint16_t)(current - PSU_VOLTAGE_STEP_MV));
+        power_ui_request_led_setpoint_update();
         break;
 
     case PSU_KEY_CURRENT_UP_ID:
@@ -97,12 +103,14 @@ static bool power_ui_execute_key_action(uint16_t key_id)
             next = PSU_CURRENT_CMD_MAX_MA;
         }
         power_app_set_current_ma((uint16_t)next);
+        power_ui_request_led_setpoint_update();
         break;
 
     case PSU_KEY_CURRENT_DOWN_ID:
         current = power_app_get_current_ma();
         power_app_set_current_ma((current < PSU_CURRENT_STEP_MA) ?
                                      0U : (uint16_t)(current - PSU_CURRENT_STEP_MA));
+        power_ui_request_led_setpoint_update();
         break;
 
     case PSU_KEY_OUTPUT_TOGGLE_ID:
@@ -149,6 +157,7 @@ static bool power_ui_process_key_id(uint16_t key_id)
                 s_key_release_count = 0U;
                 s_last_key_id = 0U;
                 g_key_scan_ready = 1U;
+                power_ui_request_led_setpoint_update();
             }
         }
         else
@@ -245,6 +254,9 @@ bool power_ui_safe_bringup_self_test(void)
     s_key_release_count = 0U;
     power_ui_reset_key_candidate();
     g_key_scan_ready = 0U;
+    g_key_ignore_scan_count = 0U;
+    s_led_last_voltage_mv = 0xFFFFU;
+    s_led_last_current_ma = 0xFFFFU;
     return passed;
 #else
     return true;
@@ -335,21 +347,37 @@ void update_led_content_8byte(ht16k33_dev_t* dev, uint16_t ch1, uint16_t ch2, ui
     dev->is_dirty = 1;
 }
 
-static void power_ui_update_led_setpoints(ht16k33_dev_t* dev)
+static void power_ui_request_led_setpoint_update(void)
 {
     uint16_t voltage_set_mv = g_power_app.voltage_set_mv;
     uint16_t current_set_ma = g_power_app.current_set_ma;
 
+    if (g_key_scan_ready == 0U)
+    {
+        return;
+    }
+
+    if ((voltage_set_mv == s_led_last_voltage_mv) &&
+        (current_set_ma == s_led_last_current_ma))
+    {
+        return;
+    }
+
+    // First-stage board test format from master: 2026-XX-, where XX is
+    // the last key accepted by the board-level three-scan confirmation.
     update_led_content_8byte(
-        dev,
-        led_lut[(voltage_set_mv / 10000U) % 10U],
-        led_lut[(voltage_set_mv / 1000U) % 10U],
-        led_lut[(voltage_set_mv / 100U) % 10U],
-        led_lut[(voltage_set_mv / 10U) % 10U],
-        led_lut[voltage_set_mv % 10U],
-        led_lut[(current_set_ma / 100U) % 10U],
-        led_lut[(current_set_ma / 10U) % 10U],
-        led_lut[current_set_ma % 10U]);
+        &ht16k33,
+        led_lut[2], led_lut[0], led_lut[2], led_lut[6],
+        led_lut[20], led_lut[s_last_key_id / 10U],
+        led_lut[s_last_key_id % 10U], led_lut[20]);
+
+    s_led_last_voltage_mv = voltage_set_mv;
+    s_led_last_current_ma = current_set_ma;
+}
+
+void power_ui_request_led_setpoint_update_from_command(void)
+{
+    power_ui_request_led_setpoint_update();
 }
 
 gmp_task_status_t tsk_LED_flush(gmp_task_t* tsk)
@@ -358,15 +386,27 @@ gmp_task_status_t tsk_LED_flush(gmp_task_t* tsk)
 
     if(flag_init_cmpt)
     {
+        bool update_requested;
         ec_gt ret;
 
-        power_ui_update_led_setpoints(dev);
+        if (g_key_scan_ready == 0U)
+        {
+            return GMP_TASK_DONE;
+        }
+
+        update_requested = (dev->is_dirty != 0);
         ret = ht16k33_update_display(dev);
+        g_led_update_result = ret;
 
         // If the display peripheral fails, stop only this background UI task.
         if (ret != GMP_EC_OK)
         {
             tsk->is_enabled = 0;
+        }
+        else if (update_requested)
+        {
+            g_key_ignore_scan_count = 2U;
+            ++g_led_update_count;
         }
     }
 
@@ -403,6 +443,14 @@ gmp_task_status_t tsk_key_flush(gmp_task_t* tsk)
 
         ++g_key_read_ok_count;
         g_key_consecutive_error_count = 0U;
+
+        if (g_key_ignore_scan_count != 0U)
+        {
+            power_ui_reset_key_candidate();
+            --g_key_ignore_scan_count;
+            return GMP_TASK_DONE;
+        }
+
         action_executed = power_ui_process_key_id((uint16_t)key_id);
 
 #if PSU_ENABLE_KEY_EVENT_LOG

@@ -6,6 +6,8 @@
 #include <ctrl_settings.h>
 #include <gmp_core.h>
 
+#include "user_main.h"
+
 volatile uint16_t g_power_debug_command = POWER_DEBUG_CMD_NONE;
 volatile uint16_t g_power_debug_arg0 = 0U;
 volatile uint16_t g_power_debug_arg1 = 0U;
@@ -40,12 +42,14 @@ void power_debug_process_command(void)
         next = (uint32_t)current + (uint32_t)PSU_VOLTAGE_STEP_MV;
         power_app_set_voltage_mv((next > PSU_VOLTAGE_CMD_MAX_MV) ?
                                      PSU_VOLTAGE_CMD_MAX_MV : (uint16_t)next);
+        power_ui_request_led_setpoint_update_from_command();
         break;
 
     case POWER_DEBUG_CMD_VOLTAGE_DOWN:
         current = power_app_get_voltage_mv();
         power_app_set_voltage_mv((current < PSU_VOLTAGE_STEP_MV) ?
                                      0U : (uint16_t)(current - PSU_VOLTAGE_STEP_MV));
+        power_ui_request_led_setpoint_update_from_command();
         break;
 
     case POWER_DEBUG_CMD_CURRENT_UP:
@@ -53,12 +57,14 @@ void power_debug_process_command(void)
         next = (uint32_t)current + (uint32_t)PSU_CURRENT_STEP_MA;
         power_app_set_current_ma((next > PSU_CURRENT_CMD_MAX_MA) ?
                                      PSU_CURRENT_CMD_MAX_MA : (uint16_t)next);
+        power_ui_request_led_setpoint_update_from_command();
         break;
 
     case POWER_DEBUG_CMD_CURRENT_DOWN:
         current = power_app_get_current_ma();
         power_app_set_current_ma((current < PSU_CURRENT_STEP_MA) ?
                                      0U : (uint16_t)(current - PSU_CURRENT_STEP_MA));
+        power_ui_request_led_setpoint_update_from_command();
         break;
 
     case POWER_DEBUG_CMD_OUTPUT_TOGGLE:
@@ -76,10 +82,12 @@ void power_debug_process_command(void)
 
     case POWER_DEBUG_CMD_SET_VOLTAGE_MV:
         power_app_set_voltage_mv(arg0);
+        power_ui_request_led_setpoint_update_from_command();
         break;
 
     case POWER_DEBUG_CMD_SET_CURRENT_MA:
         power_app_set_current_ma(arg0);
+        power_ui_request_led_setpoint_update_from_command();
         break;
 
     case POWER_DEBUG_CMD_SET_LOAD_OHM:

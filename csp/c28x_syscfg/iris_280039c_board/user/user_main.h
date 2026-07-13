@@ -55,6 +55,9 @@ extern volatile uint16_t g_key_candidate_count;
 extern volatile uint16_t g_key_scan_ready;
 extern volatile uint32_t g_key_confirmed_count;
 extern volatile uint32_t g_key_action_count;
+extern volatile uint16_t g_key_ignore_scan_count;
+extern volatile uint32_t g_led_update_count;
+extern volatile ec_gt g_led_update_result;
 extern volatile uint32_t g_blocked_output_request_count;
 extern volatile uint16_t s_last_key_id;
 extern volatile uint16_t s_key_release_count;
@@ -83,6 +86,7 @@ gmp_task_status_t tsk_LED_flush(gmp_task_t* tsk);
 gmp_task_status_t fpga_test_task(gmp_task_t* tsk);
 gmp_task_status_t oled_show_task(gmp_task_t* tsk);
 bool power_ui_safe_bringup_self_test(void);
+void power_ui_request_led_setpoint_update_from_command(void);
 
 void update_led_content_8byte(ht16k33_dev_t* dev,
                               uint16_t ch1, uint16_t ch2, uint16_t ch3, uint16_t ch4,

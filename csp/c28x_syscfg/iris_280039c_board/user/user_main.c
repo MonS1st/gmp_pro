@@ -148,6 +148,9 @@ volatile uint16_t g_key_candidate_count = 0U;
 volatile uint16_t g_key_scan_ready = 0U;
 volatile uint32_t g_key_confirmed_count = 0U;
 volatile uint32_t g_key_action_count = 0U;
+volatile uint16_t g_key_ignore_scan_count = 0U;
+volatile uint32_t g_led_update_count = 0U;
+volatile ec_gt g_led_update_result = GMP_EC_OK;
 
 gmp_task_status_t tsk_blink(gmp_task_t* tsk)
 {
@@ -363,6 +366,9 @@ gmp_task_status_t tsk_startup(gmp_task_t* tsk)
     ht16k33_init_t ht16k33_init_struct = {.brightness = 15, .blink_rate = 0, .int_enable = 0, .int_act_high = 0};
 
     ec = ht16k33_init(&ht16k33, iic_bus, HT16K33_DEFAULT_DEV_ADDR, &ht16k33_init_struct);
+    // The driver's initialization clears local RAM and marks it dirty. Keep
+    // display flushing blocked until four successful idle key scans complete.
+    ht16k33.is_dirty = 0;
     g_ui_init_stage = 2U;
     g_ui_init_result = (uint16_t)ec;
 
