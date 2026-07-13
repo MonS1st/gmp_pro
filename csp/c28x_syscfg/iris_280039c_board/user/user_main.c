@@ -150,6 +150,7 @@ volatile uint32_t g_key_confirmed_count = 0U;
 volatile uint32_t g_key_action_count = 0U;
 volatile uint16_t g_last_confirmed_key_id = 0U;
 volatile uint32_t g_unmapped_confirmed_count = 0U;
+volatile uint32_t g_key_first_sample_action_count = 0U;
 volatile uint16_t g_key_ignore_scan_count = 0U;
 volatile uint32_t g_led_update_count = 0U;
 volatile ec_gt g_led_update_result = GMP_EC_OK;
@@ -173,6 +174,7 @@ volatile uint32_t g_oled_init_success_count = 0U;
 volatile uint32_t g_oled_init_failure_count = 0U;
 volatile uint16_t g_oled_clear_page_index = 0U;
 volatile time_gt g_oled_next_action_tick = 0U;
+volatile uint32_t g_oled_deferred_for_key_count = 0U;
 
 gmp_task_status_t tsk_blink(gmp_task_t* tsk)
 {
@@ -458,6 +460,7 @@ gmp_task_status_t tsk_startup(gmp_task_t* tsk)
     g_oled_init_success_count = 0U;
     g_oled_init_failure_count = 0U;
     g_oled_clear_page_index = 0U;
+    g_oled_deferred_for_key_count = 0U;
     g_oled_next_action_tick =
         gmp_base_get_system_tick() + (time_gt)100U;
     g_key_i2c_holdoff_count = 0U;

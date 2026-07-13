@@ -62,6 +62,7 @@ static uint16_t s_key_consecutive_timeout_count = 0U;
 #define OLED_CLEAR_PAGE_BYTES       (128U)
 #define OLED_INIT_RETRY_FAST_MS     (200U)
 #define OLED_INIT_RETRY_SLOW_MS     (1000U)
+#define OLED_KEY_DEFER_MS            (100U)
 
 static data_gt s_oled_blank_page[OLED_CLEAR_PAGE_BYTES] = {0U};
 
@@ -79,12 +80,43 @@ static uint32_t power_ui_oled_retry_delay_ms(void)
                OLED_INIT_RETRY_FAST_MS : OLED_INIT_RETRY_SLOW_MS;
 }
 
+static bool power_ui_defer_oled_for_key(void)
+{
+    if ((g_last_raw_key_id == 0U) &&
+        (s_last_key_id == 0U) &&
+        (g_key_candidate_id == 0U) &&
+        (g_key_candidate_count == 0U) &&
+        (s_key_release_count == 0U))
+    {
+        return false;
+    }
+
+    ++g_oled_deferred_for_key_count;
+    g_oled_next_action_tick =
+        gmp_base_get_system_tick() + (time_gt)OLED_KEY_DEFER_MS;
+    return true;
+}
+
+static bool power_ui_oled_i2c_step_ready(void)
+{
+    if (!power_ui_oled_action_due())
+    {
+        return false;
+    }
+
+    return !power_ui_defer_oled_for_key();
+}
+
 static void power_ui_record_oled_action_result(ec_gt result)
 {
     g_oled_probe_result = result;
     g_oled_last_result = result;
-    // Protect the 20 ms key reader after every attempted OLED bus action.
-    g_key_i2c_holdoff_count = 2U;
+    // A complete checked operation can contain multiple FIFO-safe transfers.
+    // Protect the key reader once, and only after the whole operation succeeds.
+    if (result == GMP_EC_OK)
+    {
+        g_key_i2c_holdoff_count = 1U;
+    }
 }
 
 static void power_ui_schedule_oled_retry(uint32_t delay_ms)
@@ -301,6 +333,7 @@ static bool power_ui_process_key_id(uint16_t key_id)
     if (action_executed)
     {
         ++g_key_action_count;
+        ++g_key_first_sample_action_count;
     }
     else
     {
@@ -514,8 +547,8 @@ gmp_task_status_t tsk_key_flush(gmp_task_t* tsk)
     {
         ec_gt ret;
 
-        // An OLED action may contain several FIFO-safe I2C transactions. Skip
-        // two complete 20 ms key periods before accessing HT16K33 again.
+        // A successful OLED step may contain several FIFO-safe transactions.
+        // Skip one 20 ms key period before accessing HT16K33 again.
         if (g_key_i2c_holdoff_count != 0U)
         {
             --g_key_i2c_holdoff_count;
@@ -617,17 +650,24 @@ gmp_task_status_t oled_show_task(gmp_task_t* tsk)
     switch (g_oled_init_state)
     {
     case OLED_INIT_WAIT_POWER:
-        if (power_ui_oled_action_due())
+        if (power_ui_oled_i2c_step_ready())
         {
             power_ui_run_oled_commands();
         }
         return GMP_TASK_DONE;
 
     case OLED_INIT_COMMANDS:
-        power_ui_run_oled_commands();
+        if (power_ui_oled_i2c_step_ready())
+        {
+            power_ui_run_oled_commands();
+        }
         return GMP_TASK_DONE;
 
     case OLED_INIT_TEST:
+        if (!power_ui_oled_i2c_step_ready())
+        {
+            return GMP_TASK_DONE;
+        }
         ret = oled_show_line_checked(0U, 0U, "TEST");
         power_ui_record_oled_action_result(ret);
         if (ret == GMP_EC_OK)
@@ -645,6 +685,11 @@ gmp_task_status_t oled_show_task(gmp_task_t* tsk)
         if (g_oled_clear_page_index >= OLED_CLEAR_PAGE_COUNT)
         {
             g_oled_init_state = OLED_INIT_TITLE;
+            return GMP_TASK_DONE;
+        }
+
+        if (!power_ui_oled_i2c_step_ready())
+        {
             return GMP_TASK_DONE;
         }
 
@@ -666,6 +711,10 @@ gmp_task_status_t oled_show_task(gmp_task_t* tsk)
         return GMP_TASK_DONE;
 
     case OLED_INIT_TITLE:
+        if (!power_ui_oled_i2c_step_ready())
+        {
+            return GMP_TASK_DONE;
+        }
         ret = oled_show_line_checked(0U, 0U, "BOARD TEST");
         power_ui_record_oled_action_result(ret);
         if (ret != GMP_EC_OK)
@@ -685,7 +734,7 @@ gmp_task_status_t oled_show_task(gmp_task_t* tsk)
         return GMP_TASK_DONE;
 
     case OLED_INIT_RETRY_WAIT:
-        if (power_ui_oled_action_due())
+        if (power_ui_oled_i2c_step_ready())
         {
             g_oled_clear_page_index = 0U;
             g_oled_pending_mask = 0U;
@@ -725,6 +774,16 @@ gmp_task_status_t oled_show_task(gmp_task_t* tsk)
         g_oled_pending_mask |= OLED_PENDING_KEY;
     }
 
+    if (g_oled_pending_mask == 0U)
+    {
+        return GMP_TASK_DONE;
+    }
+
+    if (!power_ui_oled_i2c_step_ready())
+    {
+        return GMP_TASK_DONE;
+    }
+
     // Commit at most one pending line per scheduled OLED task.
     if ((g_oled_pending_mask & OLED_PENDING_VOLTAGE) != 0U)
     {
@@ -759,11 +818,6 @@ gmp_task_status_t oled_show_task(gmp_task_t* tsk)
             g_oled_pending_mask &= (uint16_t)(~OLED_PENDING_KEY);
         }
     }
-    else
-    {
-        return GMP_TASK_DONE;
-    }
-
     power_ui_record_oled_action_result(ret);
     if (ret != GMP_EC_OK)
     {
