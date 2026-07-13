@@ -6,11 +6,13 @@
 
 static volatile bool s_power_output_hw_enabled = false;
 
+#if !PSU_ENABLE_ANALOG_IO_TEST
 static void power_dac_force_physical_zero(void)
 {
     DAC_setShadowValue(IRIS_DACA_BASE, 0U);
     DAC_setShadowValue(IRIS_DACB_BASE, 0U);
 }
+#endif
 
 static uint16_t power_limit_dac_code(uint32_t code)
 {
@@ -49,7 +51,10 @@ uint16_t power_current_ma_to_dac(uint16_t current_ma)
 
 void power_dac_set_voltage_mv(uint16_t voltage_mv)
 {
-#if PSU_SAFE_BRINGUP || !PSU_ALLOW_PHYSICAL_DAC || PSU_SOFT_TEST_MODE
+#if PSU_ENABLE_ANALOG_IO_TEST
+    // The isolated calibration task is the only runtime owner of real DACs.
+    (void)voltage_mv;
+#elif PSU_SAFE_BRINGUP || !PSU_ALLOW_PHYSICAL_DAC || PSU_SOFT_TEST_MODE
     // SOFT_TEST does not automatically isolate the physical hardware. Force
     // both real DAC targets to zero explicitly on every command path.
     (void)voltage_mv;
@@ -61,7 +66,10 @@ void power_dac_set_voltage_mv(uint16_t voltage_mv)
 
 void power_dac_set_current_ma(uint16_t current_ma)
 {
-#if PSU_SAFE_BRINGUP || !PSU_ALLOW_PHYSICAL_DAC || PSU_SOFT_TEST_MODE
+#if PSU_ENABLE_ANALOG_IO_TEST
+    // The isolated calibration task is the only runtime owner of real DACs.
+    (void)current_ma;
+#elif PSU_SAFE_BRINGUP || !PSU_ALLOW_PHYSICAL_DAC || PSU_SOFT_TEST_MODE
     // SOFT_TEST does not automatically isolate the physical hardware. Force
     // both real DAC targets to zero explicitly on every command path.
     (void)current_ma;
@@ -73,7 +81,13 @@ void power_dac_set_current_ma(uint16_t current_ma)
 
 void power_dac_set_zero(void)
 {
+#if PSU_ENABLE_ANALOG_IO_TEST
+    // Zeroing is owned by analog_io_test so power_app cannot overwrite a
+    // manually armed calibration code from the 20 kHz control callback.
+    return;
+#else
     power_dac_force_physical_zero();
+#endif
 }
 
 void power_output_hw_set(bool enable)

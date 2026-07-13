@@ -130,6 +130,7 @@
 #define PSU_ENABLE_HT16K33_KEY             (1)
 #define PSU_ENABLE_HT16K33_DISPLAY         (1)
 #define PSU_ENABLE_OLED_DISPLAY            (1)
+#define PSU_ENABLE_ANALOG_IO_TEST           (1)
 #define PSU_ENABLE_CONSOLE_UI              (1)
 #define PSU_ENABLE_MANUAL_COMMAND          (1)
 

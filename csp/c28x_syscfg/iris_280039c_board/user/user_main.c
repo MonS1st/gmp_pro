@@ -6,6 +6,7 @@
 
 // user main header
 #include "ctl_main.h"
+#include "analog_io_test.h"
 #include "user_main.h"
 #include <stdlib.h>
 
@@ -367,6 +368,7 @@ static gmp_task_t *const tasks[] = {
     &task_fpga_test,
     &task_blink_led,
     &task_startup,
+    &task_analog_io_test,
     &task_power_app,
     &task_power_command,
     &task_power_console,
@@ -379,6 +381,8 @@ GMP_NO_OPT_PREFIX
 void init(void) GMP_NO_OPT_SUFFIX
 {
     int i;
+
+    analog_io_test_init();
 
     // init scheduler
     gmp_scheduler_init(&sched);
