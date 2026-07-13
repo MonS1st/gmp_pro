@@ -107,9 +107,9 @@
 
 // User-interface feature switches. Set a switch to 1 to restore the
 // corresponding physical peripheral or software debug interface.
-#define PSU_ENABLE_HT16K33_KEY          (0)
-#define PSU_ENABLE_HT16K33_DISPLAY      (0)
-#define PSU_ENABLE_OLED_DISPLAY         (0)
+#define PSU_ENABLE_HT16K33_KEY          (1)
+#define PSU_ENABLE_HT16K33_DISPLAY      (1)
+#define PSU_ENABLE_OLED_DISPLAY         (1)
 #define PSU_ENABLE_CONSOLE_UI           (1)
 #define PSU_ENABLE_MANUAL_COMMAND       (1)
 

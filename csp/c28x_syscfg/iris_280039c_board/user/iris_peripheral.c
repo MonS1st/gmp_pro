@@ -273,7 +273,11 @@ gmp_task_status_t tsk_key_flush(gmp_task_t* tsk)
 
         if (action_executed)
         {
-            gmp_base_print("Power key action, id=%d\r\n", key_id);
+            gmp_base_print("KEY id=%u Vset=%u Iset=%u req=%u\r\n",
+                           (unsigned int)key_id,
+                           (unsigned int)g_power_app.voltage_set_mv,
+                           (unsigned int)g_power_app.current_set_ma,
+                           (unsigned int)g_power_app.output_requested);
         }
     }
 

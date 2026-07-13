@@ -272,12 +272,14 @@ gmp_task_status_t tsk_startup(gmp_task_t* tsk)
 
         ec_gt ec = ht16k33_init(&ht16k33, iic_bus, HT16K33_DEFAULT_DEV_ADDR, &ht16k33_init_struct);
 
+        if (ec == GMP_EC_OK)
+        {
 #if PSU_ENABLE_HT16K33_DISPLAY
-        update_led_content_8byte(&ht16k33, led_lut[2], led_lut[0], led_lut[2], led_lut[6], led_lut[20], led_lut[7],
-                                         led_lut[7], led_lut[20]);
+            update_led_content_8byte(&ht16k33, led_lut[2], led_lut[0], led_lut[2], led_lut[6], led_lut[20], led_lut[7],
+                                             led_lut[7], led_lut[20]);
 #endif
-
-        if (ec != GMP_EC_OK)
+        }
+        else
         {
 #if PSU_ENABLE_HT16K33_KEY
             task_flush_key.is_enabled = 0;
@@ -291,6 +293,21 @@ gmp_task_status_t tsk_startup(gmp_task_t* tsk)
         // init and test the oled.
 #if PSU_ENABLE_OLED_DISPLAY
         oled_init();
+#endif
+
+#if PSU_ENABLE_HT16K33_KEY || PSU_ENABLE_HT16K33_DISPLAY
+        if (ec == GMP_EC_OK)
+        {
+            gmp_base_print("UI INIT HT16K33 ret=%lu key=%u led=%u oled=%u\r\n",
+                           (unsigned long)ec,
+                           (unsigned int)task_flush_key.is_enabled,
+                           (unsigned int)task_flush_led.is_enabled,
+                           (unsigned int)task_oled_show.is_enabled);
+        }
+        else
+        {
+            gmp_base_print("UI INIT HT16K33 FAILED ret=%lu\r\n", (unsigned long)ec);
+        }
 #endif
 
         //        hdc1080_config_reg_t hdc1080_cfg = {.all = 0};
