@@ -158,7 +158,7 @@ volatile uint16_t g_oled_pending_mask = 0U;
 volatile uint32_t g_oled_line_update_count = 0U;
 volatile uint16_t g_key_i2c_holdoff_count = 0U;
 volatile uint32_t g_key_i2c_holdoff_skip_count = 0U;
-volatile uint16_t g_oled_dynamic_update_enabled = 1U;
+volatile uint16_t g_oled_dynamic_update_enabled = 0U;
 volatile uint32_t g_oled_disabled_due_i2c_count = 0U;
 volatile uint16_t g_key_consecutive_ok_count = 0U;
 volatile ec_gt g_oled_last_result = GMP_EC_NOT_READY;
@@ -434,27 +434,39 @@ gmp_task_status_t tsk_startup(gmp_task_t* tsk)
     }
 #endif
 
-    // Initialize commands first, then probe one short checked text write. This
-    // distinguishes command/address NACK from position or page-data NACK.
 #if PSU_ENABLE_OLED_DISPLAY
-    // An init-command failure leaves fail_stage at NONE because no page
-    // position/data transaction has started; probe_result keeps its raw code.
-    g_oled_probe_result = oled_init_checked();
-    if (g_oled_probe_result == GMP_EC_OK)
+    // Let the shared bus settle after the one-time HT16K33 RAM clear and
+    // DISPLAY OFF command. OLED transactions remain fully checked below.
+    DEVICE_DELAY_US(1000U);
+
+    g_oled_dynamic_update_enabled = 0U;
+    g_oled_pending_mask = 0U;
+
+    ec = oled_init_checked();
+    if (ec == GMP_EC_OK)
     {
-        g_oled_probe_result = oled_show_line_checked(0U, 0U, "TEST");
+        ec = oled_show_line_checked(0U, 0U, "TEST");
+    }
+    if (ec == GMP_EC_OK)
+    {
+        ec = oled_clear_checked();
+    }
+    if (ec == GMP_EC_OK)
+    {
+        ec = oled_show_line_checked(0U, 0U, "BOARD TEST");
     }
 
+    g_oled_probe_result = ec;
     g_oled_last_result = g_oled_probe_result;
     if (g_oled_probe_result == GMP_EC_OK)
     {
         ++g_oled_probe_ok_count;
+        g_oled_dynamic_update_enabled = 1U;
     }
     else
     {
         ++g_oled_probe_error_count;
         g_oled_dynamic_update_enabled = 0U;
-        g_oled_pending_mask = 0U;
     }
 
     // Startup OLED traffic shares I2C with HT16K33. Preserve the existing

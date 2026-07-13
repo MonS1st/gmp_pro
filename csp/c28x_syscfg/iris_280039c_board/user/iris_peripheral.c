@@ -558,23 +558,8 @@ gmp_task_status_t oled_show_task(gmp_task_t* tsk)
                 return GMP_TASK_DONE;
             }
 
-            // Long checked clear pages run only after the short TEST probe.
-            // A failure leaves page/length diagnostics from the first NACK.
-            ret = oled_clear_checked();
-            if (ret == GMP_EC_OK)
-            {
-                ret = oled_show_line_checked(0U, 0U, "BOARD TEST");
-            }
-
-            g_oled_last_result = ret;
-            if (ret != GMP_EC_OK)
-            {
-                ++g_oled_update_error_count;
-                g_oled_dynamic_update_enabled = 0U;
-                g_oled_pending_mask = 0U;
-                return GMP_TASK_DONE;
-            }
-
+            // Startup already completed the checked TEST, clear, and title
+            // sequence. Arm the three dynamic lines without more I2C traffic.
             s_page_initialized = true;
             g_oled_pending_mask = OLED_PENDING_VOLTAGE |
                                   OLED_PENDING_CURRENT |

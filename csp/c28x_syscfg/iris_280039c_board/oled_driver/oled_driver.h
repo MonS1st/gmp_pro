@@ -25,6 +25,8 @@ extern volatile uint16_t g_oled_last_slave_address;
 extern volatile ec_gt g_oled_probe_result;
 extern volatile uint32_t g_oled_probe_ok_count;
 extern volatile uint32_t g_oled_probe_error_count;
+extern volatile uint16_t g_oled_init_burst_index;
+extern volatile ec_gt g_oled_init_burst_result;
 
 /**
  * @brief  Set the OLED page/column position and return the raw I2C result.
@@ -32,7 +34,7 @@ extern volatile uint32_t g_oled_probe_error_count;
 ec_gt oled_set_position_checked(uint8_t x, uint8_t y_page);
 
 /**
- * @brief  Write one bounded page segment using one position and one data transaction.
+ * @brief  Write one bounded page segment using FIFO-safe 15-byte data chunks.
  * @note   Data beyond the 128-pixel display width is truncated.
  */
 ec_gt oled_write_page_checked(uint8_t x, uint8_t y_page,
@@ -40,7 +42,7 @@ ec_gt oled_write_page_checked(uint8_t x, uint8_t y_page,
 
 /**
  * @brief  Render one text line into page buffers and return the first I2C error.
- * @note   Uses two I2C transactions for 8-pixel text and four for 16-pixel text.
+ * @note   Each page is automatically split into position and bounded data transactions.
  */
 ec_gt oled_show_line_checked(uint8_t x, uint8_t y_page, const char *str);
 
@@ -72,8 +74,7 @@ void oled_display_on(void);
 void oled_display_off(void);
 
 /**
- * @brief  Optimized ultra-fast, non-blocking-friendly OLED clear function.
- * @note   Replaces 1024 separate I2C bursts with 8 continuous page bursts.
+ * @brief  Clear the OLED through FIFO-safe checked page chunks.
  */
 void oled_clear(void);
 
