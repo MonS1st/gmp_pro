@@ -161,6 +161,9 @@ volatile uint32_t g_key_i2c_holdoff_skip_count = 0U;
 volatile uint16_t g_oled_dynamic_update_enabled = 1U;
 volatile uint32_t g_oled_disabled_due_i2c_count = 0U;
 volatile uint16_t g_key_consecutive_ok_count = 0U;
+volatile ec_gt g_oled_last_result = GMP_EC_NOT_READY;
+volatile uint32_t g_oled_update_ok_count = 0U;
+volatile uint32_t g_oled_update_error_count = 0U;
 
 gmp_task_status_t tsk_blink(gmp_task_t* tsk)
 {

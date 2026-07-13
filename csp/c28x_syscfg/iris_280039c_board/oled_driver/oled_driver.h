@@ -10,6 +10,24 @@
 extern iic_halt iic_bus;
 
 /**
+ * @brief  Set the OLED page/column position and return the raw I2C result.
+ */
+ec_gt oled_set_position_checked(uint8_t x, uint8_t y_page);
+
+/**
+ * @brief  Write one bounded page segment using one position and one data transaction.
+ * @note   Data beyond the 128-pixel display width is truncated.
+ */
+ec_gt oled_write_page_checked(uint8_t x, uint8_t y_page,
+                              const data_gt *data, uint16_t length);
+
+/**
+ * @brief  Render one text line into page buffers and return the first I2C error.
+ * @note   Uses two I2C transactions for 8-pixel text and four for 16-pixel text.
+ */
+ec_gt oled_show_line_checked(uint8_t x, uint8_t y_page, const char *str);
+
+/**
  * @brief  Optimized, low-overhead positional command function.
  * @note   Combines page and column positioning into a single I2C burst transaction.
  */

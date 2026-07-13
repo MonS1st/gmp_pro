@@ -7,6 +7,28 @@
 #include <core/pm/function_scheduler.h>
 
 #define TIMEOUT_SET 40
+#define OLED_DISPLAY_WIDTH       128U
+#define OLED_PAGE_COUNT          8U
+#define OLED_TEXT_CELL_WIDTH     8U
+#define OLED_FONT8_GLYPH_WIDTH   6U
+#define OLED_PAGE_PAYLOAD_SIZE   (OLED_DISPLAY_WIDTH + 1U)
+
+// Shared board-local buffers avoid placing full display lines on the C28x stack.
+static data_gt s_oled_page_payload[OLED_PAGE_PAYLOAD_SIZE];
+static data_gt s_oled_line_upper[OLED_DISPLAY_WIDTH];
+#if FONT_SIZE == 16
+static data_gt s_oled_line_lower[OLED_DISPLAY_WIDTH];
+#endif
+
+static uint8_t oled_checked_printable_char(uint8_t chr)
+{
+    if ((chr < (uint8_t)' ') || (chr > (uint8_t)'~'))
+    {
+        return (uint8_t)'?';
+    }
+
+    return chr;
+}
 
 
 /**
@@ -32,10 +54,15 @@ void OLED_WR_Byte(uint8_t dat, uint8_t cmd)
  * @brief  Optimized, low-overhead positional command function.
  * @note   Combines page and column positioning into a single I2C burst transaction.
  */
-void oled_set_position(uint8_t x, uint8_t y_page)
+ec_gt oled_set_position_checked(uint8_t x, uint8_t y_page)
 {
     const time_gt timeout_ticks = TIMEOUT_SET;
     static data_gt pos_cmds[4];
+
+    if ((x >= OLED_DISPLAY_WIDTH) || (y_page >= OLED_PAGE_COUNT))
+    {
+        return GMP_EC_INVALID_PARAM;
+    }
 
     pos_cmds[0] = 0x00;                           /* Control Byte: Following are commands */
     pos_cmds[1] = (data_gt)(0xB0 + y_page);       /* Set Target Page Address */
@@ -43,7 +70,123 @@ void oled_set_position(uint8_t x, uint8_t y_page)
     pos_cmds[3] = (data_gt)((x + 2) & 0x0F);       /* Lower column nibble with +2 offset */
 
     /* Dispatch all 4 bytes consecutively to save bus time slices */
-    gmp_hal_iic_write_mem(iic_bus, OLED_IIC_7BIT_ADDR, 0, 0, pos_cmds, 4, timeout_ticks);
+    return gmp_hal_iic_write_mem(
+        iic_bus, OLED_IIC_7BIT_ADDR, 0, 0, pos_cmds, 4U, timeout_ticks);
+}
+
+ec_gt oled_write_page_checked(uint8_t x, uint8_t y_page,
+                              const data_gt *data, uint16_t length)
+{
+    const time_gt timeout_ticks = TIMEOUT_SET;
+    uint16_t available;
+    uint16_t write_length;
+    uint16_t i;
+    ec_gt ret;
+
+    if ((data == NULL) || (x >= OLED_DISPLAY_WIDTH) ||
+        (y_page >= OLED_PAGE_COUNT))
+    {
+        return GMP_EC_INVALID_PARAM;
+    }
+
+    available = (uint16_t)(OLED_DISPLAY_WIDTH - x);
+    write_length = (length > available) ? available : length;
+    if (write_length == 0U)
+    {
+        return GMP_EC_OK;
+    }
+
+    ret = oled_set_position_checked(x, y_page);
+    if (ret != GMP_EC_OK)
+    {
+        return ret;
+    }
+
+    s_oled_page_payload[0] = 0x40U;
+    for (i = 0U; i < write_length; ++i)
+    {
+        s_oled_page_payload[i + 1U] = data[i];
+    }
+
+    return gmp_hal_iic_write_mem(
+        iic_bus, OLED_IIC_7BIT_ADDR, 0, 0,
+        s_oled_page_payload, (size_gt)(write_length + 1U), timeout_ticks);
+}
+
+ec_gt oled_show_line_checked(uint8_t x, uint8_t y_page, const char *str)
+{
+    uint16_t max_width;
+    uint16_t used = 0U;
+    uint16_t char_index = 0U;
+    uint16_t glyph_column;
+    uint16_t font_index;
+    uint8_t chr;
+    ec_gt ret;
+
+    if ((str == NULL) || (x >= OLED_DISPLAY_WIDTH) ||
+        (y_page >= OLED_PAGE_COUNT))
+    {
+        return GMP_EC_INVALID_PARAM;
+    }
+#if FONT_SIZE == 16
+    if ((uint16_t)y_page + 1U >= OLED_PAGE_COUNT)
+    {
+        return GMP_EC_INVALID_PARAM;
+    }
+#endif
+
+    max_width = (uint16_t)(OLED_DISPLAY_WIDTH - x);
+    while ((str[char_index] != '\0') && (used < max_width))
+    {
+        chr = oled_checked_printable_char((uint8_t)str[char_index]);
+        font_index = (uint16_t)(chr - (uint8_t)' ');
+
+        for (glyph_column = 0U;
+             (glyph_column < OLED_TEXT_CELL_WIDTH) && (used < max_width);
+             ++glyph_column)
+        {
+#if FONT_SIZE == 16
+            s_oled_line_upper[used] =
+                (data_gt)F8X16[(font_index * 16U) + glyph_column];
+            s_oled_line_lower[used] =
+                (data_gt)F8X16[(font_index * 16U) + glyph_column + 8U];
+#else
+            s_oled_line_upper[used] =
+                (glyph_column < OLED_FONT8_GLYPH_WIDTH) ?
+                    (data_gt)F6x8[font_index][glyph_column] : 0U;
+#endif
+            ++used;
+        }
+
+        ++char_index;
+    }
+
+    if (used == 0U)
+    {
+        return GMP_EC_OK;
+    }
+
+    ret = oled_write_page_checked(x, y_page, s_oled_line_upper, used);
+    if (ret != GMP_EC_OK)
+    {
+        return ret;
+    }
+
+#if FONT_SIZE == 16
+    ret = oled_write_page_checked(
+        x, (uint8_t)(y_page + 1U), s_oled_line_lower, used);
+    if (ret != GMP_EC_OK)
+    {
+        return ret;
+    }
+#endif
+
+    return GMP_EC_OK;
+}
+
+void oled_set_position(uint8_t x, uint8_t y_page)
+{
+    (void)oled_set_position_checked(x, y_page);
 }
 
 

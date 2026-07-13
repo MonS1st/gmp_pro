@@ -495,7 +495,10 @@ gmp_task_status_t tsk_key_flush(gmp_task_t* tsk)
         {
             ++g_key_consecutive_ok_count;
         }
+        // Ten good key reads may recover a key-timeout suspension, but an
+        // OLED write failure keeps dynamic updates latched off for diagnosis.
         if ((g_oled_dynamic_update_enabled == 0U) &&
+            (g_oled_update_error_count == 0U) &&
             (g_key_consecutive_ok_count >= 10U))
         {
             g_oled_dynamic_update_enabled = 1U;
@@ -534,6 +537,7 @@ gmp_task_status_t oled_show_task(gmp_task_t* tsk)
     uint16_t voltage_set_mv;
     uint16_t current_set_ma;
     uint16_t key_id;
+    ec_gt ret;
 #endif
     GMP_UNUSED_VAR(tsk);
 
@@ -583,31 +587,50 @@ gmp_task_status_t oled_show_task(gmp_task_t* tsk)
         {
             (void)snprintf(line2, sizeof(line2), "V %-5u mV    ",
                            (unsigned int)voltage_set_mv);
-            oled_show_str(0U, 2U, line2);
-            s_oled_last_voltage_mv = voltage_set_mv;
-            g_oled_pending_mask &= (uint16_t)(~OLED_PENDING_VOLTAGE);
+            ret = oled_show_line_checked(0U, 2U, line2);
+            if (ret == GMP_EC_OK)
+            {
+                s_oled_last_voltage_mv = voltage_set_mv;
+                g_oled_pending_mask &= (uint16_t)(~OLED_PENDING_VOLTAGE);
+            }
         }
         else if ((g_oled_pending_mask & OLED_PENDING_CURRENT) != 0U)
         {
             (void)snprintf(line3, sizeof(line3), "I %-3u mA      ",
                            (unsigned int)current_set_ma);
-            oled_show_str(0U, 4U, line3);
-            s_oled_last_current_ma = current_set_ma;
-            g_oled_pending_mask &= (uint16_t)(~OLED_PENDING_CURRENT);
+            ret = oled_show_line_checked(0U, 4U, line3);
+            if (ret == GMP_EC_OK)
+            {
+                s_oled_last_current_ma = current_set_ma;
+                g_oled_pending_mask &= (uint16_t)(~OLED_PENDING_CURRENT);
+            }
         }
         else if ((g_oled_pending_mask & OLED_PENDING_KEY) != 0U)
         {
             (void)snprintf(line4, sizeof(line4), "KEY %-2u       ",
                            (unsigned int)key_id);
-            oled_show_str(0U, 6U, line4);
-            s_oled_last_key_id = key_id;
-            g_oled_pending_mask &= (uint16_t)(~OLED_PENDING_KEY);
+            ret = oled_show_line_checked(0U, 6U, line4);
+            if (ret == GMP_EC_OK)
+            {
+                s_oled_last_key_id = key_id;
+                g_oled_pending_mask &= (uint16_t)(~OLED_PENDING_KEY);
+            }
         }
         else
         {
             return GMP_TASK_DONE;
         }
 
+        g_oled_last_result = ret;
+        if (ret != GMP_EC_OK)
+        {
+            ++g_oled_update_error_count;
+            g_oled_dynamic_update_enabled = 0U;
+            g_oled_pending_mask = 0U;
+            return GMP_TASK_DONE;
+        }
+
+        ++g_oled_update_ok_count;
         g_key_i2c_holdoff_count = 2U;
         ++g_oled_line_update_count;
     }
