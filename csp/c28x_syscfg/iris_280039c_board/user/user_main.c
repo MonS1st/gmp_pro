@@ -139,7 +139,15 @@ volatile uint32_t g_scheduler_loop_count = 0U;
 volatile uint16_t g_ui_init_stage = 0U;
 volatile uint16_t g_ui_init_result = 0xFFFFU;
 volatile uint16_t g_last_raw_key_id = 0U;
-volatile uint16_t g_key_read_result = 0U;
+volatile ec_gt g_key_read_result = GMP_EC_OK;
+volatile uint32_t g_key_read_ok_count = 0U;
+volatile uint32_t g_key_read_error_count = 0U;
+volatile uint16_t g_key_consecutive_error_count = 0U;
+volatile uint16_t g_key_candidate_id = 0U;
+volatile uint16_t g_key_candidate_count = 0U;
+volatile uint16_t g_key_scan_ready = 0U;
+volatile uint32_t g_key_confirmed_count = 0U;
+volatile uint32_t g_key_action_count = 0U;
 
 gmp_task_status_t tsk_blink(gmp_task_t* tsk)
 {
@@ -253,13 +261,17 @@ static void power_safe_bringup_run_self_test(void)
 static gmp_task_t task_dl_online =
     {"dl_online", tsk_dl_debug_device, 2, 0, 1, NULL};
 static gmp_task_t task_flush_key =
-    {"flush_key", tsk_key_flush, PSU_KEY_TASK_PERIOD_MS, 10,
+    {"flush_key", tsk_key_flush,
+     PSU_KEY_TASK_PERIOD_MS, PSU_KEY_TASK_INITIAL_DELAY_MS,
      PSU_ENABLE_HT16K33_KEY, (void*)&ht16k33};
 static gmp_task_t task_oled_show =
-    {"oled_show", oled_show_task, 100, 500,
+    {"oled_show", oled_show_task,
+     PSU_OLED_TASK_PERIOD_MS, PSU_OLED_TASK_INITIAL_DELAY_MS,
      PSU_ENABLE_OLED_DISPLAY, NULL};
 static gmp_task_t task_flush_led =
-    {"flush_led", tsk_LED_flush, 500, 200,
+    {"flush_led", tsk_LED_flush,
+     PSU_HT16K33_DISPLAY_PERIOD_MS,
+     PSU_HT16K33_DISPLAY_INITIAL_DELAY_MS,
      PSU_ENABLE_HT16K33_DISPLAY, (void*)&ht16k33};
 static gmp_task_t task_fpga_test =
     {"fpga_test", fpga_test_task, 1000, 600, 0, NULL};

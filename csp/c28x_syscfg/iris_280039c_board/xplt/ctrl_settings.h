@@ -98,12 +98,16 @@
 #define PSU_VOLTAGE_STEP_MV             (100U)
 #define PSU_CURRENT_STEP_MA             (1U)
 
-#define PSU_KEY_TASK_PERIOD_MS          (50U)
-// The HT16K33 driver suppresses same-key events for about 120 ms. At a 50 ms
-// task period, a held key therefore usually reappears about every 150 ms with
-// zero events between reports. Four consecutive zero scans (about 200 ms) are
-// required to confirm release; +/- repetition follows the driver's event rate.
-#define PSU_KEY_RELEASE_FILTER_COUNT    (4U)
+#define PSU_KEY_TASK_PERIOD_MS                    (50U)
+#define PSU_KEY_TASK_INITIAL_DELAY_MS             (10U)
+#define PSU_HT16K33_DISPLAY_PERIOD_MS             (500U)
+#define PSU_HT16K33_DISPLAY_INITIAL_DELAY_MS      (250U)
+#define PSU_OLED_TASK_PERIOD_MS                   (1000U)
+#define PSU_OLED_TASK_INITIAL_DELAY_MS            (750U)
+
+#define PSU_KEY_PRESS_CONFIRM_COUNT               (3U)
+#define PSU_KEY_RELEASE_FILTER_COUNT              (4U)
+#define PSU_KEY_ENABLE_REPEAT                     (0)
 
 //=================================================================================================
 // Complete control-board functional test profile

@@ -46,8 +46,18 @@ extern volatile uint32_t g_scheduler_loop_count;
 extern volatile uint16_t g_ui_init_stage;
 extern volatile uint16_t g_ui_init_result;
 extern volatile uint16_t g_last_raw_key_id;
-extern volatile uint16_t g_key_read_result;
+extern volatile ec_gt g_key_read_result;
+extern volatile uint32_t g_key_read_ok_count;
+extern volatile uint32_t g_key_read_error_count;
+extern volatile uint16_t g_key_consecutive_error_count;
+extern volatile uint16_t g_key_candidate_id;
+extern volatile uint16_t g_key_candidate_count;
+extern volatile uint16_t g_key_scan_ready;
+extern volatile uint32_t g_key_confirmed_count;
+extern volatile uint32_t g_key_action_count;
 extern volatile uint32_t g_blocked_output_request_count;
+extern volatile uint16_t s_last_key_id;
+extern volatile uint16_t s_key_release_count;
 
 //=================================================================================================
 // global functions

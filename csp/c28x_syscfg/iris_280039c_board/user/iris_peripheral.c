@@ -46,22 +46,30 @@ iic_halt iic_bus;
 ht16k33_dev_t ht16k33;
 hdc1080_dev_t hdc1080;
 
-// File-local variables remain visible to CCS for key scan debugging.
-static volatile uint16_t s_last_key_id = 0U;
-static volatile uint16_t s_key_release_count = 0U;
+// Global volatile state remains directly observable in CCS Expressions.
+volatile uint16_t s_last_key_id = 0U;
+volatile uint16_t s_key_release_count = 0U;
+static uint16_t s_oled_last_voltage_mv = 0xFFFFU;
+static uint16_t s_oled_last_current_ma = 0xFFFFU;
+static uint16_t s_oled_last_key_id = 0xFFFFU;
 
-static bool power_ui_key_supports_repeat(uint16_t key_id)
+static void power_ui_reset_key_candidate(void)
 {
-    return (key_id == PSU_KEY_VOLTAGE_UP_ID) ||
-           (key_id == PSU_KEY_VOLTAGE_DOWN_ID) ||
-           (key_id == PSU_KEY_CURRENT_UP_ID) ||
-           (key_id == PSU_KEY_CURRENT_DOWN_ID);
+    g_key_candidate_id = 0U;
+    g_key_candidate_count = 0U;
 }
 
-static void power_ui_execute_key_action(uint16_t key_id)
+static void power_ui_handle_key_read_error(void)
+{
+    power_ui_reset_key_candidate();
+    s_key_release_count = 0U;
+}
+
+static bool power_ui_execute_key_action(uint16_t key_id)
 {
     uint16_t current;
     uint32_t next;
+    bool action_executed = true;
 
     switch (key_id)
     {
@@ -113,50 +121,104 @@ static void power_ui_execute_key_action(uint16_t key_id)
         break;
 
     default:
+        action_executed = false;
         break;
     }
+
+    return action_executed;
 }
 
 static bool power_ui_process_key_id(uint16_t key_id)
 {
-    if (key_id != 0U)
+    bool action_executed;
+
+    // Ignore every nonzero report until four consecutive successful idle
+    // scans prove that the shared I2C bus and key matrix started cleanly.
+    if (g_key_scan_ready == 0U)
     {
-        s_key_release_count = 0U;
+        power_ui_reset_key_candidate();
 
-        if (key_id != s_last_key_id)
+        if (key_id == 0U)
         {
-            s_last_key_id = key_id;
-            power_ui_execute_key_action(key_id);
-            return true;
+            if (s_key_release_count < PSU_KEY_RELEASE_FILTER_COUNT)
+            {
+                ++s_key_release_count;
+            }
+            if (s_key_release_count >= PSU_KEY_RELEASE_FILTER_COUNT)
+            {
+                s_key_release_count = 0U;
+                s_last_key_id = 0U;
+                g_key_scan_ready = 1U;
+            }
         }
-
-        if (power_ui_key_supports_repeat(key_id))
+        else
         {
-            power_ui_execute_key_action(key_id);
-            return true;
+            s_key_release_count = 0U;
         }
 
         return false;
     }
 
-    if (s_last_key_id == 0U)
+    // A confirmed key remains latched until four consecutive successful zero
+    // reports. Other nonzero IDs cannot bypass the release requirement.
+    if (s_last_key_id != 0U)
     {
-        s_key_release_count = 0U;
+        power_ui_reset_key_candidate();
+
+        if (key_id == 0U)
+        {
+            if (s_key_release_count < PSU_KEY_RELEASE_FILTER_COUNT)
+            {
+                ++s_key_release_count;
+            }
+            if (s_key_release_count >= PSU_KEY_RELEASE_FILTER_COUNT)
+            {
+                s_last_key_id = 0U;
+                s_key_release_count = 0U;
+            }
+        }
+        else
+        {
+            s_key_release_count = 0U;
+        }
+
         return false;
     }
 
-    if (s_key_release_count < PSU_KEY_RELEASE_FILTER_COUNT)
+    s_key_release_count = 0U;
+
+    if (key_id == 0U)
     {
-        ++s_key_release_count;
+        power_ui_reset_key_candidate();
+        return false;
     }
 
-    if (s_key_release_count >= PSU_KEY_RELEASE_FILTER_COUNT)
+    if (g_key_candidate_id != key_id)
     {
-        s_last_key_id = 0U;
-        s_key_release_count = 0U;
+        g_key_candidate_id = key_id;
+        g_key_candidate_count = 1U;
+    }
+    else if (g_key_candidate_count < PSU_KEY_PRESS_CONFIRM_COUNT)
+    {
+        ++g_key_candidate_count;
     }
 
-    return false;
+    if (g_key_candidate_count < PSU_KEY_PRESS_CONFIRM_COUNT)
+    {
+        return false;
+    }
+
+    s_last_key_id = key_id;
+    power_ui_reset_key_candidate();
+    ++g_key_confirmed_count;
+
+    action_executed = power_ui_execute_key_action(key_id);
+    if (action_executed)
+    {
+        ++g_key_action_count;
+    }
+
+    return action_executed;
 }
 
 bool power_ui_safe_bringup_self_test(void)
@@ -168,7 +230,7 @@ bool power_ui_safe_bringup_self_test(void)
     for (key_id = 1U; key_id <= 39U; ++key_id)
     {
         g_power_app.output_requested = false;
-        power_ui_execute_key_action(key_id);
+        (void)power_ui_execute_key_action(key_id);
         if (g_power_app.output_requested)
         {
             passed = false;
@@ -181,6 +243,8 @@ bool power_ui_safe_bringup_self_test(void)
     g_power_app.fault_reset_requested = false;
     s_last_key_id = 0U;
     s_key_release_count = 0U;
+    power_ui_reset_key_candidate();
+    g_key_scan_ready = 0U;
     return passed;
 #else
     return true;
@@ -317,18 +381,28 @@ gmp_task_status_t tsk_key_flush(gmp_task_t* tsk)
 
     if(flag_init_cmpt)
     {
-        ec_gt ret = ht16k33_read_keys(dev, &key_id);
+        ec_gt ret;
+
+        // The common driver suppresses repeated reports of the same key for
+        // 120 ms. This board-level state machine needs the current matrix
+        // state on every scheduled scan, so disable only that event cache;
+        // confirmation and repeat suppression are handled below.
+        dev->last_key = 0;
+        ret = ht16k33_read_keys(dev, &key_id);
 
         g_last_raw_key_id = (uint16_t)key_id;
-        g_key_read_result = (uint16_t)ret;
+        g_key_read_result = ret;
 
-        // If the key peripheral fails, stop only this background UI task.
         if (ret != GMP_EC_OK)
         {
-            tsk->is_enabled = 0;
+            ++g_key_read_error_count;
+            ++g_key_consecutive_error_count;
+            power_ui_handle_key_read_error();
             return GMP_TASK_DONE;
         }
 
+        ++g_key_read_ok_count;
+        g_key_consecutive_error_count = 0U;
         action_executed = power_ui_process_key_id((uint16_t)key_id);
 
 #if PSU_ENABLE_KEY_EVENT_LOG
@@ -352,29 +426,49 @@ gmp_task_status_t oled_show_task(gmp_task_t* tsk)
     char line2[16];
     char line3[16];
     char line4[16];
+    uint16_t voltage_set_mv;
+    uint16_t current_set_ma;
+    uint16_t key_id;
 #endif
     GMP_UNUSED_VAR(tsk);
 
 #if PSU_SAFE_BRINGUP
     if (flag_init_cmpt == 1U)
     {
+        voltage_set_mv = g_power_app.voltage_set_mv;
+        current_set_ma = g_power_app.current_set_ma;
+        key_id = g_last_raw_key_id;
+
         if (!s_page_initialized)
         {
             oled_clear();
+            oled_show_str(0U, 0U, "BOARD TEST");
             s_page_initialized = true;
         }
 
-        (void)snprintf(line2, sizeof(line2), "V %-5u mV    ",
-                       (unsigned int)g_power_app.voltage_set_mv);
-        (void)snprintf(line3, sizeof(line3), "I %-3u mA      ",
-                       (unsigned int)g_power_app.current_set_ma);
-        (void)snprintf(line4, sizeof(line4), "KEY %-2u       ",
-                       (unsigned int)g_last_raw_key_id);
+        if (voltage_set_mv != s_oled_last_voltage_mv)
+        {
+            (void)snprintf(line2, sizeof(line2), "V %-5u mV    ",
+                           (unsigned int)voltage_set_mv);
+            oled_show_str(0U, 2U, line2);
+            s_oled_last_voltage_mv = voltage_set_mv;
+        }
 
-        oled_show_str(0U, 0U, "BOARD TEST");
-        oled_show_str(0U, 2U, line2);
-        oled_show_str(0U, 4U, line3);
-        oled_show_str(0U, 6U, line4);
+        if (current_set_ma != s_oled_last_current_ma)
+        {
+            (void)snprintf(line3, sizeof(line3), "I %-3u mA      ",
+                           (unsigned int)current_set_ma);
+            oled_show_str(0U, 4U, line3);
+            s_oled_last_current_ma = current_set_ma;
+        }
+
+        if (key_id != s_oled_last_key_id)
+        {
+            (void)snprintf(line4, sizeof(line4), "KEY %-2u       ",
+                           (unsigned int)key_id);
+            oled_show_str(0U, 6U, line4);
+            s_oled_last_key_id = key_id;
+        }
     }
 
     return GMP_TASK_DONE;
