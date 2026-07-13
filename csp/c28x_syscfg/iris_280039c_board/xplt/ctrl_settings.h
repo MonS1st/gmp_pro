@@ -105,9 +105,10 @@
 #define PSU_OLED_TASK_PERIOD_MS                   (100U)
 #define PSU_OLED_TASK_INITIAL_DELAY_MS            (100U)
 
-#define PSU_KEY_PRESS_CONFIRM_COUNT               (1U)
 #define PSU_KEY_RELEASE_FILTER_COUNT              (2U)
 #define PSU_KEY_ENABLE_REPEAT                     (0)
+#define PSU_KEY_VOTE_REQUIRED_COUNT               (2U)
+#define PSU_KEY_VOTE_WINDOW_COUNT                 (3U)
 
 //=================================================================================================
 // Complete control-board functional test profile

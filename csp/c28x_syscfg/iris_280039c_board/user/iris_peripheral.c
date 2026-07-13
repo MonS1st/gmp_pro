@@ -49,6 +49,9 @@ hdc1080_dev_t hdc1080;
 // Global volatile state remains directly observable in CCS Expressions.
 volatile uint16_t s_last_key_id = 0U;
 volatile uint16_t s_key_release_count = 0U;
+static uint16_t s_key_vote_id = 0U;
+static uint16_t s_key_vote_count = 0U;
+static uint16_t s_key_vote_age = 0U;
 #if PSU_ENABLE_HT16K33_DISPLAY
 static uint16_t s_led_last_voltage_mv = 0xFFFFU;
 static uint16_t s_led_last_current_ma = 0xFFFFU;
@@ -164,16 +167,54 @@ static void power_ui_run_oled_commands(void)
 
 static void power_ui_request_led_setpoint_update(void);
 
+static void power_ui_publish_key_vote(void)
+{
+    g_key_vote_id = s_key_vote_id;
+    g_key_vote_count = s_key_vote_count;
+    g_key_vote_age = s_key_vote_age;
+
+    // Preserve the existing board diagnostics and OLED key-activity guard.
+    g_key_candidate_id = s_key_vote_id;
+    g_key_candidate_count = s_key_vote_count;
+}
+
 static void power_ui_reset_key_candidate(void)
 {
-    g_key_candidate_id = 0U;
-    g_key_candidate_count = 0U;
+    s_key_vote_id = 0U;
+    s_key_vote_count = 0U;
+    s_key_vote_age = 0U;
+    power_ui_publish_key_vote();
+}
+
+static void power_ui_start_key_vote(uint16_t key_id)
+{
+    s_key_vote_id = key_id;
+    s_key_vote_count = 1U;
+    s_key_vote_age = 1U;
+    power_ui_publish_key_vote();
 }
 
 static void power_ui_handle_key_read_error(void)
 {
-    power_ui_reset_key_candidate();
+    // A failed read is neither a vote-window sample nor a release sample.
     s_key_release_count = 0U;
+}
+
+static bool power_ui_is_mapped_key(uint16_t key_id)
+{
+    switch (key_id)
+    {
+    case PSU_KEY_VOLTAGE_UP_ID:
+    case PSU_KEY_VOLTAGE_DOWN_ID:
+    case PSU_KEY_CURRENT_UP_ID:
+    case PSU_KEY_CURRENT_DOWN_ID:
+    case PSU_KEY_OUTPUT_TOGGLE_ID:
+    case PSU_KEY_FAULT_RESET_ID:
+        return true;
+
+    default:
+        return false;
+    }
 }
 
 static bool power_ui_execute_key_action(uint16_t key_id)
@@ -246,6 +287,17 @@ static bool power_ui_execute_key_action(uint16_t key_id)
 static bool power_ui_process_key_id(uint16_t key_id)
 {
     bool action_executed;
+    bool mapped_key = false;
+
+    if (key_id != 0U)
+    {
+        mapped_key = power_ui_is_mapped_key(key_id);
+        if (!mapped_key)
+        {
+            g_last_unmapped_key_id = key_id;
+            ++g_unmapped_confirmed_count;
+        }
+    }
 
     // Ignore every nonzero report until the configured consecutive idle scans
     // prove that the shared I2C bus and key matrix started cleanly.
@@ -303,44 +355,61 @@ static bool power_ui_process_key_id(uint16_t key_id)
 
     s_key_release_count = 0U;
 
-    if (key_id == 0U)
+    if (s_key_vote_id == 0U)
     {
+        if ((key_id != 0U) && mapped_key)
+        {
+            power_ui_start_key_vote(key_id);
+        }
+        return false;
+    }
+
+    // A different valid ID starts a fresh three-scan window. Zero and
+    // unmapped samples leave the valid candidate in place.
+    if ((key_id != 0U) && mapped_key && (key_id != s_key_vote_id))
+    {
+        power_ui_start_key_vote(key_id);
+        return false;
+    }
+
+    if (s_key_vote_age < PSU_KEY_VOTE_WINDOW_COUNT)
+    {
+        ++s_key_vote_age;
+    }
+
+    if ((key_id == s_key_vote_id) &&
+        (s_key_vote_count < PSU_KEY_VOTE_REQUIRED_COUNT))
+    {
+        ++s_key_vote_count;
+    }
+
+    if (s_key_vote_count >= PSU_KEY_VOTE_REQUIRED_COUNT)
+    {
+        key_id = s_key_vote_id;
+        s_last_key_id = key_id;
+        g_last_confirmed_key_id = key_id;
+        power_ui_reset_key_candidate();
+        ++g_key_confirmed_count;
+
+        action_executed = power_ui_execute_key_action(key_id);
+        if (action_executed)
+        {
+            ++g_key_action_count;
+            ++g_key_first_sample_action_count;
+        }
+
+        return action_executed;
+    }
+
+    if (s_key_vote_age >= PSU_KEY_VOTE_WINDOW_COUNT)
+    {
+        ++g_key_vote_timeout_count;
         power_ui_reset_key_candidate();
         return false;
     }
 
-    if (g_key_candidate_id != key_id)
-    {
-        g_key_candidate_id = key_id;
-        g_key_candidate_count = 1U;
-    }
-    else if (g_key_candidate_count < PSU_KEY_PRESS_CONFIRM_COUNT)
-    {
-        ++g_key_candidate_count;
-    }
-
-    if (g_key_candidate_count < PSU_KEY_PRESS_CONFIRM_COUNT)
-    {
-        return false;
-    }
-
-    s_last_key_id = key_id;
-    g_last_confirmed_key_id = key_id;
-    power_ui_reset_key_candidate();
-    ++g_key_confirmed_count;
-
-    action_executed = power_ui_execute_key_action(key_id);
-    if (action_executed)
-    {
-        ++g_key_action_count;
-        ++g_key_first_sample_action_count;
-    }
-    else
-    {
-        ++g_unmapped_confirmed_count;
-    }
-
-    return action_executed;
+    power_ui_publish_key_vote();
+    return false;
 }
 
 bool power_ui_safe_bringup_self_test(void)
