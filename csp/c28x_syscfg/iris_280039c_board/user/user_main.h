@@ -41,6 +41,12 @@ extern hdc1080_dev_t hdc1080;
 
 extern volatile uint16_t flag_init_cmpt;
 extern volatile uint16_t g_power_safe_bringup_self_test_failures;
+extern volatile uint32_t g_main_isr_count;
+extern volatile uint32_t g_scheduler_loop_count;
+extern volatile uint16_t g_ui_init_stage;
+extern volatile uint16_t g_ui_init_result;
+extern volatile uint16_t g_last_raw_key_id;
+extern volatile uint16_t g_key_read_result;
 
 //=================================================================================================
 // global functions

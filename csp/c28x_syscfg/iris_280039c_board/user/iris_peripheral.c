@@ -300,11 +300,20 @@ gmp_task_status_t tsk_key_flush(gmp_task_t* tsk)
     {
         ec_gt ret = ht16k33_read_keys(dev, &key_id);
 
+        g_last_raw_key_id = (uint16_t)key_id;
+        g_key_read_result = (uint16_t)ret;
+
         // If the key peripheral fails, stop only this background UI task.
         if (ret != GMP_EC_OK)
         {
             tsk->is_enabled = 0;
             return GMP_TASK_DONE;
+        }
+
+        if (key_id != 0U)
+        {
+            gmp_base_print("RAW KEY id=%u\r\n",
+                           (unsigned int)key_id);
         }
 
         action_executed = power_ui_process_key_id((uint16_t)key_id);

@@ -159,6 +159,8 @@ void setup_peripheral(void)
 // ADC interrupt
 interrupt void MainISR(void)
 {
+    ++g_main_isr_count;
+
     //
     // call GMP ISR  Controller operation callback function
     //

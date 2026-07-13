@@ -128,7 +128,7 @@
 
 // User-interface feature switches. Keep input actions disabled until the
 // board key IDs and all output-control paths have been verified.
-#define PSU_ENABLE_HT16K33_KEY          (0)
+#define PSU_ENABLE_HT16K33_KEY          (1)
 #define PSU_ENABLE_HT16K33_DISPLAY      (1)
 #define PSU_ENABLE_OLED_DISPLAY         (1)
 #define PSU_ENABLE_CONSOLE_UI           (1)

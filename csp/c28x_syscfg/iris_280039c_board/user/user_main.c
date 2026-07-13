@@ -134,6 +134,12 @@ gmp_task_status_t tsk_dl_debug_device(gmp_task_t* tsk)
 gpio_halt user_led;
 volatile uint16_t flag_init_cmpt = 0;
 volatile uint16_t g_power_safe_bringup_self_test_failures = 0U;
+volatile uint32_t g_main_isr_count = 0U;
+volatile uint32_t g_scheduler_loop_count = 0U;
+volatile uint16_t g_ui_init_stage = 0U;
+volatile uint16_t g_ui_init_result = 0U;
+volatile uint16_t g_last_raw_key_id = 0U;
+volatile uint16_t g_key_read_result = 0U;
 
 gmp_task_status_t tsk_blink(gmp_task_t* tsk)
 {
@@ -321,6 +327,10 @@ void init(void) GMP_NO_OPT_SUFFIX
 // Initialization tasks after all peripherals have been initialized
 gmp_task_status_t tsk_startup(gmp_task_t* tsk)
 {
+    ec_gt ec = GMP_EC_OK;
+
+    g_ui_init_stage = 1U;
+
 #if PSU_ENABLE_BEEP && !PSU_SAFE_BRINGUP
     static uint16_t beep_counter = 0;
 
@@ -356,7 +366,9 @@ gmp_task_status_t tsk_startup(gmp_task_t* tsk)
 #if PSU_ENABLE_HT16K33_KEY || PSU_ENABLE_HT16K33_DISPLAY
     ht16k33_init_t ht16k33_init_struct = {.brightness = 15, .blink_rate = 0, .int_enable = 0, .int_act_high = 0};
 
-    ec_gt ec = ht16k33_init(&ht16k33, iic_bus, HT16K33_DEFAULT_DEV_ADDR, &ht16k33_init_struct);
+    ec = ht16k33_init(&ht16k33, iic_bus, HT16K33_DEFAULT_DEV_ADDR, &ht16k33_init_struct);
+    g_ui_init_stage = 2U;
+    g_ui_init_result = (uint16_t)ec;
 
     if (ec == GMP_EC_OK)
     {
@@ -403,6 +415,19 @@ gmp_task_status_t tsk_startup(gmp_task_t* tsk)
     //        hdc1080_trigger_temp_hum_sequence(&hdc1080);
 
     flag_init_cmpt = 1;
+    g_ui_init_stage = 3U;
+
+    gmp_base_print("UI CHAIN STATUS:\r\n"
+                   "EPWM1 SOCA ENABLED\r\n"
+                   "ADCA INT1 ENABLED\r\n"
+                   "MAIN ISR ACTIVE\r\n"
+                   "SYSTEM TICK ACTIVE\r\n"
+                   "SCHEDULER ACTIVE\r\n"
+                   "HT16K33 INIT ret=%lu\r\n"
+                   "%s\r\n",
+                   (unsigned long)ec,
+                   task_flush_key.is_enabled ?
+                       "KEY TASK ENABLED" : "KEY TASK DISABLED");
 
     // startup process is complete.
     tsk->is_enabled = 0;
@@ -416,6 +441,8 @@ gmp_task_status_t tsk_startup(gmp_task_t* tsk)
 GMP_NO_OPT_PREFIX
 void mainloop(void) GMP_NO_OPT_SUFFIX
 {
+    ++g_scheduler_loop_count;
+
     // run task scheduler
     gmp_scheduler_dispatch(&sched);
 }
