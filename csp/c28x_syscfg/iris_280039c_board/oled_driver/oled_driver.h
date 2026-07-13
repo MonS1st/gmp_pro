@@ -3,8 +3,10 @@
 #ifndef _FILE_OLED_DRIVER_H_
 #define _FILE_OLED_DRIVER_H_
 
-/* Your macro for the 7-bit slave address (e.g., 0x3C) */
-#define OLED_IIC_7BIT_ADDR (0x78>>1)
+#define OLED_IIC_7BIT_ADDR_3C  (0x3CU)
+#define OLED_IIC_7BIT_ADDR_3D  (0x3DU)
+#define OLED_INIT_COMMAND_COUNT (18U)
+#define OLED_I2C_TIMEOUT_TICKS   (40U)
 
 /* Global IIC bus handle declared in your repository */
 extern iic_halt iic_bus;
@@ -27,6 +29,18 @@ extern volatile uint32_t g_oled_probe_ok_count;
 extern volatile uint32_t g_oled_probe_error_count;
 extern volatile uint16_t g_oled_init_burst_index;
 extern volatile ec_gt g_oled_init_burst_result;
+extern volatile uint16_t g_oled_init_command_index;
+extern volatile ec_gt g_oled_init_command_result;
+extern volatile uint16_t g_oled_last_failed_command;
+extern volatile uint32_t g_oled_command_ok_count;
+extern volatile uint32_t g_oled_command_error_count;
+
+/** Select 0x3C/0x3D after probing, or clear the selection with any other value. */
+void oled_set_active_address(uint16_t address);
+uint16_t oled_get_active_address(void);
+
+/** Restart the asynchronous logical-command initialization sequence at index 0. */
+void oled_reset_init_sequence(void);
 
 /**
  * @brief  Set the OLED page/column position and return the raw I2C result.
@@ -52,8 +66,8 @@ ec_gt oled_show_line_checked(uint8_t x, uint8_t y_page, const char *str);
 ec_gt oled_clear_checked(void);
 
 /**
- * @brief  Send the OLED controller initialization command sequence with error checks.
- * @note   This function does not clear RAM or render demo text.
+ * @brief  Send the next OLED logical initialization command with error checks.
+ * @note   Each call performs at most one I2C transaction.
  */
 ec_gt oled_init_checked(void);
 

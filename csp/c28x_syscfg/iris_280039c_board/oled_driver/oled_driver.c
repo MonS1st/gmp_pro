@@ -6,7 +6,6 @@
 
 #include <core/pm/function_scheduler.h>
 
-#define TIMEOUT_SET 40
 #define OLED_DISPLAY_WIDTH       128U
 #define OLED_PAGE_COUNT          8U
 #define OLED_TEXT_CELL_WIDTH     8U
@@ -20,6 +19,7 @@ static data_gt s_oled_line_upper[OLED_DISPLAY_WIDTH];
 #if FONT_SIZE == 16
 static data_gt s_oled_line_lower[OLED_DISPLAY_WIDTH];
 #endif
+static uint16_t s_oled_active_address = 0U;
 
 volatile ec_gt g_oled_position_result = GMP_EC_NOT_READY;
 volatile ec_gt g_oled_data_result = GMP_EC_NOT_READY;
@@ -27,12 +27,60 @@ volatile uint16_t g_oled_fail_stage = OLED_FAIL_STAGE_NONE;
 volatile uint16_t g_oled_fail_x = 0U;
 volatile uint16_t g_oled_fail_page = 0U;
 volatile uint16_t g_oled_fail_length = 0U;
-volatile uint16_t g_oled_last_slave_address = OLED_IIC_7BIT_ADDR;
+volatile uint16_t g_oled_last_slave_address = 0U;
 volatile ec_gt g_oled_probe_result = GMP_EC_NOT_READY;
 volatile uint32_t g_oled_probe_ok_count = 0U;
 volatile uint32_t g_oled_probe_error_count = 0U;
 volatile uint16_t g_oled_init_burst_index = 0U;
 volatile ec_gt g_oled_init_burst_result = GMP_EC_NOT_READY;
+volatile uint16_t g_oled_init_command_index = 0U;
+volatile ec_gt g_oled_init_command_result = GMP_EC_NOT_READY;
+volatile uint16_t g_oled_last_failed_command = 0U;
+volatile uint32_t g_oled_command_ok_count = 0U;
+volatile uint32_t g_oled_command_error_count = 0U;
+
+static bool oled_active_address_is_valid(void)
+{
+    return (s_oled_active_address == OLED_IIC_7BIT_ADDR_3C) ||
+           (s_oled_active_address == OLED_IIC_7BIT_ADDR_3D);
+}
+
+void oled_set_active_address(uint16_t address)
+{
+    if ((address == OLED_IIC_7BIT_ADDR_3C) ||
+        (address == OLED_IIC_7BIT_ADDR_3D))
+    {
+        s_oled_active_address = address;
+    }
+    else
+    {
+        s_oled_active_address = 0U;
+    }
+}
+
+uint16_t oled_get_active_address(void)
+{
+    return s_oled_active_address;
+}
+
+void oled_reset_init_sequence(void)
+{
+    g_oled_init_command_index = 0U;
+    g_oled_init_command_result = GMP_EC_NOT_READY;
+}
+
+static ec_gt oled_write_active(const data_gt *payload, size_gt length)
+{
+    if (!oled_active_address_is_valid())
+    {
+        return GMP_EC_NOT_READY;
+    }
+
+    g_oled_last_slave_address = s_oled_active_address;
+    return gmp_hal_iic_write_mem(
+        iic_bus, s_oled_active_address, 0U, 0U,
+        payload, length, (time_gt)OLED_I2C_TIMEOUT_TICKS);
+}
 
 static void oled_prepare_diagnostics(void)
 {
@@ -42,7 +90,6 @@ static void oled_prepare_diagnostics(void)
     g_oled_fail_x = 0U;
     g_oled_fail_page = 0U;
     g_oled_fail_length = 0U;
-    g_oled_last_slave_address = OLED_IIC_7BIT_ADDR;
 }
 
 static void oled_record_failure(uint16_t stage, uint16_t x,
@@ -52,20 +99,15 @@ static void oled_record_failure(uint16_t stage, uint16_t x,
     g_oled_fail_x = x;
     g_oled_fail_page = page;
     g_oled_fail_length = length;
-    g_oled_last_slave_address = OLED_IIC_7BIT_ADDR;
 }
 
 static ec_gt oled_write_byte_checked(uint8_t dat, uint8_t cmd)
 {
-    const time_gt timeout_ticks = TIMEOUT_SET;
     static data_gt byte_payload[2];
 
     byte_payload[0] = (cmd != 0U) ? 0x40U : 0x00U;
     byte_payload[1] = (data_gt)dat;
-    g_oled_last_slave_address = OLED_IIC_7BIT_ADDR;
-    return gmp_hal_iic_write_mem(
-        iic_bus, OLED_IIC_7BIT_ADDR, 0U, 0U,
-        byte_payload, 2U, timeout_ticks);
+    return oled_write_active(byte_payload, 2U);
 }
 
 static uint8_t oled_checked_printable_char(uint8_t chr)
@@ -95,7 +137,6 @@ void OLED_WR_Byte(uint8_t dat, uint8_t cmd)
  */
 static ec_gt oled_set_position_raw(uint8_t x, uint8_t y_page)
 {
-    const time_gt timeout_ticks = TIMEOUT_SET;
     static data_gt pos_cmds[4];
 
     pos_cmds[0] = 0x00;                           /* Control Byte: Following are commands */
@@ -104,8 +145,7 @@ static ec_gt oled_set_position_raw(uint8_t x, uint8_t y_page)
     pos_cmds[3] = (data_gt)((x + 2) & 0x0F);       /* Lower column nibble with +2 offset */
 
     /* Dispatch all 4 bytes consecutively to save bus time slices */
-    return gmp_hal_iic_write_mem(
-        iic_bus, OLED_IIC_7BIT_ADDR, 0, 0, pos_cmds, 4U, timeout_ticks);
+    return oled_write_active(pos_cmds, 4U);
 }
 
 ec_gt oled_set_position_checked(uint8_t x, uint8_t y_page)
@@ -113,6 +153,11 @@ ec_gt oled_set_position_checked(uint8_t x, uint8_t y_page)
     ec_gt ret;
 
     oled_prepare_diagnostics();
+    if (!oled_active_address_is_valid())
+    {
+        g_oled_position_result = GMP_EC_NOT_READY;
+        return GMP_EC_NOT_READY;
+    }
     if ((x >= OLED_DISPLAY_WIDTH) || (y_page >= OLED_PAGE_COUNT))
     {
         g_oled_position_result = GMP_EC_INVALID_PARAM;
@@ -133,7 +178,6 @@ ec_gt oled_set_position_checked(uint8_t x, uint8_t y_page)
 ec_gt oled_write_page_checked(uint8_t x, uint8_t y_page,
                               const data_gt *data, uint16_t length)
 {
-    const time_gt timeout_ticks = TIMEOUT_SET;
     uint16_t available;
     uint16_t write_length;
     uint16_t offset;
@@ -144,6 +188,11 @@ ec_gt oled_write_page_checked(uint8_t x, uint8_t y_page,
     ec_gt ret;
 
     oled_prepare_diagnostics();
+    if (!oled_active_address_is_valid())
+    {
+        g_oled_position_result = GMP_EC_NOT_READY;
+        return GMP_EC_NOT_READY;
+    }
     if ((data == NULL) || (length == 0U) ||
         (x >= OLED_DISPLAY_WIDTH) || (y_page >= OLED_PAGE_COUNT))
     {
@@ -188,9 +237,8 @@ ec_gt oled_write_page_checked(uint8_t x, uint8_t y_page,
             s_oled_i2c_payload[i + 1U] = data[offset + i];
         }
 
-        ret = gmp_hal_iic_write_mem(
-            iic_bus, OLED_IIC_7BIT_ADDR, 0U, 0U,
-            s_oled_i2c_payload, (size_gt)(chunk + 1U), timeout_ticks);
+        ret = oled_write_active(
+            s_oled_i2c_payload, (size_gt)(chunk + 1U));
         g_oled_data_result = ret;
         if (ret != GMP_EC_OK)
         {
@@ -214,6 +262,13 @@ ec_gt oled_show_line_checked(uint8_t x, uint8_t y_page, const char *str)
     uint16_t font_index;
     uint8_t chr;
     ec_gt ret;
+
+    if (!oled_active_address_is_valid())
+    {
+        oled_prepare_diagnostics();
+        g_oled_position_result = GMP_EC_NOT_READY;
+        return GMP_EC_NOT_READY;
+    }
 
     if ((str == NULL) || (x >= OLED_DISPLAY_WIDTH) ||
         (y_page >= OLED_PAGE_COUNT))
@@ -296,7 +351,6 @@ void oled_set_position(uint8_t x, uint8_t y_page)
  */
 void oled_display_on(void)
 {
-    const time_gt timeout_ticks = TIMEOUT_SET;
     static data_gt on_cmds[4];
 
     on_cmds[0] = 0x00; /* Control Byte: Following are commands */
@@ -304,7 +358,7 @@ void oled_display_on(void)
     on_cmds[2] = 0x14; /* Enable Charge Pump */
     on_cmds[3] = 0xAF; /* Display ON */
 
-    gmp_hal_iic_write_mem(iic_bus, OLED_IIC_7BIT_ADDR, 0, 0, on_cmds, 4, timeout_ticks);
+    (void)oled_write_active(on_cmds, 4U);
 }
 
 /**
@@ -312,7 +366,6 @@ void oled_display_on(void)
  */
 void oled_display_off(void)
 {
-    const time_gt timeout_ticks = TIMEOUT_SET;
     static data_gt off_cmds[4];
 
     off_cmds[0] = 0x00; /* Control Byte: Following are commands */
@@ -320,7 +373,7 @@ void oled_display_off(void)
     off_cmds[2] = 0x10; /* Disable Charge Pump */
     off_cmds[3] = 0xAE; /* Display OFF */
 
-    gmp_hal_iic_write_mem(iic_bus, OLED_IIC_7BIT_ADDR, 0, 0, off_cmds, 4, timeout_ticks);
+    (void)oled_write_active(off_cmds, 4U);
 }
 
 /**
@@ -332,6 +385,12 @@ ec_gt oled_clear_checked(void)
     static data_gt blank_page[OLED_DISPLAY_WIDTH] = {0U};
     uint8_t page;
     ec_gt ret;
+
+    if (!oled_active_address_is_valid())
+    {
+        oled_prepare_diagnostics();
+        return GMP_EC_NOT_READY;
+    }
 
     for (page = 0U; page < OLED_PAGE_COUNT; ++page)
     {
@@ -361,7 +420,6 @@ void oled_show_char(uint8_t x, uint8_t y_page, uint8_t chr)
 {
     uint16_t i;
 
-    const time_gt timeout_ticks = TIMEOUT_SET;
     uint8_t c_offset = chr - ' '; /* Calculate ASCII matrix offset index */
 
     /*
@@ -390,7 +448,7 @@ void oled_show_char(uint8_t x, uint8_t y_page, uint8_t chr)
             tx_payload[i + 1] = (data_gt)F8X16[font_index + i];
         }
         /* Continuous push of 1 control byte + 8 data bytes via C2000 FIFO */
-        gmp_hal_iic_write_mem(iic_bus, OLED_IIC_7BIT_ADDR, 0, 0, tx_payload, 9, timeout_ticks);
+        (void)oled_write_active(tx_payload, 9U);
 
         /* 2. Render Lower Half (8 pixels high, 8 pixels wide) at the next vertical page slot */
         oled_set_position(x, y_page + 1);
@@ -398,7 +456,7 @@ void oled_show_char(uint8_t x, uint8_t y_page, uint8_t chr)
         {
             tx_payload[i + 1] = (data_gt)F8X16[font_index + i + 8];
         }
-        gmp_hal_iic_write_mem(iic_bus, OLED_IIC_7BIT_ADDR, 0, 0, tx_payload, 9, timeout_ticks);
+        (void)oled_write_active(tx_payload, 9U);
     }
     else
     {
@@ -409,7 +467,7 @@ void oled_show_char(uint8_t x, uint8_t y_page, uint8_t chr)
             tx_payload[i + 1] = (data_gt)F6x8[c_offset][i];
         }
         /* Continuous push of 1 control byte + 6 data bytes */
-        gmp_hal_iic_write_mem(iic_bus, OLED_IIC_7BIT_ADDR, 0, 0, tx_payload, 7, timeout_ticks);
+        (void)oled_write_active(tx_payload, 7U);
     }
 }
 
@@ -488,89 +546,125 @@ void oled_show_bmp(unsigned char x0, unsigned char y0, unsigned char x1, unsigne
     }
 }
 
-/**
- * @brief  Initializes the SSD1306/SH1106 OLED module controller registers.
- * @details This function transmits a pre-defined hardware configuration macro sequence
- *          to setup internal clocks, multiplex ratio, display flip directions, and
- *          crucially activates the internal charge pump required to drive the panel VCC.
- *          It forces Page Addressing Mode and performs a clear screen layout at the end.
- *
- * @param  None
- * @return None
- *
- * @note   Ensure the physical hardware supply is connected to 5V prior to running this
- *         sequence to avoid sub-optimal low voltage NACK lockouts from the display controller.
- * @see    OLED_WR_Byte
- * @see    oled_clear
- * @see    oled_set_position
- */
 ec_gt oled_init_checked(void)
 {
-    const time_gt timeout_ticks = TIMEOUT_SET;
-    static data_gt init_burst_1[OLED_I2C_MAX_TRANSACTION_BYTES] = {
-        0x00U,
-        0xAEU, 0x02U, 0x10U, 0x40U,
-        0x81U, 0xCFU, 0xA1U, 0xC8U,
-        0xA6U, 0xA8U, 0x3FU, 0xD3U,
-        0x00U, 0xD5U, 0x80U
-    };
-    static data_gt init_burst_2[] = {
-        0x00U,
-        0xD9U, 0xF1U, 0xDAU, 0x12U,
-        0xDBU, 0x40U, 0x20U, 0x02U,
-        0x8DU, 0x14U, 0xA4U, 0xA6U,
-        0xAFU
-    };
+    static data_gt command_payload[3];
+    size_gt payload_length = 2U;
+    uint16_t command_index = g_oled_init_command_index;
     ec_gt ret;
 
     oled_prepare_diagnostics();
-    g_oled_init_burst_index = 0U;
-    g_oled_init_burst_result = GMP_EC_NOT_READY;
-    g_oled_last_slave_address = OLED_IIC_7BIT_ADDR;
-
-    g_oled_init_burst_index = 1U;
-    ret = gmp_hal_iic_write_mem(
-        iic_bus, OLED_IIC_7BIT_ADDR, 0U, 0U,
-        init_burst_1, OLED_I2C_MAX_TRANSACTION_BYTES, timeout_ticks);
-    g_oled_init_burst_result = ret;
-    if (ret != GMP_EC_OK)
+    if (!oled_active_address_is_valid())
     {
-        return ret;
+        g_oled_init_command_result = GMP_EC_NOT_READY;
+        return GMP_EC_NOT_READY;
+    }
+    if (command_index >= OLED_INIT_COMMAND_COUNT)
+    {
+        g_oled_init_command_result = GMP_EC_OK;
+        return GMP_EC_OK;
     }
 
-    DEVICE_DELAY_US(500U);
+    command_payload[0] = 0x00U;
+    command_payload[2] = 0x00U;
+    switch (command_index)
+    {
+    case 0U:
+        command_payload[1] = 0xAEU;
+        break;
+    case 1U:
+        command_payload[1] = 0x02U;
+        break;
+    case 2U:
+        command_payload[1] = 0x10U;
+        break;
+    case 3U:
+        command_payload[1] = 0x40U;
+        break;
+    case 4U:
+        command_payload[1] = 0x81U;
+        command_payload[2] = 0xCFU;
+        payload_length = 3U;
+        break;
+    case 5U:
+        command_payload[1] = 0xA1U;
+        break;
+    case 6U:
+        command_payload[1] = 0xC8U;
+        break;
+    case 7U:
+        command_payload[1] = 0xA6U;
+        break;
+    case 8U:
+        command_payload[1] = 0xA8U;
+        command_payload[2] = 0x3FU;
+        payload_length = 3U;
+        break;
+    case 9U:
+        command_payload[1] = 0xD3U;
+        command_payload[2] = 0x00U;
+        payload_length = 3U;
+        break;
+    case 10U:
+        command_payload[1] = 0xD5U;
+        command_payload[2] = 0x80U;
+        payload_length = 3U;
+        break;
+    case 11U:
+        command_payload[1] = 0xD9U;
+        command_payload[2] = 0xF1U;
+        payload_length = 3U;
+        break;
+    case 12U:
+        command_payload[1] = 0xDAU;
+        command_payload[2] = 0x12U;
+        payload_length = 3U;
+        break;
+    case 13U:
+        command_payload[1] = 0xDBU;
+        command_payload[2] = 0x40U;
+        payload_length = 3U;
+        break;
+    case 14U:
+        command_payload[1] = 0x20U;
+        command_payload[2] = 0x02U;
+        payload_length = 3U;
+        break;
+    case 15U:
+        command_payload[1] = 0x8DU;
+        command_payload[2] = 0x14U;
+        payload_length = 3U;
+        break;
+    case 16U:
+        command_payload[1] = 0xA4U;
+        break;
+    case 17U:
+        command_payload[1] = 0xAFU;
+        break;
+    default:
+        g_oled_init_command_result = GMP_EC_INVALID_PARAM;
+        return GMP_EC_INVALID_PARAM;
+    }
 
-    g_oled_init_burst_index = 2U;
-    ret = gmp_hal_iic_write_mem(
-        iic_bus, OLED_IIC_7BIT_ADDR, 0U, 0U,
-        init_burst_2,
-        (size_gt)(sizeof(init_burst_2) / sizeof(init_burst_2[0])),
-        timeout_ticks);
+    ret = oled_write_active(command_payload, payload_length);
+    g_oled_init_command_result = ret;
     g_oled_init_burst_result = ret;
+    if (ret == GMP_EC_OK)
+    {
+        ++g_oled_init_command_index;
+        ++g_oled_command_ok_count;
+    }
+    else
+    {
+        g_oled_last_failed_command = (uint16_t)(command_index + 1U);
+        ++g_oled_command_error_count;
+    }
+
     return ret;
 }
 
 void oled_init(void)
 {
-    ec_gt ret = oled_init_checked();
-
-    if (ret != GMP_EC_OK)
-    {
-        return;
-    }
-
-    ret = oled_clear_checked();
-    if (ret != GMP_EC_OK)
-    {
-        return;
-    }
-
-    ret = oled_show_line_checked(0U, 0U, "OLED TEST");
-    if (ret != GMP_EC_OK)
-    {
-        return;
-    }
-
-    (void)oled_show_line_checked(0U, 4U, "2026/07/01");
+    (void)oled_init_checked();
 }
 

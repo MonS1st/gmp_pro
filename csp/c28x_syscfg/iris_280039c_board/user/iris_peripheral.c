@@ -68,6 +68,7 @@ static uint16_t s_key_consecutive_timeout_count = 0U;
 #define OLED_KEY_DEFER_MS            (100U)
 
 static data_gt s_oled_blank_page[OLED_CLEAR_PAGE_BYTES] = {0U};
+static data_gt s_oled_probe_payload[2] = {0x00U, 0xAEU};
 
 static bool power_ui_oled_action_due(void)
 {
@@ -127,6 +128,8 @@ static void power_ui_schedule_oled_retry(uint32_t delay_ms)
     g_oled_dynamic_update_enabled = 0U;
     g_oled_pending_mask = 0U;
     g_oled_clear_page_index = 0U;
+    g_oled_selected_address = 0U;
+    oled_set_active_address(0U);
     g_oled_init_state = OLED_INIT_RETRY_WAIT;
     g_oled_next_action_tick =
         gmp_base_get_system_tick() + (time_gt)delay_ms;
@@ -135,7 +138,8 @@ static void power_ui_schedule_oled_retry(uint32_t delay_ms)
     s_oled_last_key_id = 0xFFFFU;
 }
 
-static void power_ui_handle_oled_failure(ec_gt result)
+static void power_ui_handle_oled_failure_with_delay(ec_gt result,
+                                                    uint32_t delay_ms)
 {
     ++g_oled_probe_error_count;
     ++g_oled_init_failure_count;
@@ -144,7 +148,84 @@ static void power_ui_handle_oled_failure(ec_gt result)
         ++g_oled_init_retry_count;
     }
 
-    power_ui_schedule_oled_retry(power_ui_oled_retry_delay_ms());
+    power_ui_schedule_oled_retry(delay_ms);
+}
+
+static void power_ui_handle_oled_failure(ec_gt result)
+{
+    power_ui_handle_oled_failure_with_delay(
+        result, power_ui_oled_retry_delay_ms());
+}
+
+static ec_gt power_ui_probe_oled_address(uint16_t address)
+{
+    g_oled_last_slave_address = address;
+    return gmp_hal_iic_write_mem(
+        iic_bus, address, 0U, 0U,
+        s_oled_probe_payload, 2U, (time_gt)OLED_I2C_TIMEOUT_TICKS);
+}
+
+static void power_ui_prepare_oled_address_scan(void)
+{
+    g_oled_selected_address = 0U;
+    g_oled_probe_3c_result = GMP_EC_NOT_READY;
+    g_oled_probe_3d_result = GMP_EC_NOT_READY;
+    g_oled_position_result = GMP_EC_NOT_READY;
+    g_oled_data_result = GMP_EC_NOT_READY;
+    g_oled_fail_stage = OLED_FAIL_STAGE_NONE;
+    g_oled_fail_x = 0U;
+    g_oled_fail_page = 0U;
+    g_oled_fail_length = 0U;
+    g_oled_clear_page_index = 0U;
+    g_oled_pending_mask = 0U;
+    oled_set_active_address(0U);
+    oled_reset_init_sequence();
+}
+
+static void power_ui_run_oled_probe_3c(void)
+{
+    ec_gt result;
+
+    power_ui_prepare_oled_address_scan();
+    g_oled_init_state = OLED_INIT_PROBE_3C;
+    ++g_oled_address_scan_count;
+    result = power_ui_probe_oled_address(OLED_IIC_7BIT_ADDR_3C);
+    g_oled_probe_3c_result = result;
+    power_ui_record_oled_action_result(result);
+    g_oled_init_state = OLED_INIT_PROBE_3D;
+}
+
+static void power_ui_run_oled_probe_3d(void)
+{
+    uint16_t selected_address;
+    ec_gt result;
+
+    g_oled_init_state = OLED_INIT_PROBE_3D;
+    result = power_ui_probe_oled_address(OLED_IIC_7BIT_ADDR_3D);
+    g_oled_probe_3d_result = result;
+    power_ui_record_oled_action_result(result);
+
+    if (g_oled_probe_3c_result == GMP_EC_OK)
+    {
+        selected_address = OLED_IIC_7BIT_ADDR_3C;
+    }
+    else if (g_oled_probe_3d_result == GMP_EC_OK)
+    {
+        selected_address = OLED_IIC_7BIT_ADDR_3D;
+    }
+    else
+    {
+        ++g_oled_no_device_count;
+        power_ui_handle_oled_failure_with_delay(
+            result, OLED_INIT_RETRY_SLOW_MS);
+        return;
+    }
+
+    g_oled_selected_address = selected_address;
+    oled_set_active_address(selected_address);
+    oled_reset_init_sequence();
+    ++g_oled_init_attempt_count;
+    g_oled_init_state = OLED_INIT_COMMANDS;
 }
 
 static void power_ui_run_oled_commands(void)
@@ -152,16 +233,15 @@ static void power_ui_run_oled_commands(void)
     ec_gt result;
 
     g_oled_init_state = OLED_INIT_COMMANDS;
-    ++g_oled_init_attempt_count;
     result = oled_init_checked();
     power_ui_record_oled_action_result(result);
-    if (result == GMP_EC_OK)
-    {
-        g_oled_init_state = OLED_INIT_TEST;
-    }
-    else
+    if (result != GMP_EC_OK)
     {
         power_ui_handle_oled_failure(result);
+    }
+    else if (g_oled_init_command_index >= OLED_INIT_COMMAND_COUNT)
+    {
+        g_oled_init_state = OLED_INIT_TEST;
     }
 }
 
@@ -721,7 +801,21 @@ gmp_task_status_t oled_show_task(gmp_task_t* tsk)
     case OLED_INIT_WAIT_POWER:
         if (power_ui_oled_i2c_step_ready())
         {
-            power_ui_run_oled_commands();
+            power_ui_run_oled_probe_3c();
+        }
+        return GMP_TASK_DONE;
+
+    case OLED_INIT_PROBE_3C:
+        if (power_ui_oled_i2c_step_ready())
+        {
+            power_ui_run_oled_probe_3c();
+        }
+        return GMP_TASK_DONE;
+
+    case OLED_INIT_PROBE_3D:
+        if (power_ui_oled_i2c_step_ready())
+        {
+            power_ui_run_oled_probe_3d();
         }
         return GMP_TASK_DONE;
 
@@ -805,9 +899,7 @@ gmp_task_status_t oled_show_task(gmp_task_t* tsk)
     case OLED_INIT_RETRY_WAIT:
         if (power_ui_oled_i2c_step_ready())
         {
-            g_oled_clear_page_index = 0U;
-            g_oled_pending_mask = 0U;
-            power_ui_run_oled_commands();
+            power_ui_run_oled_probe_3c();
         }
         return GMP_TASK_DONE;
 
@@ -818,6 +910,8 @@ gmp_task_status_t oled_show_task(gmp_task_t* tsk)
         g_oled_dynamic_update_enabled = 0U;
         g_oled_pending_mask = 0U;
         g_oled_clear_page_index = 0U;
+        g_oled_selected_address = 0U;
+        oled_set_active_address(0U);
         g_oled_init_state = OLED_INIT_WAIT_POWER;
         g_oled_next_action_tick =
             gmp_base_get_system_tick() + (time_gt)100U;

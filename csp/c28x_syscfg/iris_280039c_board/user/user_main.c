@@ -180,6 +180,14 @@ volatile uint32_t g_oled_init_failure_count = 0U;
 volatile uint16_t g_oled_clear_page_index = 0U;
 volatile time_gt g_oled_next_action_tick = 0U;
 volatile uint32_t g_oled_deferred_for_key_count = 0U;
+volatile ec_gt g_oled_probe_3c_result = GMP_EC_NOT_READY;
+volatile ec_gt g_oled_probe_3d_result = GMP_EC_NOT_READY;
+volatile uint16_t g_oled_selected_address = 0U;
+volatile uint32_t g_oled_address_scan_count = 0U;
+volatile uint32_t g_oled_no_device_count = 0U;
+volatile uint16_t g_oled_reset_control_available = 0U;
+volatile uint16_t g_oled_power_control_available = 0U;
+volatile uint32_t g_oled_reset_count = 0U;
 
 gmp_task_status_t tsk_blink(gmp_task_t* tsk)
 {
@@ -466,6 +474,22 @@ gmp_task_status_t tsk_startup(gmp_task_t* tsk)
     g_oled_init_failure_count = 0U;
     g_oled_clear_page_index = 0U;
     g_oled_deferred_for_key_count = 0U;
+    g_oled_probe_3c_result = GMP_EC_NOT_READY;
+    g_oled_probe_3d_result = GMP_EC_NOT_READY;
+    g_oled_selected_address = 0U;
+    g_oled_address_scan_count = 0U;
+    g_oled_no_device_count = 0U;
+    g_oled_reset_control_available = 0U;
+    g_oled_power_control_available = 0U;
+    g_oled_reset_count = 0U;
+    g_oled_last_slave_address = 0U;
+    g_oled_init_command_index = 0U;
+    g_oled_init_command_result = GMP_EC_NOT_READY;
+    g_oled_last_failed_command = 0U;
+    g_oled_command_ok_count = 0U;
+    g_oled_command_error_count = 0U;
+    oled_set_active_address(0U);
+    oled_reset_init_sequence();
     g_oled_next_action_tick =
         gmp_base_get_system_tick() + (time_gt)100U;
     g_key_i2c_holdoff_count = 0U;

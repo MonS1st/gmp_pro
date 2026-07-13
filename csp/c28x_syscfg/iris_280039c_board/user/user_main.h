@@ -87,6 +87,14 @@ extern volatile uint32_t g_oled_init_failure_count;
 extern volatile uint16_t g_oled_clear_page_index;
 extern volatile time_gt g_oled_next_action_tick;
 extern volatile uint32_t g_oled_deferred_for_key_count;
+extern volatile ec_gt g_oled_probe_3c_result;
+extern volatile ec_gt g_oled_probe_3d_result;
+extern volatile uint16_t g_oled_selected_address;
+extern volatile uint32_t g_oled_address_scan_count;
+extern volatile uint32_t g_oled_no_device_count;
+extern volatile uint16_t g_oled_reset_control_available;
+extern volatile uint16_t g_oled_power_control_available;
+extern volatile uint32_t g_oled_reset_count;
 extern volatile uint32_t g_blocked_output_request_count;
 extern volatile uint16_t s_last_key_id;
 extern volatile uint16_t s_key_release_count;
@@ -96,12 +104,14 @@ extern volatile uint16_t s_key_release_count;
 #define OLED_PENDING_KEY     (1U << 2)
 
 #define OLED_INIT_WAIT_POWER  (0U)
-#define OLED_INIT_COMMANDS    (1U)
-#define OLED_INIT_TEST        (2U)
-#define OLED_INIT_CLEAR_PAGE  (3U)
-#define OLED_INIT_TITLE       (4U)
-#define OLED_INIT_READY       (5U)
-#define OLED_INIT_RETRY_WAIT  (6U)
+#define OLED_INIT_PROBE_3C    (1U)
+#define OLED_INIT_PROBE_3D    (2U)
+#define OLED_INIT_COMMANDS    (3U)
+#define OLED_INIT_TEST        (4U)
+#define OLED_INIT_CLEAR_PAGE  (5U)
+#define OLED_INIT_TITLE       (6U)
+#define OLED_INIT_READY       (7U)
+#define OLED_INIT_RETRY_WAIT  (8U)
 
 //=================================================================================================
 // global functions
