@@ -26,12 +26,16 @@ gpio_halt gpio_beep;
 
 void beep_on()
 {
+#if PSU_ENABLE_BEEP && !PSU_SAFE_BRINGUP
     gmp_hal_gpio_write(gpio_beep, 1);
+#endif
 }
 
 void beep_off()
 {
+#if PSU_ENABLE_BEEP && !PSU_SAFE_BRINGUP
     gmp_hal_gpio_write(gpio_beep, 0);
+#endif
 }
 
 //=================================================================================================
@@ -94,10 +98,14 @@ static void power_ui_execute_key_action(uint16_t key_id)
         break;
 
     case PSU_KEY_OUTPUT_TOGGLE_ID:
+#if PSU_SAFE_BRINGUP || !PSU_ALLOW_OUTPUT_REQUEST
+        power_app_request_output(true);
+#else
         if (!g_power_app.fault_latched)
         {
             power_app_request_output(!g_power_app.output_requested);
         }
+#endif
         break;
 
     case PSU_KEY_FAULT_RESET_ID:
@@ -151,6 +159,35 @@ static bool power_ui_process_key_id(uint16_t key_id)
     return false;
 }
 
+bool power_ui_safe_bringup_self_test(void)
+{
+#if PSU_SAFE_BRINGUP
+    uint16_t key_id;
+    bool passed = true;
+
+    for (key_id = 1U; key_id <= 39U; ++key_id)
+    {
+        g_power_app.output_requested = false;
+        power_ui_execute_key_action(key_id);
+        if (g_power_app.output_requested)
+        {
+            passed = false;
+        }
+    }
+
+    power_app_set_voltage_mv(0U);
+    power_app_set_current_ma(0U);
+    g_power_app.output_requested = false;
+    g_power_app.fault_reset_requested = false;
+    s_last_key_id = 0U;
+    s_key_release_count = 0U;
+    return passed;
+#else
+    return true;
+#endif
+}
+
+#if !PSU_SAFE_BRINGUP
 static const char *power_ui_state_text(power_state_t state)
 {
     switch (state)
@@ -189,6 +226,7 @@ static uint16_t power_ui_display_current(uint16_t current_ma)
 {
     return (current_ma > 999U) ? 999U : current_ma;
 }
+#endif
 
 //
 // Common cathode digital tube segment code table
@@ -287,6 +325,21 @@ gmp_task_status_t tsk_key_flush(gmp_task_t* tsk)
 gmp_task_status_t oled_show_task(gmp_task_t* tsk)
 {
     static bool s_page_initialized = false;
+    GMP_UNUSED_VAR(tsk);
+
+#if PSU_SAFE_BRINGUP
+    if ((flag_init_cmpt == 1) && !s_page_initialized)
+    {
+        oled_clear();
+        oled_show_str(0U, 0U, "SAFE MODE");
+        oled_show_str(0U, 2U, "PWM OFF");
+        oled_show_str(0U, 4U, "DAC 0");
+        oled_show_str(0U, 6U, "OUTPUT OFF");
+        s_page_initialized = true;
+    }
+
+    return GMP_TASK_DONE;
+#else
     static bool s_last_fault_page = false;
     char line1[32];
     char line2[32];
@@ -304,8 +357,6 @@ gmp_task_status_t oled_show_task(gmp_task_t* tsk)
     bool output_enabled;
     bool fault_latched;
     bool fault_page;
-
-    GMP_UNUSED_VAR(tsk);
 
     if (flag_init_cmpt == 1)
     {
@@ -376,6 +427,7 @@ gmp_task_status_t oled_show_task(gmp_task_t* tsk)
     }
 
     return GMP_TASK_DONE;
+#endif
 }
 
 //=================================================================================================

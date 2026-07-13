@@ -12,6 +12,7 @@
 #include <gmp_core.h>
 
 #include "user_main.h"
+#include <xplt.ctl_interface.h>
 #include <xplt.peripheral.h>
 #include <ctl/component/interface/gain_model.h>
 
@@ -99,6 +100,12 @@ void initI2C()
 // User should setup all the peripheral in this function.
 void setup_peripheral(void)
 {
+#if PSU_SAFE_BRINGUP
+    // SysConfig deliberately exposes no EPWM A/B pins in this build. Force
+    // every internal PWM module into one-shot trip before other user setup.
+    ctl_force_all_pwm_trip();
+#endif
+
     parameter_gt vout_adc_gain = ctl_gain_calc_generic(PSU_ADC_VREF_V, PSU_VOUT_SENSOR_GAIN,
                                                        PSU_VOUT_BASE_V);
     parameter_gt iout_adc_gain = ctl_gain_calc_generic(PSU_ADC_VREF_V, PSU_IOUT_SENSOR_GAIN_V_PER_A,
@@ -138,7 +145,9 @@ void setup_peripheral(void)
 
     user_led = SYSTEM_LED;
 
+#if PSU_ENABLE_BEEP && !PSU_SAFE_BRINGUP
     gpio_beep = IRIS_GPIO1;
+#endif
 
 }
 
@@ -182,6 +191,11 @@ interrupt void MainISR(void)
 
 void reset_controller(void)
 {
+#if PSU_SAFE_BRINGUP || !PSU_ALLOW_PHYSICAL_OUTPUT_ENABLE
+    // PWM_RESET_PORT is an unconfirmed legacy mapping. Never toggle it in the
+    // control-board-only safe build.
+    return;
+#else
     int i = 0;
 
     GPIO_WritePin(PWM_RESET_PORT, 0);
@@ -189,6 +203,7 @@ void reset_controller(void)
     for(i=0;i<10000;++i);
 
     GPIO_WritePin(PWM_RESET_PORT, 1);
+#endif
 
 }
 

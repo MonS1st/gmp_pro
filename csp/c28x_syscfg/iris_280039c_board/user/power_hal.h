@@ -19,6 +19,7 @@ void power_dac_set_zero(void);
 
 void power_output_hw_set(bool enable);
 bool power_output_hw_get(void);
+bool power_hal_safe_bringup_self_test(void);
 
 #ifdef __cplusplus
 }

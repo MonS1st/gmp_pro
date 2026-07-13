@@ -1,6 +1,7 @@
 #ifndef POWER_DEBUG_H
 #define POWER_DEBUG_H
 
+#include <stdbool.h>
 #include <stdint.h>
 
 #ifdef __cplusplus
@@ -35,6 +36,7 @@ extern volatile uint16_t g_power_debug_ack_count;
 
 void power_debug_process_command(void);
 void power_debug_print_status(void);
+bool power_debug_safe_bringup_self_test(void);
 
 #ifdef __cplusplus
 }

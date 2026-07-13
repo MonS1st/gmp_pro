@@ -5,8 +5,8 @@
 #include "power_self_test.h"
 
 #include <ctrl_settings.h>
-#if !PSU_SOFT_TEST_MODE
 #include <gmp_core.h>
+#if !PSU_SOFT_TEST_MODE
 #include <xplt.peripheral.h>
 #endif
 
@@ -227,6 +227,14 @@ uint16_t power_app_get_current_ma(void)
 
 void power_app_request_output(bool enable)
 {
+#if PSU_SAFE_BRINGUP || !PSU_ALLOW_OUTPUT_REQUEST
+    if (enable)
+    {
+        gmp_base_print("SAFE_BRINGUP: physical output command blocked\r\n");
+    }
+    g_power_app.output_requested = false;
+    return;
+#else
     if (enable)
     {
         // Write first, then re-check the ISR-owned latch. Whichever side wins
@@ -241,6 +249,7 @@ void power_app_request_output(bool enable)
     {
         g_power_app.output_requested = false;
     }
+#endif
 }
 
 void power_app_reset_fault(void)
@@ -275,8 +284,29 @@ void power_app_fast_step(void)
     g_power_app.current_meas_ma = power_float_to_u16(g_iout_meas_ma);
 #endif
 
-    voltage_meas_mv = g_power_app.voltage_meas_mv;
-    current_meas_ma = g_power_app.current_meas_ma;
+    if (PSU_SAFE_BRINGUP || !PSU_ALLOW_OUTPUT_REQUEST ||
+        !PSU_ALLOW_PHYSICAL_OUTPUT_ENABLE)
+    {
+        // This barrier is evaluated in every fast control step. It sanitizes
+        // even direct debugger or memory writes before the application can
+        // enter an output state or apply a physical command.
+        power_output_hw_set(false);
+        power_dac_set_zero();
+        g_power_app.output_requested = false;
+        g_power_app.output_enabled = false;
+        g_power_app.fault_reset_requested = false;
+        g_power_app.state = POWER_STATE_OFF;
+        g_power_app.dac_voltage_code = power_voltage_mv_to_dac(g_power_app.voltage_set_mv);
+        g_power_app.dac_current_code = power_current_ma_to_dac(g_power_app.current_set_ma);
+        power_app_clear_mode_confirmation();
+        (void)power_protection_step(g_power_app.voltage_meas_mv,
+                                    g_power_app.current_meas_ma,
+                                    false);
+    }
+    else
+    {
+        voltage_meas_mv = g_power_app.voltage_meas_mv;
+        current_meas_ma = g_power_app.current_meas_ma;
 
     if (g_power_app.fault_latched)
     {
@@ -368,9 +398,10 @@ void power_app_fast_step(void)
         break;
     }
 
-    if (update_mode && !command_changed)
-    {
-        power_app_update_mode();
+        if (update_mode && !command_changed)
+        {
+            power_app_update_mode();
+        }
     }
 }
 

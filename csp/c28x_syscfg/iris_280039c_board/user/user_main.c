@@ -17,6 +17,8 @@
 
 #include "power_app.h"
 #include "power_debug.h"
+#include "power_hal.h"
+#include <xplt.ctl_interface.h>
 
 ctrl_gt kp, ki, kd;
 
@@ -131,6 +133,7 @@ gmp_task_status_t tsk_dl_debug_device(gmp_task_t* tsk)
 // GPIO
 gpio_halt user_led;
 volatile uint16_t flag_init_cmpt = 0;
+volatile uint16_t g_power_safe_bringup_self_test_failures = 0U;
 
 gmp_task_status_t tsk_blink(gmp_task_t* tsk)
 {
@@ -179,6 +182,75 @@ static gmp_task_status_t tsk_power_console_status(gmp_task_t* tsk)
     power_debug_print_status();
     return GMP_TASK_DONE;
 }
+
+#if PSU_SAFE_BRINGUP
+#define PSU_SAFE_TEST_HAL_OUTPUTS  (1U << 0)
+#define PSU_SAFE_TEST_APP_REQUEST  (1U << 1)
+#define PSU_SAFE_TEST_DEBUG_TOGGLE (1U << 2)
+#define PSU_SAFE_TEST_KEY_ACTIONS  (1U << 3)
+#define PSU_SAFE_TEST_STATE_GUARD  (1U << 4)
+#define PSU_SAFE_TEST_PWM_TRIP     (1U << 5)
+
+static void power_safe_bringup_run_self_test(void)
+{
+    uint16_t failures = 0U;
+
+    if (!power_hal_safe_bringup_self_test())
+    {
+        failures |= PSU_SAFE_TEST_HAL_OUTPUTS;
+    }
+
+    power_app_request_output(true);
+    if (g_power_app.output_requested)
+    {
+        failures |= PSU_SAFE_TEST_APP_REQUEST;
+    }
+
+    if (!power_debug_safe_bringup_self_test())
+    {
+        failures |= PSU_SAFE_TEST_DEBUG_TOGGLE;
+    }
+
+    if (!power_ui_safe_bringup_self_test())
+    {
+        failures |= PSU_SAFE_TEST_KEY_ACTIONS;
+    }
+
+    // Simulate hostile debugger/memory writes and verify that one fast step
+    // sanitizes them before any output path can consume the values.
+    g_power_app.output_requested = true;
+    g_power_app.output_enabled = true;
+    g_power_app.state = POWER_STATE_CC;
+    power_app_fast_step();
+    if (g_power_app.output_requested || g_power_app.output_enabled ||
+        (g_power_app.state != POWER_STATE_OFF) || power_output_hw_get())
+    {
+        failures |= PSU_SAFE_TEST_STATE_GUARD;
+    }
+
+    ctl_fast_enable_output();
+    if (!ctl_safe_bringup_pwm_all_tripped())
+    {
+        failures |= PSU_SAFE_TEST_PWM_TRIP;
+    }
+
+    // Restore a deterministic zero/off application state after destructive
+    // invariant tests, then reinforce the PWM trip one more time.
+    power_app_init();
+    ctl_fast_disable_output();
+    g_power_safe_bringup_self_test_failures = failures;
+
+    if (failures == 0U)
+    {
+        gmp_base_print("SAFE_BRINGUP SELF TEST: PASS\r\n");
+    }
+    else
+    {
+        gmp_base_print("SAFE_BRINGUP SELF TEST: FAIL mask=0x%04x\r\n",
+                       (unsigned int)failures);
+    }
+}
+#endif
 
 // Keep named task objects so startup/error handling never depends on a
 // scheduler-list index. All tasks must be non-blocking.
@@ -249,8 +321,7 @@ void init(void) GMP_NO_OPT_SUFFIX
 // Initialization tasks after all peripherals have been initialized
 gmp_task_status_t tsk_startup(gmp_task_t* tsk)
 {
-    GMP_UNUSED_VAR(tsk);
-
+#if PSU_ENABLE_BEEP && !PSU_SAFE_BRINGUP
     static uint16_t beep_counter = 0;
 
     if (beep_counter == 0)
@@ -264,63 +335,77 @@ gmp_task_status_t tsk_startup(gmp_task_t* tsk)
 
     beep_counter += 1;
 
-    // if program is complete, init all the peripherals, and close this routine.
-    if (beep_counter >= 4)
+    if (beep_counter < 4)
     {
-#if PSU_ENABLE_HT16K33_KEY || PSU_ENABLE_HT16K33_DISPLAY
-        ht16k33_init_t ht16k33_init_struct = {.brightness = 15, .blink_rate = 0, .int_enable = 0, .int_act_high = 0};
-
-        ec_gt ec = ht16k33_init(&ht16k33, iic_bus, HT16K33_DEFAULT_DEV_ADDR, &ht16k33_init_struct);
-
-        if (ec == GMP_EC_OK)
-        {
-#if PSU_ENABLE_HT16K33_DISPLAY
-            update_led_content_8byte(&ht16k33, led_lut[2], led_lut[0], led_lut[2], led_lut[6], led_lut[20], led_lut[7],
-                                             led_lut[7], led_lut[20]);
-#endif
-        }
-        else
-        {
-#if PSU_ENABLE_HT16K33_KEY
-            task_flush_key.is_enabled = 0;
-#endif
-#if PSU_ENABLE_HT16K33_DISPLAY
-            task_flush_led.is_enabled = 0;
-#endif
-        }
-#endif
-
-        // init and test the oled.
-#if PSU_ENABLE_OLED_DISPLAY
-        oled_init();
-#endif
-
-#if PSU_ENABLE_HT16K33_KEY || PSU_ENABLE_HT16K33_DISPLAY
-        if (ec == GMP_EC_OK)
-        {
-            gmp_base_print("UI INIT HT16K33 ret=%lu key=%u led=%u oled=%u\r\n",
-                           (unsigned long)ec,
-                           (unsigned int)task_flush_key.is_enabled,
-                           (unsigned int)task_flush_led.is_enabled,
-                           (unsigned int)task_oled_show.is_enabled);
-        }
-        else
-        {
-            gmp_base_print("UI INIT HT16K33 FAILED ret=%lu\r\n", (unsigned long)ec);
-        }
-#endif
-
-        //        hdc1080_config_reg_t hdc1080_cfg = {.all = 0};
-        //        hdc1080_cfg.bits.mode = 1; // continuous acquisition data
-        //
-        //        hdc1080_init(&hdc1080, iic_bus, HDC1080_I2C_ADDR_DEFAULT, hdc1080_cfg);
-        //        hdc1080_trigger_temp_hum_sequence(&hdc1080);
-
-        flag_init_cmpt = 1;
-
-        // startup process is complete.
-        tsk->is_enabled = 0;
+        return GMP_TASK_DONE;
     }
+#endif
+
+#if PSU_SAFE_BRINGUP
+    gmp_base_print("================================\r\n"
+                   "GMP IRIS SAFE BRINGUP MODE\r\n"
+                   "PWM OUTPUT: BLOCKED\r\n"
+                   "DAC OUTPUT: FORCED TO ZERO\r\n"
+                   "OUTPUT ENABLE: BLOCKED\r\n"
+                   "KEY OUTPUT CONTROL: BLOCKED\r\n"
+                   "BEEP GPIO: BLOCKED\r\n"
+                   "================================\r\n");
+    power_safe_bringup_run_self_test();
+#endif
+
+#if PSU_ENABLE_HT16K33_KEY || PSU_ENABLE_HT16K33_DISPLAY
+    ht16k33_init_t ht16k33_init_struct = {.brightness = 15, .blink_rate = 0, .int_enable = 0, .int_act_high = 0};
+
+    ec_gt ec = ht16k33_init(&ht16k33, iic_bus, HT16K33_DEFAULT_DEV_ADDR, &ht16k33_init_struct);
+
+    if (ec == GMP_EC_OK)
+    {
+#if PSU_ENABLE_HT16K33_DISPLAY
+        update_led_content_8byte(&ht16k33, led_lut[2], led_lut[0], led_lut[2], led_lut[6], led_lut[20], led_lut[7],
+                                         led_lut[7], led_lut[20]);
+#endif
+    }
+    else
+    {
+#if PSU_ENABLE_HT16K33_KEY
+        task_flush_key.is_enabled = 0;
+#endif
+#if PSU_ENABLE_HT16K33_DISPLAY
+        task_flush_led.is_enabled = 0;
+#endif
+    }
+#endif
+
+    // init and test the oled.
+#if PSU_ENABLE_OLED_DISPLAY
+    oled_init();
+#endif
+
+#if PSU_ENABLE_HT16K33_KEY || PSU_ENABLE_HT16K33_DISPLAY
+    if (ec == GMP_EC_OK)
+    {
+        gmp_base_print("UI INIT HT16K33 ret=%lu key=%u led=%u oled=%u\r\n",
+                       (unsigned long)ec,
+                       (unsigned int)task_flush_key.is_enabled,
+                       (unsigned int)task_flush_led.is_enabled,
+                       (unsigned int)task_oled_show.is_enabled);
+    }
+    else
+    {
+        gmp_base_print("UI INIT HT16K33 FAILED ret=%lu\r\n", (unsigned long)ec);
+    }
+#endif
+
+    //        hdc1080_config_reg_t hdc1080_cfg = {.all = 0};
+    //        hdc1080_cfg.bits.mode = 1; // continuous acquisition data
+    //
+    //        hdc1080_init(&hdc1080, iic_bus, HDC1080_I2C_ADDR_DEFAULT, hdc1080_cfg);
+    //        hdc1080_trigger_temp_hum_sequence(&hdc1080);
+
+    flag_init_cmpt = 1;
+
+    // startup process is complete.
+    tsk->is_enabled = 0;
 
     return GMP_TASK_DONE;
 }

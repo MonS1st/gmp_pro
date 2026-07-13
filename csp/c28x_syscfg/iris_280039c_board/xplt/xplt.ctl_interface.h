@@ -11,6 +11,7 @@
 //
 
 #include <xplt.peripheral.h>
+#include <ctrl_settings.h>
 
 #ifndef _FILE_CTL_INTERFACE_H_
 #define _FILE_CTL_INTERFACE_H_
@@ -41,9 +42,29 @@ GMP_STATIC_INLINE void ctl_input_callback(void)
 // Output Callback
 GMP_STATIC_INLINE void ctl_output_callback(void)
 {
-
+#if !PSU_SAFE_BRINGUP && PSU_ALLOW_PHYSICAL_PWM
     EPWM_setCounterCompareValue(IRIS_EPWM1_BASE, EPWM_COUNTER_COMPARE_A, 1500);
+#endif
+}
 
+GMP_STATIC_INLINE void ctl_force_all_pwm_trip(void)
+{
+    EPWM_forceTripZoneEvent(IRIS_EPWM1_BASE, EPWM_TZ_FORCE_EVENT_OST);
+    EPWM_forceTripZoneEvent(IRIS_EPWM2_BASE, EPWM_TZ_FORCE_EVENT_OST);
+    EPWM_forceTripZoneEvent(IRIS_EPWM3_BASE, EPWM_TZ_FORCE_EVENT_OST);
+    EPWM_forceTripZoneEvent(IRIS_EPWM4_BASE, EPWM_TZ_FORCE_EVENT_OST);
+    EPWM_forceTripZoneEvent(IRIS_EPWM5_BASE, EPWM_TZ_FORCE_EVENT_OST);
+    EPWM_forceTripZoneEvent(IRIS_EPWM6_BASE, EPWM_TZ_FORCE_EVENT_OST);
+}
+
+GMP_STATIC_INLINE bool ctl_safe_bringup_pwm_all_tripped(void)
+{
+    return ((EPWM_getTripZoneFlagStatus(IRIS_EPWM1_BASE) & EPWM_TZ_FLAG_OST) != 0U) &&
+           ((EPWM_getTripZoneFlagStatus(IRIS_EPWM2_BASE) & EPWM_TZ_FLAG_OST) != 0U) &&
+           ((EPWM_getTripZoneFlagStatus(IRIS_EPWM3_BASE) & EPWM_TZ_FLAG_OST) != 0U) &&
+           ((EPWM_getTripZoneFlagStatus(IRIS_EPWM4_BASE) & EPWM_TZ_FLAG_OST) != 0U) &&
+           ((EPWM_getTripZoneFlagStatus(IRIS_EPWM5_BASE) & EPWM_TZ_FLAG_OST) != 0U) &&
+           ((EPWM_getTripZoneFlagStatus(IRIS_EPWM6_BASE) & EPWM_TZ_FLAG_OST) != 0U);
 }
 
 // function prototype
@@ -53,19 +74,29 @@ void GPIO_WritePin(uint16_t gpioNumber, uint16_t outVal);
 // Enable Output
 GMP_STATIC_INLINE void ctl_fast_enable_output()
 {
+#if PSU_SAFE_BRINGUP || !PSU_ALLOW_PHYSICAL_PWM
+    // Enabling a controller in safe bringup must reinforce, never clear, the
+    // one-shot trip on every configured PWM module.
+    ctl_force_all_pwm_trip();
+#else
     // Clear any Trip Zone flag
     EPWM_clearTripZoneFlag(PHASE_U_BASE, EPWM_TZ_FORCE_EVENT_OST);
     EPWM_clearTripZoneFlag(PHASE_V_BASE, EPWM_TZ_FORCE_EVENT_OST);
     EPWM_clearTripZoneFlag(PHASE_W_BASE, EPWM_TZ_FORCE_EVENT_OST);
+#endif
 }
 
 // Disable Output
 GMP_STATIC_INLINE void ctl_fast_disable_output()
 {
+#if PSU_SAFE_BRINGUP
+    ctl_force_all_pwm_trip();
+#else
     // Disables the PWM device
     EPWM_forceTripZoneEvent(PHASE_U_BASE, EPWM_TZ_FORCE_EVENT_OST);
     EPWM_forceTripZoneEvent(PHASE_V_BASE, EPWM_TZ_FORCE_EVENT_OST);
     EPWM_forceTripZoneEvent(PHASE_W_BASE, EPWM_TZ_FORCE_EVENT_OST);
+#endif
 }
 
 #ifdef __cplusplus

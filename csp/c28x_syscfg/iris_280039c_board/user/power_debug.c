@@ -96,7 +96,13 @@ void power_debug_process_command(void)
         break;
 
     case POWER_DEBUG_CMD_OUTPUT_TOGGLE:
+#if PSU_SAFE_BRINGUP || !PSU_ALLOW_OUTPUT_REQUEST
+        // Exercise the common request barrier so the rejected operation is
+        // visible on the console and can never leave a pending true request.
+        power_app_request_output(true);
+#else
         power_app_request_output(!g_power_app.output_requested);
+#endif
         break;
 
     case POWER_DEBUG_CMD_FAULT_RESET:
@@ -129,6 +135,23 @@ void power_debug_process_command(void)
     }
 
     g_power_debug_ack_count = pending_count;
+}
+
+bool power_debug_safe_bringup_self_test(void)
+{
+#if PSU_SAFE_BRINGUP
+    uint16_t test_count = (uint16_t)(g_power_debug_ack_count + 1U);
+
+    g_power_debug_command = POWER_DEBUG_CMD_OUTPUT_TOGGLE;
+    g_power_debug_command_count = test_count;
+    power_debug_process_command();
+    g_power_debug_command = POWER_DEBUG_CMD_NONE;
+
+    return (g_power_debug_ack_count == test_count) &&
+           !g_power_app.output_requested;
+#else
+    return true;
+#endif
 }
 
 void power_debug_print_status(void)

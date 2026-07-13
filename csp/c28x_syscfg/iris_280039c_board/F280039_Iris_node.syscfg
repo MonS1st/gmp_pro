@@ -295,6 +295,8 @@ analog1.analog["c2/b12Pin"].$assign              = "C2/B12";
 analog1.analog["c3/a7Pin"].$assign               = "C3/A7";
 
 epwm1.$name                                                      = "IRIS_EPWM1";
+epwm1.useCase                                                    = "CUSTOM";
+epwm1.useInterfacePins                                           = [];
 epwm1.epwmEventTrigger_EPWM_SOC_A_triggerEnable                  = true;
 epwm1.epwmEventTrigger_EPWM_SOC_A_triggerSource                  = "EPWM_SOC_TBCTR_PERIOD";
 epwm1.epwmTimebase_periodLoadEvent                               = "EPWM_SHADOW_LOAD_MODE_COUNTER_SYNC";
@@ -323,6 +325,8 @@ epwm1.epwmTimebase_period                                        = 3000;
 epwm1.epwmCounterCompare_cmpA                                    = 1500;
 
 epwm2.$name                                                      = "IRIS_EPWM2";
+epwm2.useCase                                                    = "CUSTOM";
+epwm2.useInterfacePins                                           = [];
 epwm2.copyFrom                                                   = "IRIS_EPWM1";
 epwm2.epwmTimebase_hsClockDiv                                    = "EPWM_HSCLOCK_DIVIDER_1";
 epwm2.epwmTimebase_periodLoadEvent                               = "EPWM_SHADOW_LOAD_MODE_COUNTER_SYNC";
@@ -352,10 +356,10 @@ epwm2.copyUse                                                    = true;
 epwm2.epwmTimebase_period                                        = 3000;
 epwm2.epwmCounterCompare_cmpA                                    = 1500;
 epwm2.epwm.$assign                                               = "EPWM1";
-epwm2.epwm.epwm_aPin.$assign                                     = "GPIO0";
-epwm2.epwm.epwm_bPin.$assign                                     = "GPIO1";
 
 epwm3.$name                                                      = "IRIS_EPWM3";
+epwm3.useCase                                                    = "CUSTOM";
+epwm3.useInterfacePins                                           = [];
 epwm3.copyFrom                                                   = "IRIS_EPWM1";
 epwm3.epwmTimebase_hsClockDiv                                    = "EPWM_HSCLOCK_DIVIDER_1";
 epwm3.epwmTimebase_periodLoadEvent                               = "EPWM_SHADOW_LOAD_MODE_COUNTER_SYNC";
@@ -385,10 +389,10 @@ epwm3.copyUse                                                    = true;
 epwm3.epwmTimebase_period                                        = 3000;
 epwm3.epwmCounterCompare_cmpA                                    = 1500;
 epwm3.epwm.$assign                                               = "EPWM4";
-epwm3.epwm.epwm_aPin.$assign                                     = "GPIO22";
-epwm3.epwm.epwm_bPin.$assign                                     = "GPIO7";
 
 epwm4.$name                                                      = "IRIS_EPWM4";
+epwm4.useCase                                                    = "CUSTOM";
+epwm4.useInterfacePins                                           = [];
 epwm4.copyUse                                                    = true;
 epwm4.epwmTimebase_hsClockDiv                                    = "EPWM_HSCLOCK_DIVIDER_1";
 epwm4.epwmTimebase_periodLoadEvent                               = "EPWM_SHADOW_LOAD_MODE_COUNTER_SYNC";
@@ -418,10 +422,10 @@ epwm4.copyFrom                                                   = "IRIS_EPWM1";
 epwm4.epwmTimebase_period                                        = 3000;
 epwm4.epwmCounterCompare_cmpA                                    = 1500;
 epwm4.epwm.$assign                                               = "EPWM3";
-epwm4.epwm.epwm_aPin.$assign                                     = "GPIO4";
-epwm4.epwm.epwm_bPin.$assign                                     = "GPIO5";
 
 epwm5.$name                                                      = "IRIS_EPWM5";
+epwm5.useCase                                                    = "CUSTOM";
+epwm5.useInterfacePins                                           = [];
 epwm5.copyUse                                                    = true;
 epwm5.copyFrom                                                   = "IRIS_EPWM1";
 epwm5.epwmTimebase_hsClockDiv                                    = "EPWM_HSCLOCK_DIVIDER_1";
@@ -451,10 +455,10 @@ epwm5.epwmEventTrigger_EPWM_SOC_A_triggerEventPrescalar          = "1";
 epwm5.epwmTimebase_period                                        = 3000;
 epwm5.epwmCounterCompare_cmpA                                    = 1500;
 epwm5.epwm.$assign                                               = "EPWM8";
-epwm5.epwm.epwm_aPin.$assign                                     = "GPIO14";
-epwm5.epwm.epwm_bPin.$assign                                     = "GPIO15";
 
 epwm6.$name                                                      = "IRIS_EPWM6";
+epwm6.useCase                                                    = "CUSTOM";
+epwm6.useInterfacePins                                           = [];
 epwm6.copyUse                                                    = true;
 epwm6.copyFrom                                                   = "IRIS_EPWM1";
 epwm6.epwmTimebase_hsClockDiv                                    = "EPWM_HSCLOCK_DIVIDER_1";
@@ -484,8 +488,6 @@ epwm6.epwmEventTrigger_EPWM_SOC_A_triggerEventPrescalar          = "1";
 epwm6.epwmTimebase_period                                        = 3000;
 epwm6.epwmCounterCompare_cmpA                                    = 1500;
 epwm6.epwm.$assign                                               = "EPWM7";
-epwm6.epwm.epwm_aPin.$assign                                     = "GPIO28";
-epwm6.epwm.epwm_bPin.$assign                                     = "GPIO29";
 
 eqep1.$name                      = "IRIS_EQEP1";
 eqep1.useCase                    = "CUSTOM";
@@ -513,7 +515,9 @@ eqep2.bQual.qualMode             = "GPIO_QUAL_3SAMPLE";
 eqep2.indexQual.qualMode         = "GPIO_QUAL_3SAMPLE";
 
 gpio1.$name           = "IRIS_GPIO1";
-gpio1.direction       = "GPIO_DIR_MODE_OUT";
+// GPIO58 has conflicting, unconfirmed historical uses. Keep it high-impedance
+// in safe bringup and do not drive it as a beeper or power-enable output.
+gpio1.direction       = "GPIO_DIR_MODE_IN";
 gpio1.gpioPin.$assign = "GPIO58";
 
 gpio2.$name           = "IRIS_GPIO2";
@@ -618,9 +622,7 @@ fsi1.fsiTx.fsitx.$suggestSolution              = "FSITXA";
 fsi1.fsiTx.fsitx.fsitx_d0Pin.$suggestSolution  = "GPIO49";
 fsi1.fsiTx.fsitx.fsitx_d1Pin.$suggestSolution  = "GPIO50";
 fsi1.fsiTx.fsitx.fsitx_clkPin.$suggestSolution = "GPIO51";
-epwm1.epwm.$suggestSolution                    = "EPWM2";
-epwm1.epwm.epwm_aPin.$suggestSolution          = "GPIO2";
-epwm1.epwm.epwm_bPin.$suggestSolution          = "GPIO3";
+epwm1.epwm.$assign                             = "EPWM2";
 spi1.spi.spi_picoPin.$suggestSolution          = "GPIO16";
 spi1.spi.spi_pociPin.$suggestSolution          = "GPIO17";
 spi1.spi.spi_clkPin.$suggestSolution           = "GPIO12";

@@ -105,13 +105,34 @@
 // required to confirm release; +/- repetition follows the driver's event rate.
 #define PSU_KEY_RELEASE_FILTER_COUNT    (4U)
 
-// User-interface feature switches. Set a switch to 1 to restore the
-// corresponding physical peripheral or software debug interface.
-#define PSU_ENABLE_HT16K33_KEY          (1)
+//=================================================================================================
+// SAFE BRINGUP CONFIGURATION
+//
+// SAFE_BRINGUP mode is only for basic control-board validation.
+// Do not disable it until the DAC, PWM, relay, beeper, and power-interface
+// pin mappings have all been confirmed against the actual hardware.
+#define PSU_SAFE_BRINGUP                  (1)
+#define PSU_ALLOW_PHYSICAL_DAC            (0)
+#define PSU_ALLOW_PHYSICAL_PWM            (0)
+#define PSU_ALLOW_PHYSICAL_OUTPUT_ENABLE  (0)
+#define PSU_ALLOW_OUTPUT_REQUEST          (0)
+#define PSU_ENABLE_BEEP                   (0)
+
+#if (PSU_SAFE_BRINGUP == 1) && \
+    ((PSU_ALLOW_PHYSICAL_DAC == 1) || \
+     (PSU_ALLOW_PHYSICAL_PWM == 1) || \
+     (PSU_ALLOW_PHYSICAL_OUTPUT_ENABLE == 1) || \
+     (PSU_ALLOW_OUTPUT_REQUEST == 1))
+#error "SAFE_BRINGUP forbids all physical power-output permissions"
+#endif
+
+// User-interface feature switches. Keep input actions disabled until the
+// board key IDs and all output-control paths have been verified.
+#define PSU_ENABLE_HT16K33_KEY          (0)
 #define PSU_ENABLE_HT16K33_DISPLAY      (1)
 #define PSU_ENABLE_OLED_DISPLAY         (1)
 #define PSU_ENABLE_CONSOLE_UI           (1)
-#define PSU_ENABLE_MANUAL_COMMAND       (1)
+#define PSU_ENABLE_MANUAL_COMMAND       (0)
 
 // Use the software resistive-load model instead of ADC measurements.
 #define PSU_SOFT_TEST_MODE             (1)
@@ -278,9 +299,13 @@
 #define PHASE_V_BASE    IRIS_EPWM2_BASE
 #define PHASE_W_BASE    IRIS_EPWM3_BASE
 
-// PWM Enable
+// LEGACY/UNCONFIRMED motor-template mappings. GPIO58/IRIS_GPIO1 conflicts
+// with the historical beeper mapping. Safe-bringup code must not reference
+// either port until the board schematic and active levels are confirmed.
+#if !PSU_SAFE_BRINGUP
 #define PWM_ENABLE_PORT IRIS_GPIO1
 #define PWM_RESET_PORT  IRIS_GPIO3
+#endif
 
 // Vbus Voltage Channels
 //#define MOTOR_VBUS_RESULT_BASE IRIS_ADCA_RESULT_BASE

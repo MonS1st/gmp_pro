@@ -16,6 +16,8 @@
 #include <core/dev/gpio/pca9555.h>
 #include <core/dev/sensor/hdc1080.h>
 
+#include <stdbool.h>
+
 #ifndef _FILE_USER_MAIN_H_
 #define _FILE_USER_MAIN_H_
 
@@ -38,6 +40,7 @@ extern ht16k33_dev_t ht16k33;
 extern hdc1080_dev_t hdc1080;
 
 extern volatile uint16_t flag_init_cmpt;
+extern volatile uint16_t g_power_safe_bringup_self_test_failures;
 
 //=================================================================================================
 // global functions
@@ -60,6 +63,7 @@ gmp_task_status_t tsk_key_flush(gmp_task_t* tsk);
 gmp_task_status_t tsk_LED_flush(gmp_task_t* tsk);
 gmp_task_status_t fpga_test_task(gmp_task_t* tsk);
 gmp_task_status_t oled_show_task(gmp_task_t* tsk);
+bool power_ui_safe_bringup_self_test(void);
 
 void update_led_content_8byte(ht16k33_dev_t* dev,
                               uint16_t ch1, uint16_t ch2, uint16_t ch3, uint16_t ch4,
