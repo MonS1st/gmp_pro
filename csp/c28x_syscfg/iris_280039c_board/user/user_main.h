@@ -35,6 +35,13 @@ extern "C"
 #define HT16K33_DISPLAY_TEST_RESTORE       (3U)
 #define HT16K33_DISPLAY_TEST_NORMAL        (4U)
 
+#define PSU_I2C_RECOVERY_IDLE               (0U)
+#define PSU_I2C_RECOVERY_WAIT               (1U)
+#define PSU_I2C_RECOVERY_RESET_MODULE       (2U)
+#define PSU_I2C_RECOVERY_REINIT_HT          (3U)
+#define PSU_I2C_RECOVERY_VERIFY             (4U)
+#define PSU_I2C_RECOVERY_COMPLETE           (5U)
+
 #ifndef SPECIFY_PC_TEST_ENV
 
 #endif // SPECIFY_PC_TEST_ENV
@@ -88,6 +95,20 @@ extern volatile uint32_t g_key_i2c_holdoff_skip_count;
 extern volatile uint16_t g_oled_dynamic_update_enabled;
 extern volatile uint32_t g_oled_disabled_due_i2c_count;
 extern volatile uint16_t g_key_consecutive_ok_count;
+extern volatile uint16_t g_i2c_fault_active;
+extern volatile uint16_t g_i2c_recovery_state;
+extern volatile uint32_t g_i2c_recovery_attempt_count;
+extern volatile uint32_t g_i2c_recovery_success_count;
+extern volatile uint32_t g_i2c_recovery_failure_count;
+extern volatile ec_gt g_i2c_recovery_ht_init_result;
+extern volatile ec_gt g_i2c_recovery_verify_result;
+extern volatile uint16_t g_i2c_recovery_verify_ok_count;
+extern volatile uint16_t g_i2c_sda_level_before;
+extern volatile uint16_t g_i2c_scl_level_before;
+extern volatile uint16_t g_i2c_sda_level_after;
+extern volatile uint16_t g_i2c_scl_level_after;
+extern volatile uint32_t g_i2c_key_backoff_skip_count;
+extern volatile time_gt g_i2c_recovery_next_tick;
 extern volatile ec_gt g_oled_last_result;
 extern volatile uint32_t g_oled_update_ok_count;
 extern volatile uint32_t g_oled_update_error_count;

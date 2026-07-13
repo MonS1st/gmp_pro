@@ -63,7 +63,7 @@ extern gpio_halt gpio_beep;
 //
 // Function to configure I2C A in FIFO mode.
 //
-void initI2C()
+void initI2C(void)
 {
     //
     // Must put I2C into reset before configuring it
@@ -93,6 +93,22 @@ void initI2C()
     // Configuration complete. Enable the module.
     //
     I2C_enableModule(I2CA_BASE);
+}
+
+void board_i2c_controller_reinit(void)
+{
+    initI2C();
+    iic_bus = I2CA_BASE;
+}
+
+uint16_t board_i2c_read_sda_level(void)
+{
+    return (uint16_t)GPIO_readPin(IRIS_IIC_I2CSDA_GPIO);
+}
+
+uint16_t board_i2c_read_scl_level(void)
+{
+    return (uint16_t)GPIO_readPin(IRIS_IIC_I2CSCL_GPIO);
 }
 
 

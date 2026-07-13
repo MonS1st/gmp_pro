@@ -2,6 +2,7 @@
 // GMP basic core header
 #include <gmp_core.h>
 #include <ctrl_settings.h>
+#include <xplt.peripheral.h>
 
 // user main header
 #include "ctl_main.h"
@@ -61,6 +62,12 @@ static uint16_t s_oled_last_voltage_mv = 0xFFFFU;
 static uint16_t s_oled_last_current_ma = 0xFFFFU;
 static uint16_t s_oled_last_key_id = 0xFFFFU;
 static uint16_t s_key_consecutive_timeout_count = 0U;
+static uint16_t s_i2c_recovery_ht_stage = 0U;
+
+#define PSU_I2C_RECOVERY_HT_INIT_STAGE       (0U)
+#define PSU_I2C_RECOVERY_HT_OSC_STAGE        (1U)
+#define PSU_I2C_RECOVERY_HT_BRIGHTNESS_STAGE (2U)
+#define PSU_I2C_RECOVERY_HT_DISPLAY_STAGE    (3U)
 
 #define OLED_CLEAR_PAGE_COUNT       (8U)
 #define OLED_CLEAR_PAGE_BYTES       (128U)
@@ -72,12 +79,25 @@ static uint16_t s_key_consecutive_timeout_count = 0U;
 static data_gt s_oled_blank_page[OLED_CLEAR_PAGE_BYTES] = {0U};
 static data_gt s_oled_probe_payload[2] = {0x00U, 0xAEU};
 
-static bool power_ui_oled_action_due(void)
+static bool power_ui_tick_due(time_gt deadline)
 {
     time_gt now = gmp_base_get_system_tick();
 
+    return ((int32_t)(now - deadline) >= 0);
+}
+
+static bool power_ui_oled_action_due(void)
+{
     // Signed subtraction is wrap-safe for these sub-second deadlines.
-    return ((int32_t)(now - g_oled_next_action_tick) >= 0);
+    return power_ui_tick_due(g_oled_next_action_tick);
+}
+
+static bool power_ui_shared_i2c_ready(void)
+{
+    return (g_i2c_fault_active == 0U) &&
+           (g_i2c_recovery_state == PSU_I2C_RECOVERY_IDLE) &&
+           (g_key_scan_ready == 1U) &&
+           (g_key_consecutive_ok_count >= 4U);
 }
 
 static uint32_t power_ui_oled_retry_delay_ms(void)
@@ -105,6 +125,11 @@ static bool power_ui_defer_oled_for_key(void)
 
 static bool power_ui_oled_i2c_step_ready(void)
 {
+    if (!power_ui_shared_i2c_ready())
+    {
+        return false;
+    }
+
     if (!power_ui_oled_action_due())
     {
         return false;
@@ -255,6 +280,7 @@ static void power_ui_run_oled_commands(void)
     }
 }
 
+static void power_ui_render_led_setpoints(bool force_update);
 static void power_ui_request_led_setpoint_update(void);
 
 static void power_ui_publish_key_vote(void)
@@ -288,6 +314,216 @@ static void power_ui_handle_key_read_error(void)
 {
     // A failed read is neither a vote-window sample nor a release sample.
     s_key_release_count = 0U;
+}
+
+static void power_ui_schedule_i2c_recovery_retry(void)
+{
+    ++g_i2c_recovery_failure_count;
+    g_i2c_recovery_verify_ok_count = 0U;
+    g_key_consecutive_ok_count = 0U;
+    s_i2c_recovery_ht_stage = PSU_I2C_RECOVERY_HT_INIT_STAGE;
+    g_i2c_recovery_next_tick =
+        gmp_base_get_system_tick() + (time_gt)PSU_I2C_RECOVERY_RETRY_MS;
+    g_i2c_recovery_state = PSU_I2C_RECOVERY_WAIT;
+}
+
+static void power_ui_begin_i2c_recovery(void)
+{
+    g_i2c_sda_level_before = board_i2c_read_sda_level();
+    g_i2c_scl_level_before = board_i2c_read_scl_level();
+    g_i2c_fault_active = 1U;
+    g_i2c_recovery_state = PSU_I2C_RECOVERY_WAIT;
+    g_i2c_recovery_next_tick =
+        gmp_base_get_system_tick() +
+        (time_gt)PSU_I2C_RECOVERY_INITIAL_DELAY_MS;
+    g_i2c_recovery_ht_init_result = GMP_EC_NOT_READY;
+    g_i2c_recovery_verify_result = GMP_EC_NOT_READY;
+    g_i2c_recovery_verify_ok_count = 0U;
+    g_key_scan_ready = 0U;
+    g_key_consecutive_ok_count = 0U;
+    g_oled_dynamic_update_enabled = 0U;
+    s_i2c_recovery_ht_stage = PSU_I2C_RECOVERY_HT_INIT_STAGE;
+    s_last_key_id = 0U;
+    s_key_release_count = 0U;
+    power_ui_reset_key_candidate();
+}
+
+static void power_ui_advance_i2c_recovery(ht16k33_dev_t* dev)
+{
+    ec_gt result;
+    fast_gt key_id = 0U;
+
+    switch (g_i2c_recovery_state)
+    {
+    case PSU_I2C_RECOVERY_WAIT:
+        if (power_ui_tick_due(g_i2c_recovery_next_tick))
+        {
+            g_i2c_recovery_state = PSU_I2C_RECOVERY_RESET_MODULE;
+        }
+        return;
+
+    case PSU_I2C_RECOVERY_RESET_MODULE:
+        if (!power_ui_tick_due(g_i2c_recovery_next_tick))
+        {
+            return;
+        }
+
+        ++g_i2c_recovery_attempt_count;
+        board_i2c_controller_reinit();
+        g_i2c_sda_level_after = board_i2c_read_sda_level();
+        g_i2c_scl_level_after = board_i2c_read_scl_level();
+        g_i2c_recovery_next_tick =
+            gmp_base_get_system_tick() +
+            (time_gt)PSU_I2C_RECOVERY_SETTLE_MS;
+        s_i2c_recovery_ht_stage = PSU_I2C_RECOVERY_HT_INIT_STAGE;
+        g_i2c_recovery_state = PSU_I2C_RECOVERY_REINIT_HT;
+        return;
+
+    case PSU_I2C_RECOVERY_REINIT_HT:
+        if (!power_ui_tick_due(g_i2c_recovery_next_tick))
+        {
+            return;
+        }
+
+        if (s_i2c_recovery_ht_stage == PSU_I2C_RECOVERY_HT_INIT_STAGE)
+        {
+            ht16k33_init_t init_cfg = {
+                .brightness = 15,
+                .blink_rate = 0,
+                .int_enable = 0,
+                .int_act_high = 0
+            };
+
+            result = ht16k33_init(
+                dev, iic_bus, HT16K33_DEFAULT_DEV_ADDR, &init_cfg);
+            g_i2c_recovery_ht_init_result = result;
+            if (result != GMP_EC_OK)
+            {
+                power_ui_schedule_i2c_recovery_retry();
+                return;
+            }
+            s_i2c_recovery_ht_stage = PSU_I2C_RECOVERY_HT_OSC_STAGE;
+            return;
+        }
+
+        if (s_i2c_recovery_ht_stage == PSU_I2C_RECOVERY_HT_OSC_STAGE)
+        {
+            result = gmp_hal_iic_write_cmd(
+                dev->bus, dev->dev_addr,
+                HT16K33_CMD_OSC_ON, 1U, HT16K33_CFG_TIMEOUT);
+            g_ht16k33_osc_on_result = result;
+            if (result != GMP_EC_OK)
+            {
+                power_ui_schedule_i2c_recovery_retry();
+                return;
+            }
+            s_i2c_recovery_ht_stage = PSU_I2C_RECOVERY_HT_BRIGHTNESS_STAGE;
+            return;
+        }
+
+        if (s_i2c_recovery_ht_stage == PSU_I2C_RECOVERY_HT_BRIGHTNESS_STAGE)
+        {
+            result = gmp_hal_iic_write_cmd(
+                dev->bus, dev->dev_addr,
+                HT16K33_REG_BRIGHTNESS | 0x0FU, 1U,
+                HT16K33_CFG_TIMEOUT);
+            g_ht16k33_brightness_result = result;
+            if (result != GMP_EC_OK)
+            {
+                power_ui_schedule_i2c_recovery_retry();
+                return;
+            }
+            s_i2c_recovery_ht_stage = PSU_I2C_RECOVERY_HT_DISPLAY_STAGE;
+            return;
+        }
+
+        result = gmp_hal_iic_write_cmd(
+            dev->bus, dev->dev_addr,
+            HT16K33_CMD_DISPLAY_ON, 1U, HT16K33_CFG_TIMEOUT);
+        g_ht16k33_display_on_result = result;
+        if (result != GMP_EC_OK)
+        {
+            power_ui_schedule_i2c_recovery_retry();
+            return;
+        }
+
+        dev->last_key = 0U;
+        g_key_scan_ready = 0U;
+        s_last_key_id = 0U;
+        s_key_release_count = 0U;
+        g_key_ignore_scan_count = 0U;
+        power_ui_reset_key_candidate();
+        g_i2c_recovery_verify_result = GMP_EC_NOT_READY;
+        g_i2c_recovery_verify_ok_count = 0U;
+        g_key_consecutive_ok_count = 0U;
+        g_i2c_recovery_next_tick =
+            gmp_base_get_system_tick() +
+            (time_gt)PSU_I2C_RECOVERY_VERIFY_PERIOD_MS;
+        g_i2c_recovery_state = PSU_I2C_RECOVERY_VERIFY;
+        return;
+
+    case PSU_I2C_RECOVERY_VERIFY:
+        if (!power_ui_tick_due(g_i2c_recovery_next_tick))
+        {
+            return;
+        }
+
+        dev->last_key = 0U;
+        result = ht16k33_read_keys(dev, &key_id);
+        g_i2c_recovery_verify_result = result;
+        if (result != GMP_EC_OK)
+        {
+            power_ui_schedule_i2c_recovery_retry();
+            return;
+        }
+
+        if (g_key_consecutive_ok_count < 0xFFFFU)
+        {
+            ++g_key_consecutive_ok_count;
+        }
+
+        if (key_id == 0U)
+        {
+            if (g_i2c_recovery_verify_ok_count < 0xFFFFU)
+            {
+                ++g_i2c_recovery_verify_ok_count;
+            }
+        }
+        else
+        {
+            g_i2c_recovery_verify_ok_count = 0U;
+        }
+
+        if ((key_id == 0U) &&
+            (g_i2c_recovery_verify_ok_count >=
+             PSU_I2C_RECOVERY_VERIFY_OK_COUNT))
+        {
+            g_last_raw_key_id = 0U;
+            g_key_consecutive_error_count = 0U;
+            s_key_consecutive_timeout_count = 0U;
+            g_key_scan_ready = 1U;
+            g_i2c_fault_active = 0U;
+            g_i2c_recovery_state = PSU_I2C_RECOVERY_COMPLETE;
+            ++g_i2c_recovery_success_count;
+            return;
+        }
+
+        g_i2c_recovery_next_tick =
+            gmp_base_get_system_tick() +
+            (time_gt)PSU_I2C_RECOVERY_VERIFY_PERIOD_MS;
+        return;
+
+    case PSU_I2C_RECOVERY_COMPLETE:
+        power_ui_render_led_setpoints(true);
+        dev->is_dirty = 1U;
+        g_ht16k33_display_test_state = HT16K33_DISPLAY_TEST_NORMAL;
+        g_i2c_recovery_state = PSU_I2C_RECOVERY_IDLE;
+        return;
+
+    case PSU_I2C_RECOVERY_IDLE:
+    default:
+        return;
+    }
 }
 
 static bool power_ui_is_mapped_key(uint16_t key_id)
@@ -690,7 +926,9 @@ gmp_task_status_t tsk_LED_flush(gmp_task_t* tsk)
         uint16_t i;
         ec_gt ret;
 
-        if (g_key_scan_ready == 0U)
+        if ((g_i2c_fault_active != 0U) ||
+            (g_i2c_recovery_state != PSU_I2C_RECOVERY_IDLE) ||
+            (g_key_scan_ready == 0U))
         {
             return GMP_TASK_DONE;
         }
@@ -782,6 +1020,14 @@ gmp_task_status_t tsk_key_flush(gmp_task_t* tsk)
     {
         ec_gt ret;
 
+        if ((g_i2c_fault_active != 0U) ||
+            (g_i2c_recovery_state != PSU_I2C_RECOVERY_IDLE))
+        {
+            power_ui_advance_i2c_recovery(dev);
+            ++g_i2c_key_backoff_skip_count;
+            return GMP_TASK_DONE;
+        }
+
         // A successful OLED step may contain several FIFO-safe transactions.
         // Skip one 20 ms key period before accessing HT16K33 again.
         if (g_key_i2c_holdoff_count != 0U)
@@ -820,15 +1066,15 @@ gmp_task_status_t tsk_key_flush(gmp_task_t* tsk)
                 s_key_consecutive_timeout_count = 0U;
             }
 
-            if ((s_key_consecutive_timeout_count >= 3U) &&
-                (g_oled_init_state == OLED_INIT_READY))
+            power_ui_handle_key_read_error();
+
+            if (s_key_consecutive_timeout_count >=
+                PSU_I2C_TIMEOUT_TRIGGER_COUNT)
             {
                 ++g_oled_disabled_due_i2c_count;
-                power_ui_schedule_oled_retry(
-                    power_ui_oled_retry_delay_ms());
+                power_ui_begin_i2c_recovery();
             }
 
-            power_ui_handle_key_read_error();
             return GMP_TASK_DONE;
         }
 
@@ -876,12 +1122,12 @@ gmp_task_status_t oled_show_task(gmp_task_t* tsk)
 #endif
     GMP_UNUSED_VAR(tsk);
 
-#if PSU_SAFE_BRINGUP
-    if (flag_init_cmpt != 1U)
+    if ((flag_init_cmpt != 1U) || !power_ui_shared_i2c_ready())
     {
         return GMP_TASK_DONE;
     }
 
+#if PSU_SAFE_BRINGUP
     switch (g_oled_init_state)
     {
     case OLED_INIT_WAIT_POWER:
@@ -990,6 +1236,7 @@ gmp_task_status_t oled_show_task(gmp_task_t* tsk)
         return GMP_TASK_DONE;
 
     case OLED_INIT_READY:
+        g_oled_dynamic_update_enabled = 1U;
         break;
 
     default:

@@ -63,6 +63,10 @@ extern adc_gt idc_src;
 
 void reset_controller(void);
 
+void board_i2c_controller_reinit(void);
+uint16_t board_i2c_read_sda_level(void);
+uint16_t board_i2c_read_scl_level(void);
+
 uint16_t SPI_readReg(uint16_t addr);
 void SPI_writeReg(uint16_t addr, uint16_t data);
 
