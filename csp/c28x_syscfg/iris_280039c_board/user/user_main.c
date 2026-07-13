@@ -440,9 +440,17 @@ gmp_task_status_t tsk_startup(gmp_task_t* tsk)
         ht16k33.is_dirty = 0;
     }
 #else
-    // The driver's initialization clears local RAM and marks it dirty. Keep
-    // display flushing blocked until four successful idle key scans complete.
-    ht16k33.is_dirty = 0;
+    if (ec == GMP_EC_OK)
+    {
+        // Initialization clears the complete local display RAM. Rebuild the
+        // eight active digits from the current setpoints and leave it dirty so
+        // the periodic display task owns the first RAM transaction.
+        power_ui_request_led_setpoint_update_from_command();
+    }
+    else
+    {
+        ht16k33.is_dirty = 0;
+    }
 #endif
     g_ui_init_stage = 2U;
     g_ui_init_result = (uint16_t)ec;

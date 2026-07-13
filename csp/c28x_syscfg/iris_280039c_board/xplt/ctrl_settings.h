@@ -117,7 +117,7 @@
 #if PSU_FULL_BOARD_TEST_PROFILE
 
 #define PSU_ENABLE_HT16K33_KEY             (1)
-#define PSU_ENABLE_HT16K33_DISPLAY         (0)
+#define PSU_ENABLE_HT16K33_DISPLAY         (1)
 #define PSU_ENABLE_OLED_DISPLAY            (1)
 #define PSU_ENABLE_CONSOLE_UI              (1)
 #define PSU_ENABLE_MANUAL_COMMAND          (1)

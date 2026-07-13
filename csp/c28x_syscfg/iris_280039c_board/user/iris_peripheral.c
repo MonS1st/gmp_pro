@@ -626,11 +626,8 @@ static void power_ui_request_led_setpoint_update(void)
 #else
     uint16_t voltage_set_mv = g_power_app.voltage_set_mv;
     uint16_t current_set_ma = g_power_app.current_set_ma;
-
-    if (g_key_scan_ready == 0U)
-    {
-        return;
-    }
+    uint32_t display_voltage_mv = voltage_set_mv;
+    uint16_t display_current_ma = current_set_ma;
 
     if ((voltage_set_mv == s_led_last_voltage_mv) &&
         (current_set_ma == s_led_last_current_ma))
@@ -638,13 +635,27 @@ static void power_ui_request_led_setpoint_update(void)
         return;
     }
 
-    // First-stage board test format from master: 2026-XX-, where XX is
-    // the last key accepted by the board-level three-scan confirmation.
+    if (display_voltage_mv > 99999U)
+    {
+        display_voltage_mv = 99999U;
+    }
+    if (display_current_ma > 999U)
+    {
+        display_current_ma = 999U;
+    }
+
+    // Fixed-width setpoint display: five voltage digits followed by three
+    // current digits. Each led_lut index is constrained to the decimal range.
     update_led_content_8byte(
         &ht16k33,
-        led_lut[2], led_lut[0], led_lut[2], led_lut[6],
-        led_lut[20], led_lut[s_last_key_id / 10U],
-        led_lut[s_last_key_id % 10U], led_lut[20]);
+        led_lut[(display_voltage_mv / 10000U) % 10U],
+        led_lut[(display_voltage_mv / 1000U) % 10U],
+        led_lut[(display_voltage_mv / 100U) % 10U],
+        led_lut[(display_voltage_mv / 10U) % 10U],
+        led_lut[display_voltage_mv % 10U],
+        led_lut[(display_current_ma / 100U) % 10U],
+        led_lut[(display_current_ma / 10U) % 10U],
+        led_lut[display_current_ma % 10U]);
 
     s_led_last_voltage_mv = voltage_set_mv;
     s_led_last_current_ma = current_set_ma;
@@ -666,7 +677,6 @@ gmp_task_status_t tsk_LED_flush(gmp_task_t* tsk)
 
     if(flag_init_cmpt)
     {
-        bool update_requested;
         ec_gt ret;
 
         if (g_key_scan_ready == 0U)
@@ -674,20 +684,22 @@ gmp_task_status_t tsk_LED_flush(gmp_task_t* tsk)
             return GMP_TASK_DONE;
         }
 
-        update_requested = (dev->is_dirty != 0);
+        power_ui_request_led_setpoint_update();
+        if (dev->is_dirty == 0)
+        {
+            return GMP_TASK_DONE;
+        }
+
         ret = ht16k33_update_display(dev);
         g_led_update_result = ret;
 
-        // If the display peripheral fails, stop only this background UI task.
         if (ret != GMP_EC_OK)
         {
-            tsk->is_enabled = 0;
+            return GMP_TASK_DONE;
         }
-        else if (update_requested)
-        {
-            g_key_ignore_scan_count = 2U;
-            ++g_led_update_count;
-        }
+
+        g_key_ignore_scan_count = 1U;
+        ++g_led_update_count;
     }
 
     return GMP_TASK_DONE;
