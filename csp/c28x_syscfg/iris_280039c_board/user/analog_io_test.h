@@ -61,6 +61,10 @@ extern volatile uint16_t g_analog_board_feedback_fault;
 extern volatile uint32_t g_analog_board_feedback_fault_count;
 extern volatile uint16_t g_analog_board_last_vout_raw;
 extern volatile uint16_t g_analog_board_last_iout_raw;
+extern volatile uint16_t g_analog_board_feedback_settled;
+extern volatile uint16_t g_analog_board_feedback_valid_count;
+extern volatile uint32_t g_analog_board_feedback_settle_skip_count;
+extern volatile time_gt g_analog_board_feedback_start_tick;
 
 extern gmp_task_t task_analog_io_test;
 

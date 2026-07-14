@@ -1,5 +1,6 @@
 #include "power_app.h"
 
+#include "analog_io_test.h"
 #include "power_hal.h"
 #include "power_protection.h"
 #include "power_self_test.h"
@@ -304,6 +305,26 @@ void power_app_fast_step(void)
     g_analog_board_real_feedback_active = 0U;
     g_power_app.voltage_meas_mv = power_float_to_u16(g_vout_meas_v * 1000.0f);
     g_power_app.current_meas_ma = power_float_to_u16(g_iout_meas_ma);
+#endif
+
+#if PSU_ENABLE_ANALOG_BOARD_BRINGUP
+    if (g_analog_board_feedback_settled != 1U)
+    {
+        voltage_meas_mv = g_power_app.voltage_meas_mv;
+        current_meas_ma = g_power_app.current_meas_ma;
+        protection_enabled = false;
+        (void)power_protection_step(voltage_meas_mv,
+                                    current_meas_ma,
+                                    protection_enabled);
+        power_output_hw_set(false);
+        power_dac_set_zero();
+        g_power_app.output_requested = false;
+        g_power_app.output_enabled = false;
+        g_power_app.fault_reset_requested = false;
+        g_power_app.state = POWER_STATE_OFF;
+        power_app_clear_mode_confirmation();
+        return;
+    }
 #endif
 
     if (PSU_SAFE_BRINGUP || !PSU_ALLOW_OUTPUT_REQUEST ||
