@@ -47,6 +47,10 @@ extern volatile uint16_t g_dac_test_follow_ui_active;
 extern volatile uint16_t g_dac_test_last_voltage_mv;
 extern volatile uint16_t g_dac_test_last_current_ma;
 extern volatile uint32_t g_dac_test_follow_update_count;
+extern volatile uint16_t g_dac_test_auto_follow_pending;
+extern volatile uint16_t g_dac_test_auto_follow_completed;
+extern volatile uint32_t g_dac_test_auto_follow_count;
+extern volatile time_gt g_dac_test_auto_follow_start_tick;
 
 extern gmp_task_t task_analog_io_test;
 
