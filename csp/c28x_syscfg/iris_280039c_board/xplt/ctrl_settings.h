@@ -53,7 +53,7 @@
 #define PSU_IOUT_BASE_A                (0.100f)
 
 #define PSU_VOUT_SENSOR_GAIN           (0.25f)
-#define PSU_IOUT_SENSOR_GAIN_V_PER_A   (20.0f)
+#define PSU_IOUT_SENSOR_GAIN_V_PER_A   (22.0f)
 
 // DAC command conversion parameters
 #define PSU_DAC_VREF_MV                (3300UL)
@@ -64,7 +64,7 @@
 #define PSU_VOLTAGE_CMD_MAX_MV         (10000U)
 #define PSU_CURRENT_CMD_MAX_MA         (100U)
 #define PSU_VSET_DIVIDER               (4UL)
-#define PSU_ISET_GAIN_MV_PER_MA        (20UL)
+#define PSU_ISET_GAIN_MV_PER_MA        (22UL)
 
 // CV/CC mode hysteresis and consecutive-sample confirmation thresholds.
 #define PSU_CC_ENTER_CURRENT_MARGIN_MA  (1U)
@@ -137,6 +137,8 @@
 #define PSU_ANALOG_BOARD_USE_REAL_ADC               (1)
 #define PSU_ANALOG_BOARD_VOLTAGE_LIMIT_MV           (2000U)
 #define PSU_ANALOG_BOARD_CURRENT_LIMIT_MA            (20U)
+#define PSU_ANALOG_BOARD_MIN_CURRENT_MA              (10U)
+#define PSU_ANALOG_BOARD_ISET_PRECHARGE_MS           (100U)
 #define PSU_ANALOG_BOARD_STARTUP_DELAY_MS            (500U)
 #define PSU_ANALOG_BOARD_FEEDBACK_SETTLE_MS          (100U)
 #define PSU_ENABLE_CONSOLE_UI              (1)

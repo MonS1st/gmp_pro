@@ -188,13 +188,18 @@ static void power_app_apply_commands(void)
 void power_app_init(void)
 {
     g_power_app.voltage_set_mv = 0U;
+#if PSU_ENABLE_ANALOG_BOARD_BRINGUP
+    g_power_app.current_set_ma = PSU_ANALOG_BOARD_MIN_CURRENT_MA;
+#else
     g_power_app.current_set_ma = 0U;
+#endif
     g_power_app.voltage_meas_mv = 0U;
     g_power_app.current_meas_ma = 0U;
     g_power_app.trip_voltage_mv = 0U;
     g_power_app.trip_current_ma = 0U;
     g_power_app.dac_voltage_code = 0U;
-    g_power_app.dac_current_code = 0U;
+    g_power_app.dac_current_code =
+        power_current_ma_to_dac(g_power_app.current_set_ma);
     g_power_app.cc_confirm_count = 0U;
     g_power_app.cv_confirm_count = 0U;
     g_power_app.state = POWER_STATE_OFF;
@@ -344,6 +349,10 @@ void power_app_fast_step(void)
 
         if (g_power_app.fault_latched)
         {
+#if PSU_ENABLE_ANALOG_BOARD_BRINGUP
+            // Bring-up faults remain latched; no reset may restart DAC follow.
+            g_power_app.fault_reset_requested = false;
+#else
             if (g_power_app.fault_reset_requested &&
                 power_protection_release_safe(voltage_meas_mv, current_meas_ma))
             {
@@ -354,6 +363,7 @@ void power_app_fast_step(void)
                 power_protection_reset();
             }
             g_power_app.fault_reset_requested = false;
+#endif
         }
         else
         {
