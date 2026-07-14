@@ -59,6 +59,9 @@ extern volatile uint16_t g_analog_board_applied_current_ma;
 extern volatile uint16_t g_analog_board_iset_precharge_active;
 extern volatile uint16_t g_analog_board_iset_precharge_complete;
 extern volatile uint32_t g_analog_board_iset_precharge_count;
+extern volatile uint16_t g_analog_board_protection_grace_active;
+extern volatile uint32_t g_analog_board_protection_grace_skip_count;
+extern volatile time_gt g_analog_board_protection_grace_start_tick;
 extern volatile uint32_t g_analog_board_fault_shutdown_count;
 extern volatile uint16_t g_analog_board_fault_shutdown_active;
 extern volatile uint16_t g_analog_board_fault_hold_current_ma;
@@ -66,12 +69,18 @@ extern volatile uint16_t g_analog_board_fault_hold_active;
 extern volatile uint32_t g_analog_board_fault_hold_count;
 extern volatile uint16_t g_analog_board_feedback_fault;
 extern volatile uint32_t g_analog_board_feedback_fault_count;
+extern volatile uint16_t g_analog_board_adc_fault_confirm_count;
+extern volatile uint32_t g_analog_board_adc_transient_count;
 extern volatile uint16_t g_analog_board_last_vout_raw;
 extern volatile uint16_t g_analog_board_last_iout_raw;
 extern volatile uint16_t g_analog_board_feedback_settled;
 extern volatile uint16_t g_analog_board_feedback_valid_count;
 extern volatile uint32_t g_analog_board_feedback_settle_skip_count;
 extern volatile time_gt g_analog_board_feedback_start_tick;
+extern volatile uint16_t g_analog_board_ovp_confirm_count;
+extern volatile uint16_t g_analog_board_ocp_confirm_count;
+extern volatile uint32_t g_analog_board_ovp_transient_count;
+extern volatile uint32_t g_analog_board_ocp_transient_count;
 
 extern gmp_task_t task_analog_io_test;
 

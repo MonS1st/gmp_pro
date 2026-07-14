@@ -10,7 +10,6 @@
 
 #define PSU_ANALOG_IO_TEST_ADC_FULL_SCALE_CODE (4095.0f)
 #define PSU_ANALOG_BOARD_ADC_SATURATION_CODE   (4090U)
-#define PSU_ANALOG_BOARD_FEEDBACK_VALID_COUNT  (3U)
 
 #if PSU_ENABLE_ANALOG_BOARD_BRINGUP
 #define PSU_ANALOG_IO_ACTIVE_AUTO_FOLLOW_DELAY_MS \
@@ -57,6 +56,9 @@ volatile uint16_t g_analog_board_applied_current_ma = 0U;
 volatile uint16_t g_analog_board_iset_precharge_active = 0U;
 volatile uint16_t g_analog_board_iset_precharge_complete = 0U;
 volatile uint32_t g_analog_board_iset_precharge_count = 0U;
+volatile uint16_t g_analog_board_protection_grace_active = 0U;
+volatile uint32_t g_analog_board_protection_grace_skip_count = 0U;
+volatile time_gt g_analog_board_protection_grace_start_tick = 0U;
 volatile uint32_t g_analog_board_fault_shutdown_count = 0U;
 volatile uint16_t g_analog_board_fault_shutdown_active = 0U;
 volatile uint16_t g_analog_board_fault_hold_current_ma = 0U;
@@ -64,6 +66,8 @@ volatile uint16_t g_analog_board_fault_hold_active = 0U;
 volatile uint32_t g_analog_board_fault_hold_count = 0U;
 volatile uint16_t g_analog_board_feedback_fault = 0U;
 volatile uint32_t g_analog_board_feedback_fault_count = 0U;
+volatile uint16_t g_analog_board_adc_fault_confirm_count = 0U;
+volatile uint32_t g_analog_board_adc_transient_count = 0U;
 volatile uint16_t g_analog_board_last_vout_raw = 0U;
 volatile uint16_t g_analog_board_last_iout_raw = 0U;
 volatile uint16_t g_analog_board_feedback_settled = 0U;
@@ -172,9 +176,52 @@ static uint16_t analog_io_test_update_iset_precharge(void)
         return 0U;
     }
 
+    g_analog_board_protection_grace_start_tick = gmp_base_get_system_tick();
+    g_analog_board_protection_grace_active = 1U;
     g_analog_board_iset_precharge_active = 0U;
+    // Publish completion last so the 20 kHz path always sees a guard active.
     g_analog_board_iset_precharge_complete = 1U;
     return 1U;
+#else
+    return 1U;
+#endif
+}
+
+static uint16_t analog_io_test_update_protection_grace(void)
+{
+#if PSU_ENABLE_ANALOG_BOARD_BRINGUP
+    uint16_t vout_raw;
+    uint16_t iout_raw;
+
+    if (g_analog_board_protection_grace_active != 1U)
+    {
+        return 1U;
+    }
+
+    analog_io_test_apply_inactive_outputs();
+    if (gmp_base_is_delay_elapsed(g_analog_board_protection_grace_start_tick,
+                                  PSU_ANALOG_BOARD_PROTECTION_GRACE_MS))
+    {
+        g_analog_board_adc_fault_confirm_count = 0U;
+        g_analog_board_feedback_valid_count = 0U;
+        g_analog_board_feedback_start_tick = gmp_base_get_system_tick();
+        // Publish grace completion after all post-grace counters are reset.
+        g_analog_board_protection_grace_active = 0U;
+        return 1U;
+    }
+
+    vout_raw = g_adc_vout_raw;
+    iout_raw = g_adc_iout_raw;
+    g_analog_board_last_vout_raw = vout_raw;
+    g_analog_board_last_iout_raw = iout_raw;
+    g_analog_board_adc_fault_confirm_count = 0U;
+    if ((vout_raw >= PSU_ANALOG_BOARD_ADC_SATURATION_CODE) ||
+        (iout_raw >= PSU_ANALOG_BOARD_ADC_SATURATION_CODE))
+    {
+        ++g_analog_board_adc_transient_count;
+    }
+    ++g_analog_board_protection_grace_skip_count;
+    return 0U;
 #else
     return 1U;
 #endif
@@ -188,8 +235,8 @@ static uint16_t analog_io_test_update_feedback_settle(void)
         return 1U;
     }
 
-    if (!gmp_base_is_delay_elapsed(g_analog_board_feedback_start_tick,
-                                   PSU_ANALOG_BOARD_FEEDBACK_SETTLE_MS))
+    if ((g_analog_board_iset_precharge_complete != 1U) ||
+        (g_analog_board_protection_grace_active != 0U))
     {
         g_analog_board_feedback_valid_count = 0U;
         ++g_analog_board_feedback_settle_skip_count;
@@ -198,15 +245,17 @@ static uint16_t analog_io_test_update_feedback_settle(void)
     }
 
     if ((g_adc_vout_raw < PSU_ANALOG_BOARD_ADC_SATURATION_CODE) &&
-        (g_adc_iout_raw < PSU_ANALOG_BOARD_ADC_SATURATION_CODE))
+        (g_adc_iout_raw < PSU_ANALOG_BOARD_ADC_SATURATION_CODE) &&
+        (g_power_app.voltage_meas_mv < PSU_OVP_TRIP_MV) &&
+        (g_power_app.current_meas_ma < PSU_OCP_TRIP_MA))
     {
         if (g_analog_board_feedback_valid_count <
-            PSU_ANALOG_BOARD_FEEDBACK_VALID_COUNT)
+            PSU_ANALOG_BOARD_FEEDBACK_VALID_CONFIRM_COUNT)
         {
             ++g_analog_board_feedback_valid_count;
         }
         if (g_analog_board_feedback_valid_count >=
-            PSU_ANALOG_BOARD_FEEDBACK_VALID_COUNT)
+            PSU_ANALOG_BOARD_FEEDBACK_VALID_CONFIRM_COUNT)
         {
             g_analog_board_feedback_settled = 1U;
             return 1U;
@@ -266,23 +315,40 @@ static uint16_t analog_io_test_handle_board_safety(void)
 #if PSU_ENABLE_ANALOG_BOARD_BRINGUP
     uint16_t vout_raw = g_adc_vout_raw;
     uint16_t iout_raw = g_adc_iout_raw;
-    uint16_t feedback_fault_active;
+    uint16_t adc_saturated;
 
     g_analog_board_last_vout_raw = vout_raw;
     g_analog_board_last_iout_raw = iout_raw;
 
-    feedback_fault_active =
+    adc_saturated =
         ((vout_raw >= PSU_ANALOG_BOARD_ADC_SATURATION_CODE) ||
          (iout_raw >= PSU_ANALOG_BOARD_ADC_SATURATION_CODE)) ? 1U : 0U;
 
-    if (feedback_fault_active != 0U)
+    if (adc_saturated != 0U)
     {
         if (g_analog_board_feedback_fault == 0U)
         {
-            ++g_analog_board_feedback_fault_count;
+            if (g_analog_board_adc_fault_confirm_count <
+                PSU_ANALOG_BOARD_ADC_FAULT_CONFIRM_COUNT)
+            {
+                ++g_analog_board_adc_fault_confirm_count;
+            }
+            if (g_analog_board_adc_fault_confirm_count >=
+                PSU_ANALOG_BOARD_ADC_FAULT_CONFIRM_COUNT)
+            {
+                ++g_analog_board_feedback_fault_count;
+                // Keep saturation latched; fault hold disables auto restart.
+                g_analog_board_feedback_fault = 1U;
+            }
+            else
+            {
+                ++g_analog_board_adc_transient_count;
+            }
         }
-        // Keep saturation latched; fault hold disables automatic restart.
-        g_analog_board_feedback_fault = 1U;
+    }
+    else
+    {
+        g_analog_board_adc_fault_confirm_count = 0U;
     }
 
     if (g_power_app.fault_latched)
@@ -298,7 +364,7 @@ static uint16_t analog_io_test_handle_board_safety(void)
         g_analog_board_fault_shutdown_active = 0U;
     }
 
-    if ((feedback_fault_active != 0U) ||
+    if ((g_analog_board_feedback_fault != 0U) ||
         (g_analog_board_fault_shutdown_active != 0U))
     {
         analog_io_test_shutdown_board_outputs();
@@ -314,6 +380,7 @@ static void analog_io_test_try_auto_follow(void)
 #if PSU_ANALOG_IO_AUTO_FOLLOW_ENABLE
 #if PSU_ENABLE_ANALOG_BOARD_BRINGUP
     if ((g_analog_board_iset_precharge_complete != 1U) ||
+        (g_analog_board_protection_grace_active != 0U) ||
         (g_analog_board_feedback_settled != 1U) ||
         (g_analog_board_fault_hold_active != 0U) ||
         (g_analog_board_feedback_fault != 0U) ||
@@ -594,6 +661,9 @@ void analog_io_test_init(void)
     g_analog_board_iset_precharge_active = 0U;
     g_analog_board_iset_precharge_complete = 0U;
     g_analog_board_iset_precharge_count = 0U;
+    g_analog_board_protection_grace_active = 0U;
+    g_analog_board_protection_grace_skip_count = 0U;
+    g_analog_board_protection_grace_start_tick = 0U;
     g_analog_board_fault_shutdown_count = 0U;
     g_analog_board_fault_shutdown_active = 0U;
     g_analog_board_fault_hold_current_ma = 0U;
@@ -601,12 +671,14 @@ void analog_io_test_init(void)
     g_analog_board_fault_hold_count = 0U;
     g_analog_board_feedback_fault = 0U;
     g_analog_board_feedback_fault_count = 0U;
+    g_analog_board_adc_fault_confirm_count = 0U;
+    g_analog_board_adc_transient_count = 0U;
     g_analog_board_last_vout_raw = 0U;
     g_analog_board_last_iout_raw = 0U;
     g_analog_board_feedback_settled = 0U;
     g_analog_board_feedback_valid_count = 0U;
     g_analog_board_feedback_settle_skip_count = 0U;
-    g_analog_board_feedback_start_tick = gmp_base_get_system_tick();
+    g_analog_board_feedback_start_tick = 0U;
     s_dac_test_outputs_zeroed = 0U;
     s_dac_test_follow_ui_was_active = 0U;
     s_dac_test_auto_follow_attempted = 0U;
@@ -639,11 +711,15 @@ gmp_task_status_t analog_io_test_task(gmp_task_t* tsk)
     {
         return GMP_TASK_DONE;
     }
-    if (analog_io_test_update_feedback_settle() == 0U)
+    if (analog_io_test_update_protection_grace() == 0U)
     {
         return GMP_TASK_DONE;
     }
     if (analog_io_test_handle_board_safety() != 0U)
+    {
+        return GMP_TASK_DONE;
+    }
+    if (analog_io_test_update_feedback_settle() == 0U)
     {
         return GMP_TASK_DONE;
     }

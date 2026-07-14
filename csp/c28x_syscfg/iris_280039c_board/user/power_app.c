@@ -18,6 +18,10 @@ volatile uint16_t g_analog_board_voltage_meas_mv = 0U;
 volatile uint16_t g_analog_board_current_meas_ma = 0U;
 volatile uint16_t g_analog_board_real_feedback_active = 0U;
 volatile uint32_t g_analog_board_feedback_update_count = 0U;
+volatile uint16_t g_analog_board_ovp_confirm_count = 0U;
+volatile uint16_t g_analog_board_ocp_confirm_count = 0U;
+volatile uint32_t g_analog_board_ovp_transient_count = 0U;
+volatile uint32_t g_analog_board_ocp_transient_count = 0U;
 static uint16_t s_last_voltage_set_mv;
 static uint16_t s_last_current_set_ma;
 
@@ -34,6 +38,81 @@ static uint16_t power_float_to_u16(float value)
         return 65535U;
     }
     return (uint16_t)(value + 0.5f);
+}
+#endif
+
+#if PSU_ENABLE_ANALOG_BOARD_BRINGUP && PSU_ANALOG_BOARD_USE_REAL_ADC
+static power_protection_result_t power_app_update_analog_board_protection(
+    uint16_t voltage_mv,
+    uint16_t current_ma)
+{
+    if ((g_analog_board_iset_precharge_complete != 1U) ||
+        (g_analog_board_protection_grace_active != 0U))
+    {
+        g_analog_board_ovp_confirm_count = 0U;
+        g_analog_board_ocp_confirm_count = 0U;
+        if (g_analog_board_protection_grace_active != 0U)
+        {
+            if (voltage_mv >= PSU_OVP_TRIP_MV)
+            {
+                ++g_analog_board_ovp_transient_count;
+            }
+            if (current_ma >= PSU_OCP_TRIP_MA)
+            {
+                ++g_analog_board_ocp_transient_count;
+            }
+        }
+        return POWER_PROTECTION_RESULT_NONE;
+    }
+
+    if (voltage_mv >= PSU_OVP_TRIP_MV)
+    {
+        if (g_analog_board_ovp_confirm_count <
+            PSU_ANALOG_BOARD_OVP_CONFIRM_COUNT)
+        {
+            ++g_analog_board_ovp_confirm_count;
+        }
+        if (g_analog_board_ovp_confirm_count <
+            PSU_ANALOG_BOARD_OVP_CONFIRM_COUNT)
+        {
+            ++g_analog_board_ovp_transient_count;
+        }
+    }
+    else
+    {
+        g_analog_board_ovp_confirm_count = 0U;
+    }
+
+    if (current_ma >= PSU_OCP_TRIP_MA)
+    {
+        if (g_analog_board_ocp_confirm_count <
+            PSU_ANALOG_BOARD_OCP_CONFIRM_COUNT)
+        {
+            ++g_analog_board_ocp_confirm_count;
+        }
+        if (g_analog_board_ocp_confirm_count <
+            PSU_ANALOG_BOARD_OCP_CONFIRM_COUNT)
+        {
+            ++g_analog_board_ocp_transient_count;
+        }
+    }
+    else
+    {
+        g_analog_board_ocp_confirm_count = 0U;
+    }
+
+    // Match the public protection priority when both confirm together.
+    if (g_analog_board_ovp_confirm_count >=
+        PSU_ANALOG_BOARD_OVP_CONFIRM_COUNT)
+    {
+        return POWER_PROTECTION_RESULT_OVERVOLTAGE;
+    }
+    if (g_analog_board_ocp_confirm_count >=
+        PSU_ANALOG_BOARD_OCP_CONFIRM_COUNT)
+    {
+        return POWER_PROTECTION_RESULT_OVERCURRENT;
+    }
+    return POWER_PROTECTION_RESULT_NONE;
 }
 #endif
 
@@ -214,6 +293,10 @@ void power_app_init(void)
     g_analog_board_current_meas_ma = 0U;
     g_analog_board_real_feedback_active = 0U;
     g_analog_board_feedback_update_count = 0U;
+    g_analog_board_ovp_confirm_count = 0U;
+    g_analog_board_ocp_confirm_count = 0U;
+    g_analog_board_ovp_transient_count = 0U;
+    g_analog_board_ocp_transient_count = 0U;
 
     power_output_hw_set(false);
     power_dac_set_zero();
@@ -312,6 +395,31 @@ void power_app_fast_step(void)
     g_power_app.current_meas_ma = power_float_to_u16(g_iout_meas_ma);
 #endif
 
+#if PSU_ENABLE_ANALOG_BOARD_BRINGUP && PSU_ANALOG_BOARD_USE_REAL_ADC
+    voltage_meas_mv = g_power_app.voltage_meas_mv;
+    current_meas_ma = g_power_app.current_meas_ma;
+    if (!g_power_app.fault_latched)
+    {
+        protection_result = power_app_update_analog_board_protection(
+            voltage_meas_mv,
+            current_meas_ma);
+        if (protection_result == POWER_PROTECTION_RESULT_OVERVOLTAGE)
+        {
+            power_app_trip(POWER_FAULT_OVERVOLTAGE,
+                           voltage_meas_mv,
+                           current_meas_ma);
+            return;
+        }
+        if (protection_result == POWER_PROTECTION_RESULT_OVERCURRENT)
+        {
+            power_app_trip(POWER_FAULT_OVERCURRENT,
+                           voltage_meas_mv,
+                           current_meas_ma);
+            return;
+        }
+    }
+#endif
+
 #if PSU_ENABLE_ANALOG_BOARD_BRINGUP
     if (g_analog_board_feedback_settled != 1U)
     {
@@ -326,7 +434,8 @@ void power_app_fast_step(void)
         g_power_app.output_requested = false;
         g_power_app.output_enabled = false;
         g_power_app.fault_reset_requested = false;
-        g_power_app.state = POWER_STATE_OFF;
+        g_power_app.state = g_power_app.fault_latched ?
+                                POWER_STATE_FAULT : POWER_STATE_OFF;
         power_app_clear_mode_confirmation();
         return;
     }
@@ -368,9 +477,14 @@ void power_app_fast_step(void)
         else
         {
             g_power_app.fault_reset_requested = false;
+#if PSU_ENABLE_ANALOG_BOARD_BRINGUP && PSU_ANALOG_BOARD_USE_REAL_ADC
+            // The dedicated 20 kHz bring-up filter already ran above.
+            protection_result = POWER_PROTECTION_RESULT_NONE;
+#else
             protection_result = power_protection_step(voltage_meas_mv,
                                                       current_meas_ma,
                                                       true);
+#endif
             if (protection_result == POWER_PROTECTION_RESULT_OVERVOLTAGE)
             {
                 g_power_app.fault = POWER_FAULT_OVERVOLTAGE;
@@ -432,9 +546,14 @@ void power_app_fast_step(void)
     protection_enabled = (g_power_app.state == POWER_STATE_STARTING) ||
                          (g_power_app.state == POWER_STATE_CV) ||
                          (g_power_app.state == POWER_STATE_CC);
+#if PSU_ENABLE_ANALOG_BOARD_BRINGUP && PSU_ANALOG_BOARD_USE_REAL_ADC
+    // The dedicated 20 kHz bring-up filter already ran above.
+    protection_result = POWER_PROTECTION_RESULT_NONE;
+#else
     protection_result = power_protection_step(voltage_meas_mv,
                                               current_meas_ma,
                                               protection_enabled);
+#endif
 
     if (protection_result == POWER_PROTECTION_RESULT_OVERVOLTAGE)
     {
