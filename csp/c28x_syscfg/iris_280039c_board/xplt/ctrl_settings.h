@@ -98,6 +98,18 @@
 #define PSU_VOLTAGE_STEP_MV             (100U)
 #define PSU_CURRENT_STEP_MA             (1U)
 
+#define PSU_ENABLE_ROTARY_ENCODER_UI       (1)
+
+#define PSU_ENCODER_TASK_PERIOD_MS         (2U)
+#define PSU_ENCODER_COUNTS_PER_DETENT      (4)
+#define PSU_ENCODER_BUTTON_DEBOUNCE_COUNT  (10U)
+
+#define PSU_ENCODER_MODE_VOLTAGE           (0U)
+#define PSU_ENCODER_MODE_CURRENT           (1U)
+
+// Must match eqep2.positionCounterMax in F280039_Iris_node.syscfg.
+#define PSU_ENCODER_POSITION_COUNTER_MAX   (10000UL)
+
 #define PSU_KEY_TASK_PERIOD_MS                    (20U)
 #define PSU_KEY_TASK_INITIAL_DELAY_MS             (10U)
 #define PSU_HT16K33_DISPLAY_PERIOD_MS             (500U)

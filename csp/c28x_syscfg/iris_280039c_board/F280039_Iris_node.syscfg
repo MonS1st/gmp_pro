@@ -46,6 +46,7 @@ const gpio6          = gpio.addInstance();
 const gpio7          = gpio.addInstance();
 const gpio8          = gpio.addInstance();
 const gpio9          = gpio.addInstance();
+const gpio10         = gpio.addInstance();
 const i2c            = scripting.addModule("/driverlib/i2c.js", {}, false);
 const i2c1           = i2c.addInstance();
 const other          = scripting.addModule("/driverlib/other.js", {}, false);
@@ -502,17 +503,16 @@ eqep1.eqep.eqep_indexPin.$assign = "GPIO13";
 
 eqep2.$name                      = "IRIS_EQEP2";
 eqep2.useCase                    = "CUSTOM";
-eqep2.useInterfacePins           = ["EQEP#_A","EQEP#_B","EQEP#_INDEX"];
+eqep2.useInterfacePins           = ["EQEP#_A","EQEP#_B"];
+eqep2.positionCounterMode        = "EQEP_POSITION_RESET_MAX_POS";
 eqep2.positionCounterMax         = 10000;
 eqep2.enableModule               = true;
 eqep2.swPositionInit             = true;
 eqep2.eqep.$assign               = "EQEP2";
 eqep2.eqep.eqep_aPin.$assign     = "GPIO24";
 eqep2.eqep.eqep_bPin.$assign     = "GPIO33";
-eqep2.eqep.eqep_indexPin.$assign = "GPIO26";
 eqep2.aQual.qualMode             = "GPIO_QUAL_3SAMPLE";
 eqep2.bQual.qualMode             = "GPIO_QUAL_3SAMPLE";
-eqep2.indexQual.qualMode         = "GPIO_QUAL_3SAMPLE";
 
 gpio1.$name           = "IRIS_GPIO1";
 // GPIO58 has conflicting, unconfirmed historical uses. Keep it high-impedance
@@ -548,6 +548,12 @@ gpio8.gpioPin.$assign = "GPIO59";
 gpio9.$name           = "IRIS_GPIO_SPI_RST";
 gpio9.direction       = "GPIO_DIR_MODE_OUT";
 gpio9.gpioPin.$assign = "GPIO55";
+
+gpio10.$name           = "IRIS_ENCODER_SW";
+gpio10.direction       = "GPIO_DIR_MODE_IN";
+gpio10.padConfig       = "PULLUP";
+gpio10.qualMode        = "GPIO_QUAL_ASYNC";
+gpio10.gpioPin.$assign = "GPIO26";
 
 i2c1.$name                  = "IRIS_IIC";
 i2c1.i2c.$assign            = "I2CA";
