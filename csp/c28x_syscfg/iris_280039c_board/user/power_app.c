@@ -22,6 +22,20 @@ volatile uint16_t g_analog_board_ovp_confirm_count = 0U;
 volatile uint16_t g_analog_board_ocp_confirm_count = 0U;
 volatile uint32_t g_analog_board_ovp_transient_count = 0U;
 volatile uint32_t g_analog_board_ocp_transient_count = 0U;
+volatile uint16_t g_output_switch_requested = 0U;
+volatile uint16_t g_output_switch_active = 0U;
+volatile uint16_t g_output_switch_precharge_active = 0U;
+volatile uint16_t g_output_switch_precharge_complete = 0U;
+volatile uint16_t g_output_switch_dac_gate_active = 0U;
+volatile uint16_t g_output_switch_physical_relay_available = 0U;
+volatile uint16_t g_output_switch_relay_command = 0U;
+volatile uint32_t g_output_switch_toggle_count = 0U;
+volatile uint32_t g_output_switch_enable_count = 0U;
+volatile uint32_t g_output_switch_disable_count = 0U;
+volatile uint32_t g_output_switch_reject_count = 0U;
+volatile uint32_t g_output_switch_fault_shutdown_count = 0U;
+volatile uint32_t g_output_switch_precharge_count = 0U;
+volatile time_gt g_output_switch_precharge_start_tick = 0U;
 static uint16_t s_last_voltage_set_mv;
 static uint16_t s_last_current_set_ma;
 
@@ -132,6 +146,163 @@ static void power_app_clear_mode_confirmation(void)
 {
     g_power_app.cc_confirm_count = 0U;
     g_power_app.cv_confirm_count = 0U;
+}
+
+static bool power_app_physical_output_forbidden(void)
+{
+    return PSU_SAFE_BRINGUP || !PSU_ALLOW_OUTPUT_REQUEST ||
+           !PSU_ALLOW_PHYSICAL_OUTPUT_ENABLE;
+}
+
+static bool power_app_output_switch_fault_active(void)
+{
+    return g_power_app.fault_latched ||
+           (g_analog_board_feedback_fault != 0U) ||
+           (g_analog_board_fault_hold_active != 0U) ||
+           (g_power_app.state == POWER_STATE_FAULT);
+}
+
+static bool power_app_output_switch_ready(void)
+{
+    if (power_app_output_switch_fault_active() ||
+        (g_analog_board_protection_grace_active != 0U) ||
+        (g_analog_board_iset_precharge_complete != 1U) ||
+        (g_dac_test_auto_follow_completed != 1U))
+    {
+        return false;
+    }
+
+#if PSU_OUTPUT_SWITCH_REQUIRE_SETTLED
+    if (g_analog_board_feedback_settled != 1U)
+    {
+        return false;
+    }
+#endif
+
+    return true;
+}
+
+static void power_app_output_switch_set_off(power_state_t state)
+{
+    g_output_switch_dac_gate_active = 0U;
+    g_output_switch_active = 0U;
+    g_output_switch_precharge_active = 0U;
+    g_output_switch_precharge_complete = 0U;
+    g_output_switch_requested = 0U;
+    g_output_switch_precharge_start_tick = 0U;
+    g_output_switch_physical_relay_available = 0U;
+    g_output_switch_relay_command = 0U;
+
+    g_power_app.output_requested = false;
+    g_power_app.output_enabled = false;
+    g_power_app.state = state;
+    power_output_hw_set(false);
+    power_app_clear_mode_confirmation();
+}
+
+void power_app_output_switch_fault_shutdown(void)
+{
+#if PSU_ENABLE_LOGICAL_OUTPUT_SWITCH
+    if ((g_power_app.state != POWER_STATE_FAULT) ||
+        (g_output_switch_requested != 0U) ||
+        (g_output_switch_active != 0U) ||
+        (g_output_switch_precharge_active != 0U) ||
+        (g_output_switch_dac_gate_active != 0U))
+    {
+        ++g_output_switch_fault_shutdown_count;
+    }
+
+    if (!g_power_app.fault_latched &&
+        ((g_analog_board_feedback_fault != 0U) ||
+         (g_analog_board_fault_hold_active != 0U)))
+    {
+        g_power_app.fault = POWER_FAULT_NONE;
+        g_power_app.fault_latched = true;
+        g_power_app.trip_voltage_mv = g_power_app.voltage_meas_mv;
+        g_power_app.trip_current_ma = g_power_app.current_meas_ma;
+    }
+
+    g_power_app.fault_reset_requested = false;
+    power_app_output_switch_set_off(POWER_STATE_FAULT);
+#endif
+}
+
+static void power_app_update_output_switch(void)
+{
+#if PSU_ENABLE_LOGICAL_OUTPUT_SWITCH
+    g_output_switch_physical_relay_available = 0U;
+    g_output_switch_relay_command = 0U;
+    power_output_hw_set(false);
+
+    if (power_app_output_switch_fault_active())
+    {
+        power_app_output_switch_fault_shutdown();
+        analog_io_test_force_safe_outputs();
+        return;
+    }
+
+    if (g_output_switch_precharge_active != 0U)
+    {
+        if (g_output_switch_requested == 0U)
+        {
+            power_app_output_switch_set_off(POWER_STATE_OFF);
+            analog_io_test_force_safe_outputs();
+            return;
+        }
+
+        if (gmp_base_is_delay_elapsed(g_output_switch_precharge_start_tick,
+                                      PSU_OUTPUT_SWITCH_PRECHARGE_MS))
+        {
+            g_output_switch_precharge_active = 0U;
+            g_output_switch_precharge_complete = 1U;
+            g_output_switch_dac_gate_active = 1U;
+            g_power_app.output_requested = true;
+            g_power_app.output_enabled = true;
+            g_power_app.state = POWER_STATE_CV;
+            g_output_switch_active = 1U;
+            ++g_output_switch_enable_count;
+            power_app_clear_mode_confirmation();
+        }
+        return;
+    }
+
+    if (g_output_switch_active != 0U)
+    {
+        if (g_output_switch_requested == 0U)
+        {
+            power_app_output_switch_set_off(POWER_STATE_OFF);
+            analog_io_test_force_safe_outputs();
+        }
+        return;
+    }
+
+    if (g_output_switch_requested == 0U)
+    {
+        g_power_app.output_requested = false;
+        g_power_app.output_enabled = false;
+        g_power_app.state = POWER_STATE_OFF;
+        return;
+    }
+
+    if (!power_app_output_switch_ready())
+    {
+        ++g_output_switch_reject_count;
+        power_app_output_switch_set_off(POWER_STATE_OFF);
+        analog_io_test_force_safe_outputs();
+        return;
+    }
+
+    g_output_switch_precharge_active = 1U;
+    g_output_switch_precharge_complete = 0U;
+    g_output_switch_dac_gate_active = 0U;
+    g_output_switch_active = 0U;
+    g_power_app.output_requested = false;
+    g_power_app.output_enabled = false;
+    g_power_app.state = POWER_STATE_STARTING;
+    g_output_switch_precharge_start_tick = gmp_base_get_system_tick();
+    ++g_output_switch_precharge_count;
+    power_app_clear_mode_confirmation();
+#endif
 }
 
 static bool power_app_check_command_change(void)
@@ -253,7 +424,12 @@ static void power_app_trip(power_fault_t fault,
 
     g_power_app.output_requested = false;
     g_power_app.fault_reset_requested = false;
+#if PSU_ENABLE_LOGICAL_OUTPUT_SWITCH
+    power_app_output_switch_fault_shutdown();
+    analog_io_test_force_safe_outputs();
+#else
     power_app_set_output_off(POWER_STATE_FAULT);
+#endif
 }
 
 static void power_app_apply_commands(void)
@@ -297,6 +473,20 @@ void power_app_init(void)
     g_analog_board_ocp_confirm_count = 0U;
     g_analog_board_ovp_transient_count = 0U;
     g_analog_board_ocp_transient_count = 0U;
+    g_output_switch_requested = 0U;
+    g_output_switch_active = 0U;
+    g_output_switch_precharge_active = 0U;
+    g_output_switch_precharge_complete = 0U;
+    g_output_switch_dac_gate_active = 0U;
+    g_output_switch_physical_relay_available = 0U;
+    g_output_switch_relay_command = 0U;
+    g_output_switch_toggle_count = 0U;
+    g_output_switch_enable_count = 0U;
+    g_output_switch_disable_count = 0U;
+    g_output_switch_reject_count = 0U;
+    g_output_switch_fault_shutdown_count = 0U;
+    g_output_switch_precharge_count = 0U;
+    g_output_switch_precharge_start_tick = 0U;
 
     power_output_hw_set(false);
     power_dac_set_zero();
@@ -349,6 +539,39 @@ void power_app_request_output(bool enable)
     {
         g_power_app.output_requested = false;
     }
+#endif
+}
+
+void power_app_request_logical_output(bool enable)
+{
+#if PSU_ENABLE_LOGICAL_OUTPUT_SWITCH
+    ++g_output_switch_toggle_count;
+
+    if (!enable)
+    {
+        if ((g_output_switch_requested != 0U) ||
+            (g_output_switch_active != 0U) ||
+            (g_output_switch_precharge_active != 0U))
+        {
+            ++g_output_switch_disable_count;
+        }
+        power_app_output_switch_set_off(POWER_STATE_OFF);
+        analog_io_test_force_safe_outputs();
+        return;
+    }
+
+    if (power_app_output_switch_fault_active())
+    {
+        ++g_output_switch_reject_count;
+        power_app_output_switch_fault_shutdown();
+        analog_io_test_force_safe_outputs();
+        return;
+    }
+
+    g_output_switch_requested = 1U;
+    g_power_app.output_requested = false;
+#else
+    power_app_request_output(enable);
 #endif
 }
 
@@ -434,15 +657,86 @@ void power_app_fast_step(void)
         g_power_app.output_requested = false;
         g_power_app.output_enabled = false;
         g_power_app.fault_reset_requested = false;
+#if PSU_ENABLE_LOGICAL_OUTPUT_SWITCH
+        if (g_power_app.fault_latched ||
+            (g_analog_board_feedback_fault != 0U) ||
+            (g_analog_board_fault_hold_active != 0U))
+        {
+            power_app_output_switch_fault_shutdown();
+            analog_io_test_force_safe_outputs();
+        }
+        else if ((g_output_switch_active != 0U) ||
+                 (g_output_switch_precharge_active != 0U) ||
+                 (g_output_switch_dac_gate_active != 0U))
+        {
+            ++g_output_switch_reject_count;
+            power_app_output_switch_set_off(POWER_STATE_OFF);
+            analog_io_test_force_safe_outputs();
+        }
+        else
+        {
+            g_power_app.state = POWER_STATE_OFF;
+            power_app_clear_mode_confirmation();
+        }
+#else
         g_power_app.state = g_power_app.fault_latched ?
                                 POWER_STATE_FAULT : POWER_STATE_OFF;
         power_app_clear_mode_confirmation();
+#endif
         return;
     }
 #endif
 
-    if (PSU_SAFE_BRINGUP || !PSU_ALLOW_OUTPUT_REQUEST ||
-        !PSU_ALLOW_PHYSICAL_OUTPUT_ENABLE)
+#if PSU_ENABLE_LOGICAL_OUTPUT_SWITCH
+    if (power_app_physical_output_forbidden())
+    {
+        power_output_hw_set(false);
+        g_output_switch_physical_relay_available = 0U;
+        g_output_switch_relay_command = 0U;
+        g_power_app.dac_voltage_code = g_dac_test_voltage_applied_code;
+        g_power_app.dac_current_code = g_dac_test_current_applied_code;
+
+        if (g_power_app.fault_latched ||
+            (g_analog_board_feedback_fault != 0U) ||
+            (g_analog_board_fault_hold_active != 0U))
+        {
+            power_app_output_switch_fault_shutdown();
+            analog_io_test_force_safe_outputs();
+            return;
+        }
+
+        g_power_app.fault_reset_requested = false;
+        g_power_app.output_requested = (g_output_switch_active != 0U);
+        g_power_app.output_enabled = (g_output_switch_active != 0U);
+
+        if (g_output_switch_active != 0U)
+        {
+            if ((g_power_app.state != POWER_STATE_CV) &&
+                (g_power_app.state != POWER_STATE_CC))
+            {
+                g_power_app.state = POWER_STATE_CV;
+                power_app_clear_mode_confirmation();
+            }
+            if (!command_changed)
+            {
+                power_app_update_mode();
+            }
+        }
+        else if (g_output_switch_precharge_active != 0U)
+        {
+            g_power_app.state = POWER_STATE_STARTING;
+            power_app_clear_mode_confirmation();
+        }
+        else
+        {
+            g_power_app.state = POWER_STATE_OFF;
+            power_app_clear_mode_confirmation();
+        }
+        return;
+    }
+#endif
+
+    if (power_app_physical_output_forbidden())
     {
         // Keep every physical path off while the software model, measurement
         // override, protection counters, fault latch, and reset remain active.
@@ -617,4 +911,6 @@ void power_app_slow_step(void)
 #if PSU_SOFT_TEST_MODE
     power_self_test_step();
 #endif
+
+    power_app_update_output_switch();
 }

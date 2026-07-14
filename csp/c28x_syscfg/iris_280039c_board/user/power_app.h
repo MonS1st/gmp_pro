@@ -47,6 +47,26 @@ typedef struct
 
 extern volatile power_app_t g_power_app;
 
+extern volatile uint16_t g_output_switch_requested;
+extern volatile uint16_t g_output_switch_active;
+extern volatile uint16_t g_output_switch_precharge_active;
+extern volatile uint16_t g_output_switch_precharge_complete;
+extern volatile uint16_t g_output_switch_dac_gate_active;
+
+extern volatile uint16_t g_output_switch_physical_relay_available;
+extern volatile uint16_t g_output_switch_relay_command;
+
+extern volatile uint32_t g_output_switch_toggle_count;
+extern volatile uint32_t g_output_switch_enable_count;
+extern volatile uint32_t g_output_switch_disable_count;
+extern volatile uint32_t g_output_switch_reject_count;
+extern volatile uint32_t g_output_switch_fault_shutdown_count;
+extern volatile uint32_t g_output_switch_precharge_count;
+
+// time_gt is uint32_t on this C28x target; keep this public header independent
+// of gmp_core.h to avoid pulling ctl_main.h into its own declaration path.
+extern volatile uint32_t g_output_switch_precharge_start_tick;
+
 void power_app_init(void);
 // UI and communication code should use these APIs instead of writing g_power_app directly.
 void power_app_set_voltage_mv(uint16_t voltage_mv);
@@ -54,6 +74,8 @@ void power_app_set_current_ma(uint16_t current_ma);
 uint16_t power_app_get_voltage_mv(void);
 uint16_t power_app_get_current_ma(void);
 void power_app_request_output(bool enable);
+void power_app_request_logical_output(bool enable);
+void power_app_output_switch_fault_shutdown(void);
 void power_app_reset_fault(void);
 void power_app_fast_step(void);
 void power_app_slow_step(void);

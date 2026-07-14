@@ -6,6 +6,7 @@
 
 // user main header
 #include "ctl_main.h"
+#include "analog_io_test.h"
 #include "power_app.h"
 #include "user_main.h"
 #include <stdio.h>
@@ -60,7 +61,11 @@ static time_gt s_ht16k33_display_test_start_tick = 0U;
 #endif
 static uint16_t s_oled_last_voltage_mv = 0xFFFFU;
 static uint16_t s_oled_last_current_ma = 0xFFFFU;
-static uint16_t s_oled_last_key_id = 0xFFFFU;
+static uint16_t s_oled_last_voltage_meas_mv = 0xFFFFU;
+static uint16_t s_oled_last_current_meas_ma = 0xFFFFU;
+static uint16_t s_oled_last_output_state = 0xFFFFU;
+static uint16_t s_oled_last_output_fault = 0xFFFFU;
+static uint16_t s_oled_last_feedback_fault = 0xFFFFU;
 static uint16_t s_key_consecutive_timeout_count = 0U;
 static uint16_t s_i2c_recovery_ht_stage = 0U;
 
@@ -162,7 +167,11 @@ static void power_ui_schedule_oled_retry(uint32_t delay_ms)
         gmp_base_get_system_tick() + (time_gt)delay_ms;
     s_oled_last_voltage_mv = 0xFFFFU;
     s_oled_last_current_ma = 0xFFFFU;
-    s_oled_last_key_id = 0xFFFFU;
+    s_oled_last_voltage_meas_mv = 0xFFFFU;
+    s_oled_last_current_meas_ma = 0xFFFFU;
+    s_oled_last_output_state = 0xFFFFU;
+    s_oled_last_output_fault = 0xFFFFU;
+    s_oled_last_feedback_fault = 0xFFFFU;
 }
 
 static void power_ui_handle_oled_failure_with_delay(ec_gt result,
@@ -578,20 +587,66 @@ static bool power_ui_is_mapped_key(uint16_t key_id)
     }
 }
 
+static bool power_ui_setpoint_change_allowed(void)
+{
+    return !g_power_app.fault_latched &&
+           (g_analog_board_feedback_fault == 0U) &&
+           (g_analog_board_fault_hold_active == 0U) &&
+           (g_analog_board_feedback_settled == 1U);
+}
+
+static uint16_t power_ui_voltage_limit_mv(void)
+{
+    uint16_t limit = PSU_VOLTAGE_CMD_MAX_MV;
+
+#if PSU_ENABLE_ANALOG_BOARD_BRINGUP
+    if (limit > PSU_ANALOG_BOARD_VOLTAGE_LIMIT_MV)
+    {
+        limit = PSU_ANALOG_BOARD_VOLTAGE_LIMIT_MV;
+    }
+#endif
+    return limit;
+}
+
+static uint16_t power_ui_current_limit_ma(void)
+{
+    uint16_t limit = PSU_CURRENT_CMD_MAX_MA;
+
+#if PSU_ENABLE_ANALOG_BOARD_BRINGUP
+    if (limit > PSU_ANALOG_BOARD_CURRENT_LIMIT_MA)
+    {
+        limit = PSU_ANALOG_BOARD_CURRENT_LIMIT_MA;
+    }
+#endif
+    return limit;
+}
+
 static bool power_ui_execute_key_action(uint16_t key_id)
 {
     uint16_t current;
+    uint16_t limit;
+    uint16_t minimum;
     uint32_t next;
     bool action_executed = true;
+
+    if (((key_id == PSU_KEY_VOLTAGE_UP_ID) ||
+         (key_id == PSU_KEY_VOLTAGE_DOWN_ID) ||
+         (key_id == PSU_KEY_CURRENT_UP_ID) ||
+         (key_id == PSU_KEY_CURRENT_DOWN_ID)) &&
+        !power_ui_setpoint_change_allowed())
+    {
+        return false;
+    }
 
     switch (key_id)
     {
     case PSU_KEY_VOLTAGE_UP_ID:
         current = power_app_get_voltage_mv();
+        limit = power_ui_voltage_limit_mv();
         next = (uint32_t)current + PSU_VOLTAGE_STEP_MV;
-        if (next > PSU_VOLTAGE_CMD_MAX_MV)
+        if (next > limit)
         {
-            next = PSU_VOLTAGE_CMD_MAX_MV;
+            next = limit;
         }
         power_app_set_voltage_mv((uint16_t)next);
         power_ui_request_led_setpoint_update();
@@ -606,10 +661,11 @@ static bool power_ui_execute_key_action(uint16_t key_id)
 
     case PSU_KEY_CURRENT_UP_ID:
         current = power_app_get_current_ma();
+        limit = power_ui_current_limit_ma();
         next = (uint32_t)current + PSU_CURRENT_STEP_MA;
-        if (next > PSU_CURRENT_CMD_MAX_MA)
+        if (next > limit)
         {
-            next = PSU_CURRENT_CMD_MAX_MA;
+            next = limit;
         }
         power_app_set_current_ma((uint16_t)next);
         power_ui_request_led_setpoint_update();
@@ -617,13 +673,28 @@ static bool power_ui_execute_key_action(uint16_t key_id)
 
     case PSU_KEY_CURRENT_DOWN_ID:
         current = power_app_get_current_ma();
-        power_app_set_current_ma((current < PSU_CURRENT_STEP_MA) ?
-                                     0U : (uint16_t)(current - PSU_CURRENT_STEP_MA));
+        minimum = 0U;
+#if PSU_ENABLE_ANALOG_BOARD_BRINGUP
+        if (power_app_get_voltage_mv() > 0U)
+        {
+            minimum = PSU_ANALOG_BOARD_MIN_CURRENT_MA;
+        }
+#endif
+        if (current < minimum)
+        {
+            current = minimum;
+        }
+        power_app_set_current_ma(
+            ((uint32_t)PSU_CURRENT_STEP_MA >
+             ((uint32_t)current - (uint32_t)minimum)) ?
+                minimum : (uint16_t)(current - PSU_CURRENT_STEP_MA));
         power_ui_request_led_setpoint_update();
         break;
 
     case PSU_KEY_OUTPUT_TOGGLE_ID:
-#if PSU_SAFE_BRINGUP || !PSU_ALLOW_OUTPUT_REQUEST
+#if PSU_ENABLE_LOGICAL_OUTPUT_SWITCH
+        power_app_request_logical_output(g_output_switch_requested == 0U);
+#elif PSU_SAFE_BRINGUP || !PSU_ALLOW_OUTPUT_REQUEST
         power_app_request_output(true);
 #else
         if (!g_power_app.fault_latched)
@@ -1147,12 +1218,16 @@ gmp_task_status_t tsk_key_flush(gmp_task_t* tsk)
 gmp_task_status_t oled_show_task(gmp_task_t* tsk)
 {
 #if PSU_SAFE_BRINGUP
-    char line2[16];
-    char line3[16];
-    char line4[16];
+    char line2[20];
+    char line3[20];
+    char line4[20];
     uint16_t voltage_set_mv;
     uint16_t current_set_ma;
-    uint16_t key_id;
+    uint16_t voltage_meas_mv;
+    uint16_t current_meas_ma;
+    uint16_t output_state;
+    uint16_t output_fault;
+    uint16_t feedback_fault;
     ec_gt ret;
 #endif
     GMP_UNUSED_VAR(tsk);
@@ -1245,7 +1320,7 @@ gmp_task_status_t oled_show_task(gmp_task_t* tsk)
         {
             return GMP_TASK_DONE;
         }
-        ret = oled_show_line_checked(0U, 0U, "BOARD TEST");
+        ret = oled_show_line_checked(0U, 0U, "PSU TEST");
         power_ui_record_oled_action_result(ret);
         if (ret != GMP_EC_OK)
         {
@@ -1259,7 +1334,7 @@ gmp_task_status_t oled_show_task(gmp_task_t* tsk)
         ++g_oled_line_update_count;
         g_oled_pending_mask = OLED_PENDING_VOLTAGE |
                               OLED_PENDING_CURRENT |
-                              OLED_PENDING_KEY;
+                              OLED_PENDING_OUTPUT_STATE;
         g_oled_init_state = OLED_INIT_READY;
         return GMP_TASK_DONE;
 
@@ -1288,21 +1363,29 @@ gmp_task_status_t oled_show_task(gmp_task_t* tsk)
 
     voltage_set_mv = g_power_app.voltage_set_mv;
     current_set_ma = g_power_app.current_set_ma;
-    key_id = g_last_raw_key_id;
+    voltage_meas_mv = g_power_app.voltage_meas_mv;
+    current_meas_ma = g_power_app.current_meas_ma;
+    output_state = (uint16_t)g_power_app.state;
+    output_fault = (uint16_t)g_power_app.fault;
+    feedback_fault = g_analog_board_feedback_fault;
 
-    if (voltage_set_mv != s_oled_last_voltage_mv)
+    if ((voltage_set_mv != s_oled_last_voltage_mv) ||
+        (voltage_meas_mv != s_oled_last_voltage_meas_mv))
     {
         g_oled_pending_mask |= OLED_PENDING_VOLTAGE;
     }
 
-    if (current_set_ma != s_oled_last_current_ma)
+    if ((current_set_ma != s_oled_last_current_ma) ||
+        (current_meas_ma != s_oled_last_current_meas_ma))
     {
         g_oled_pending_mask |= OLED_PENDING_CURRENT;
     }
 
-    if (key_id != s_oled_last_key_id)
+    if ((output_state != s_oled_last_output_state) ||
+        (output_fault != s_oled_last_output_fault) ||
+        (feedback_fault != s_oled_last_feedback_fault))
     {
-        g_oled_pending_mask |= OLED_PENDING_KEY;
+        g_oled_pending_mask |= OLED_PENDING_OUTPUT_STATE;
     }
 
     if (g_oled_pending_mask == 0U)
@@ -1316,37 +1399,75 @@ gmp_task_status_t oled_show_task(gmp_task_t* tsk)
     }
 
     // Commit at most one pending line per scheduled OLED task.
-    if ((g_oled_pending_mask & OLED_PENDING_VOLTAGE) != 0U)
+    if ((g_oled_pending_mask & OLED_PENDING_OUTPUT_STATE) != 0U)
     {
-        (void)snprintf(line2, sizeof(line2), "V %-5u mV    ",
-                       (unsigned int)voltage_set_mv);
+        if ((g_power_app.fault_latched != 0) ||
+            (output_state == (uint16_t)POWER_STATE_FAULT))
+        {
+            if (output_fault == (uint16_t)POWER_FAULT_OVERVOLTAGE)
+            {
+                (void)snprintf(line4, sizeof(line4), "FLT OVP        ");
+            }
+            else if (output_fault == (uint16_t)POWER_FAULT_OVERCURRENT)
+            {
+                (void)snprintf(line4, sizeof(line4), "FLT OCP        ");
+            }
+            else if (feedback_fault != 0U)
+            {
+                (void)snprintf(line4, sizeof(line4), "FLT ADC        ");
+            }
+            else
+            {
+                (void)snprintf(line4, sizeof(line4), "OUT FAULT      ");
+            }
+        }
+        else if (output_state == (uint16_t)POWER_STATE_STARTING)
+        {
+            (void)snprintf(line4, sizeof(line4), "OUT START      ");
+        }
+        else if (g_output_switch_active != 0U)
+        {
+            (void)snprintf(line4, sizeof(line4), "OUT ON         ");
+        }
+        else
+        {
+            (void)snprintf(line4, sizeof(line4), "OUT OFF        ");
+        }
+
+        ret = oled_show_line_checked(0U, 6U, line4);
+        if (ret == GMP_EC_OK)
+        {
+            s_oled_last_output_state = output_state;
+            s_oled_last_output_fault = output_fault;
+            s_oled_last_feedback_fault = feedback_fault;
+            g_oled_pending_mask &=
+                (uint16_t)(~OLED_PENDING_OUTPUT_STATE);
+        }
+    }
+    else if ((g_oled_pending_mask & OLED_PENDING_VOLTAGE) != 0U)
+    {
+        (void)snprintf(line2, sizeof(line2), "VS%-4u VM%-5u ",
+                       (unsigned int)voltage_set_mv,
+                       (unsigned int)voltage_meas_mv);
         ret = oled_show_line_checked(0U, 2U, line2);
         if (ret == GMP_EC_OK)
         {
             s_oled_last_voltage_mv = voltage_set_mv;
+            s_oled_last_voltage_meas_mv = voltage_meas_mv;
             g_oled_pending_mask &= (uint16_t)(~OLED_PENDING_VOLTAGE);
         }
     }
     else if ((g_oled_pending_mask & OLED_PENDING_CURRENT) != 0U)
     {
-        (void)snprintf(line3, sizeof(line3), "I %-3u mA      ",
-                       (unsigned int)current_set_ma);
+        (void)snprintf(line3, sizeof(line3), "IS%-3u IM%-5u  ",
+                       (unsigned int)current_set_ma,
+                       (unsigned int)current_meas_ma);
         ret = oled_show_line_checked(0U, 4U, line3);
         if (ret == GMP_EC_OK)
         {
             s_oled_last_current_ma = current_set_ma;
+            s_oled_last_current_meas_ma = current_meas_ma;
             g_oled_pending_mask &= (uint16_t)(~OLED_PENDING_CURRENT);
-        }
-    }
-    else if ((g_oled_pending_mask & OLED_PENDING_KEY) != 0U)
-    {
-        (void)snprintf(line4, sizeof(line4), "KEY %-2u       ",
-                       (unsigned int)key_id);
-        ret = oled_show_line_checked(0U, 6U, line4);
-        if (ret == GMP_EC_OK)
-        {
-            s_oled_last_key_id = key_id;
-            g_oled_pending_mask &= (uint16_t)(~OLED_PENDING_KEY);
         }
     }
     power_ui_record_oled_action_result(ret);

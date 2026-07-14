@@ -178,6 +178,11 @@
 
 #define PSU_ENABLE_BEEP                     (0)
 
+#define PSU_ENABLE_LOGICAL_OUTPUT_SWITCH        (1)
+#define PSU_OUTPUT_SWITCH_PRECHARGE_MS          (100U)
+#define PSU_OUTPUT_SWITCH_REQUIRE_SETTLED       (1)
+#define PSU_OUTPUT_SWITCH_PHYSICAL_RELAY_ENABLE (0)
+
 #endif
 
 #if (PSU_SAFE_BRINGUP == 1) && \
@@ -186,6 +191,10 @@
      (PSU_ALLOW_PHYSICAL_OUTPUT_ENABLE == 1) || \
      (PSU_ALLOW_OUTPUT_REQUEST == 1))
 #error "SAFE_BRINGUP forbids all physical power-output permissions"
+#endif
+
+#if PSU_OUTPUT_SWITCH_PHYSICAL_RELAY_ENABLE != 0
+#error "Logical output-switch test must not enable an unconfirmed physical relay"
 #endif
 
 //=================================================================================================

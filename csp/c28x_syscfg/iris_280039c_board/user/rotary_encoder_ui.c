@@ -69,8 +69,9 @@ static uint16_t rotary_encoder_current_limit_ma(void)
 static bool rotary_encoder_setpoint_change_allowed(void)
 {
     return ((g_power_app.fault_latched == 0) &&
+            (g_analog_board_feedback_fault == 0U) &&
             (g_analog_board_fault_hold_active == 0U) &&
-            (g_dac_test_follow_ui_active == 1U));
+            (g_analog_board_feedback_settled == 1U));
 }
 
 static void rotary_encoder_update_voltage(bool clockwise)

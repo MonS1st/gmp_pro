@@ -85,6 +85,7 @@ extern volatile uint32_t g_analog_board_ocp_transient_count;
 extern gmp_task_t task_analog_io_test;
 
 void analog_io_test_init(void);
+void analog_io_test_force_safe_outputs(void);
 gmp_task_status_t analog_io_test_task(gmp_task_t* tsk);
 
 #ifdef __cplusplus
