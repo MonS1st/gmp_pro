@@ -42,6 +42,11 @@ extern volatile uint32_t g_dac_test_apply_count;
 extern volatile uint32_t g_dac_test_reject_count;
 extern volatile float g_dac_test_voltage_expected_v;
 extern volatile float g_dac_test_current_expected_v;
+extern volatile uint16_t g_dac_test_follow_ui_enable;
+extern volatile uint16_t g_dac_test_follow_ui_active;
+extern volatile uint16_t g_dac_test_last_voltage_mv;
+extern volatile uint16_t g_dac_test_last_current_ma;
+extern volatile uint32_t g_dac_test_follow_update_count;
 
 extern gmp_task_t task_analog_io_test;
 

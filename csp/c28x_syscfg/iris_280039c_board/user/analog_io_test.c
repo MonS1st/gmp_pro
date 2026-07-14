@@ -1,5 +1,8 @@
 #include "analog_io_test.h"
 
+#include "power_app.h"
+#include "power_hal.h"
+
 #include <board.h>
 #include <ctrl_settings.h>
 #include <driverlib.h>
@@ -27,8 +30,14 @@ volatile uint32_t g_dac_test_apply_count = 0U;
 volatile uint32_t g_dac_test_reject_count = 0U;
 volatile float g_dac_test_voltage_expected_v = 0.0f;
 volatile float g_dac_test_current_expected_v = 0.0f;
+volatile uint16_t g_dac_test_follow_ui_enable = 0U;
+volatile uint16_t g_dac_test_follow_ui_active = 0U;
+volatile uint16_t g_dac_test_last_voltage_mv = 0U;
+volatile uint16_t g_dac_test_last_current_ma = 0U;
+volatile uint32_t g_dac_test_follow_update_count = 0U;
 
 static uint16_t s_dac_test_outputs_zeroed = 0U;
+static uint16_t s_dac_test_follow_ui_was_active = 0U;
 
 static float analog_io_test_dac_expected_v(uint16_t code)
 {
@@ -57,7 +66,9 @@ static void analog_io_test_force_dac_zero(void)
     g_dac_test_current_applied_code = 0U;
     g_dac_test_voltage_expected_v = 0.0f;
     g_dac_test_current_expected_v = 0.0f;
+    g_dac_test_follow_ui_active = 0U;
     s_dac_test_outputs_zeroed = 1U;
+    s_dac_test_follow_ui_was_active = 0U;
 }
 
 static void analog_io_test_copy_adc_diagnostics(void)
@@ -87,8 +98,44 @@ static void analog_io_test_reject_invalid_state(void)
     ++g_dac_test_reject_count;
     g_dac_test_arm = 0U;
     g_dac_test_enable = 0U;
+    g_dac_test_follow_ui_enable = 0U;
     g_dac_test_command = PSU_DAC_TEST_COMMAND_NONE;
     analog_io_test_force_dac_zero();
+}
+
+static void analog_io_test_process_follow_ui(void)
+{
+    uint16_t voltage_mv = power_app_get_voltage_mv();
+    uint16_t current_ma = power_app_get_current_ma();
+    uint16_t voltage_code;
+    uint16_t current_code;
+
+    // Synchronize once on mode entry, then write only when a UI setpoint changes.
+    if ((s_dac_test_follow_ui_was_active == 0U) ||
+        (voltage_mv != g_dac_test_last_voltage_mv) ||
+        (current_ma != g_dac_test_last_current_ma))
+    {
+        voltage_code = power_voltage_mv_to_dac(voltage_mv);
+        current_code = power_current_ma_to_dac(current_ma);
+
+        DAC_setShadowValue(IRIS_DACA_BASE, voltage_code);
+        DAC_setShadowValue(IRIS_DACB_BASE, current_code);
+
+        g_dac_test_voltage_applied_code = voltage_code;
+        g_dac_test_current_applied_code = current_code;
+        g_dac_test_voltage_expected_v =
+            analog_io_test_dac_expected_v(voltage_code);
+        g_dac_test_current_expected_v =
+            analog_io_test_dac_expected_v(current_code);
+        g_dac_test_last_voltage_mv = voltage_mv;
+        g_dac_test_last_current_ma = current_ma;
+        s_dac_test_outputs_zeroed =
+            ((voltage_code == 0U) && (current_code == 0U)) ? 1U : 0U;
+        ++g_dac_test_follow_update_count;
+    }
+
+    s_dac_test_follow_ui_was_active = 1U;
+    g_dac_test_follow_ui_active = 1U;
 }
 
 static void analog_io_test_process_dac_command(void)
@@ -97,10 +144,7 @@ static void analog_io_test_process_dac_command(void)
     uint16_t voltage_code;
     uint16_t current_code;
 
-    if ((g_dac_test_enable > 1U) ||
-        ((g_dac_test_arm != 0U) &&
-         (g_dac_test_arm != PSU_DAC_TEST_ARM_KEY)) ||
-        (command > PSU_DAC_TEST_COMMAND_CLEAR_AND_DISARM))
+    if (command > PSU_DAC_TEST_COMMAND_CLEAR_AND_DISARM)
     {
         analog_io_test_reject_invalid_state();
         return;
@@ -110,8 +154,19 @@ static void analog_io_test_process_dac_command(void)
     {
         analog_io_test_force_dac_zero();
         g_dac_test_arm = 0U;
+        g_dac_test_follow_ui_enable = 0U;
+        g_dac_test_follow_ui_active = 0U;
         g_dac_test_command = PSU_DAC_TEST_COMMAND_NONE;
         ++g_dac_test_apply_count;
+        return;
+    }
+
+    if ((g_dac_test_enable > 1U) ||
+        (g_dac_test_follow_ui_enable > 1U) ||
+        ((g_dac_test_arm != 0U) &&
+         (g_dac_test_arm != PSU_DAC_TEST_ARM_KEY)))
+    {
+        analog_io_test_reject_invalid_state();
         return;
     }
 
@@ -126,6 +181,20 @@ static void analog_io_test_process_dac_command(void)
         g_dac_test_command = PSU_DAC_TEST_COMMAND_NONE;
         return;
     }
+
+    if (g_dac_test_follow_ui_enable == 1U)
+    {
+        if (command != PSU_DAC_TEST_COMMAND_NONE)
+        {
+            ++g_dac_test_reject_count;
+            g_dac_test_command = PSU_DAC_TEST_COMMAND_NONE;
+        }
+        analog_io_test_process_follow_ui();
+        return;
+    }
+
+    g_dac_test_follow_ui_active = 0U;
+    s_dac_test_follow_ui_was_active = 0U;
 
     if (command == PSU_DAC_TEST_COMMAND_NONE)
     {
@@ -179,7 +248,13 @@ void analog_io_test_init(void)
     g_dac_test_command = PSU_DAC_TEST_COMMAND_NONE;
     g_dac_test_apply_count = 0U;
     g_dac_test_reject_count = 0U;
+    g_dac_test_follow_ui_enable = 0U;
+    g_dac_test_follow_ui_active = 0U;
+    g_dac_test_last_voltage_mv = 0U;
+    g_dac_test_last_current_ma = 0U;
+    g_dac_test_follow_update_count = 0U;
     s_dac_test_outputs_zeroed = 0U;
+    s_dac_test_follow_ui_was_active = 0U;
     analog_io_test_force_dac_zero();
 
 #if PSU_ENABLE_ANALOG_IO_TEST
