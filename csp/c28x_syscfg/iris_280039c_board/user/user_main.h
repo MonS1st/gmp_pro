@@ -140,6 +140,10 @@ extern volatile uint16_t g_oled_reset_control_available;
 extern volatile uint16_t g_oled_power_control_available;
 extern volatile uint32_t g_oled_reset_count;
 extern volatile uint32_t g_blocked_output_request_count;
+extern volatile uint16_t g_analog_board_voltage_meas_mv;
+extern volatile uint16_t g_analog_board_current_meas_ma;
+extern volatile uint16_t g_analog_board_real_feedback_active;
+extern volatile uint32_t g_analog_board_feedback_update_count;
 extern volatile uint16_t s_last_key_id;
 extern volatile uint16_t s_key_release_count;
 

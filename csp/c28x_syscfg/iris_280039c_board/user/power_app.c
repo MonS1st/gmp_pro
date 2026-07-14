@@ -6,16 +6,22 @@
 
 #include <ctrl_settings.h>
 #include <gmp_core.h>
-#if !PSU_SOFT_TEST_MODE
+#if !PSU_SOFT_TEST_MODE || \
+    (PSU_ENABLE_ANALOG_BOARD_BRINGUP && PSU_ANALOG_BOARD_USE_REAL_ADC)
 #include <xplt.peripheral.h>
 #endif
 
 volatile power_app_t g_power_app;
 volatile uint32_t g_blocked_output_request_count = 0U;
+volatile uint16_t g_analog_board_voltage_meas_mv = 0U;
+volatile uint16_t g_analog_board_current_meas_ma = 0U;
+volatile uint16_t g_analog_board_real_feedback_active = 0U;
+volatile uint32_t g_analog_board_feedback_update_count = 0U;
 static uint16_t s_last_voltage_set_mv;
 static uint16_t s_last_current_set_ma;
 
-#if !PSU_SOFT_TEST_MODE
+#if !PSU_SOFT_TEST_MODE || \
+    (PSU_ENABLE_ANALOG_BOARD_BRINGUP && PSU_ANALOG_BOARD_USE_REAL_ADC)
 static uint16_t power_float_to_u16(float value)
 {
     if (value <= 0.0f)
@@ -198,6 +204,10 @@ void power_app_init(void)
     g_power_app.fault_reset_requested = false;
     s_last_voltage_set_mv = g_power_app.voltage_set_mv;
     s_last_current_set_ma = g_power_app.current_set_ma;
+    g_analog_board_voltage_meas_mv = 0U;
+    g_analog_board_current_meas_ma = 0U;
+    g_analog_board_real_feedback_active = 0U;
+    g_analog_board_feedback_update_count = 0U;
 
     power_output_hw_set(false);
     power_dac_set_zero();
@@ -266,7 +276,8 @@ void power_app_fast_step(void)
     uint16_t voltage_meas_mv;
     uint16_t current_meas_ma;
     power_protection_result_t protection_result;
-#if PSU_SOFT_TEST_MODE
+#if PSU_SOFT_TEST_MODE && \
+    !(PSU_ENABLE_ANALOG_BOARD_BRINGUP && PSU_ANALOG_BOARD_USE_REAL_ADC)
     uint16_t virtual_voltage_mv;
     uint16_t virtual_current_ma;
 #endif
@@ -274,13 +285,23 @@ void power_app_fast_step(void)
     power_app_limit_commands();
     command_changed = power_app_check_command_change();
 
-#if PSU_SOFT_TEST_MODE
+#if PSU_ENABLE_ANALOG_BOARD_BRINGUP && PSU_ANALOG_BOARD_USE_REAL_ADC
+    g_power_app.voltage_meas_mv =
+        power_float_to_u16(g_vout_meas_v * 1000.0f);
+    g_power_app.current_meas_ma = power_float_to_u16(g_iout_meas_ma);
+    g_analog_board_voltage_meas_mv = g_power_app.voltage_meas_mv;
+    g_analog_board_current_meas_ma = g_power_app.current_meas_ma;
+    g_analog_board_real_feedback_active = 1U;
+    ++g_analog_board_feedback_update_count;
+#elif PSU_SOFT_TEST_MODE
+    g_analog_board_real_feedback_active = 0U;
     if (power_self_test_get_measurement(&virtual_voltage_mv, &virtual_current_ma))
     {
         g_power_app.voltage_meas_mv = virtual_voltage_mv;
         g_power_app.current_meas_ma = virtual_current_ma;
     }
 #else
+    g_analog_board_real_feedback_active = 0U;
     g_power_app.voltage_meas_mv = power_float_to_u16(g_vout_meas_v * 1000.0f);
     g_power_app.current_meas_ma = power_float_to_u16(g_iout_meas_ma);
 #endif

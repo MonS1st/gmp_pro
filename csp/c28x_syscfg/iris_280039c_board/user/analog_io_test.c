@@ -9,6 +9,15 @@
 #include <xplt.peripheral.h>
 
 #define PSU_ANALOG_IO_TEST_ADC_FULL_SCALE_CODE (4095.0f)
+#define PSU_ANALOG_BOARD_ADC_SATURATION_CODE   (4090U)
+
+#if PSU_ENABLE_ANALOG_BOARD_BRINGUP
+#define PSU_ANALOG_IO_ACTIVE_AUTO_FOLLOW_DELAY_MS \
+    PSU_ANALOG_BOARD_STARTUP_DELAY_MS
+#else
+#define PSU_ANALOG_IO_ACTIVE_AUTO_FOLLOW_DELAY_MS \
+    PSU_ANALOG_IO_AUTO_FOLLOW_DELAY_MS
+#endif
 
 volatile uint16_t g_adc_test_vout_raw = 0U;
 volatile uint16_t g_adc_test_iout_raw = 0U;
@@ -39,6 +48,16 @@ volatile uint16_t g_dac_test_auto_follow_pending = 0U;
 volatile uint16_t g_dac_test_auto_follow_completed = 0U;
 volatile uint32_t g_dac_test_auto_follow_count = 0U;
 volatile time_gt g_dac_test_auto_follow_start_tick = 0U;
+volatile uint32_t g_analog_board_voltage_clamp_count = 0U;
+volatile uint32_t g_analog_board_current_clamp_count = 0U;
+volatile uint16_t g_analog_board_applied_voltage_mv = 0U;
+volatile uint16_t g_analog_board_applied_current_ma = 0U;
+volatile uint32_t g_analog_board_fault_shutdown_count = 0U;
+volatile uint16_t g_analog_board_fault_shutdown_active = 0U;
+volatile uint16_t g_analog_board_feedback_fault = 0U;
+volatile uint32_t g_analog_board_feedback_fault_count = 0U;
+volatile uint16_t g_analog_board_last_vout_raw = 0U;
+volatile uint16_t g_analog_board_last_iout_raw = 0U;
 
 static uint16_t s_dac_test_outputs_zeroed = 0U;
 static uint16_t s_dac_test_follow_ui_was_active = 0U;
@@ -72,6 +91,8 @@ static void analog_io_test_force_dac_zero(void)
     g_dac_test_voltage_expected_v = 0.0f;
     g_dac_test_current_expected_v = 0.0f;
     g_dac_test_follow_ui_active = 0U;
+    g_analog_board_applied_voltage_mv = 0U;
+    g_analog_board_applied_current_ma = 0U;
     s_dac_test_outputs_zeroed = 1U;
     s_dac_test_follow_ui_was_active = 0U;
 }
@@ -108,13 +129,86 @@ static void analog_io_test_reject_invalid_state(void)
     analog_io_test_force_dac_zero();
 }
 
+static void analog_io_test_shutdown_board_outputs(void)
+{
+    // analog_io_test owns the real DACs in this profile; zero them directly.
+    analog_io_test_force_dac_zero();
+    g_dac_test_arm = 0U;
+    g_dac_test_follow_ui_enable = 0U;
+    g_dac_test_follow_ui_active = 0U;
+    g_dac_test_command = PSU_DAC_TEST_COMMAND_NONE;
+    s_dac_test_auto_follow_attempted = 1U;
+    g_dac_test_auto_follow_pending = 0U;
+}
+
+static uint16_t analog_io_test_handle_board_safety(void)
+{
+#if PSU_ENABLE_ANALOG_BOARD_BRINGUP
+    uint16_t vout_raw = g_adc_vout_raw;
+    uint16_t iout_raw = g_adc_iout_raw;
+    uint16_t feedback_fault_active;
+
+    g_analog_board_last_vout_raw = vout_raw;
+    g_analog_board_last_iout_raw = iout_raw;
+
+    feedback_fault_active =
+        ((vout_raw >= PSU_ANALOG_BOARD_ADC_SATURATION_CODE) ||
+         (iout_raw >= PSU_ANALOG_BOARD_ADC_SATURATION_CODE)) ? 1U : 0U;
+
+    if (feedback_fault_active != 0U)
+    {
+        if (g_analog_board_feedback_fault == 0U)
+        {
+            ++g_analog_board_feedback_fault_count;
+        }
+        g_analog_board_feedback_fault = 1U;
+    }
+    else
+    {
+        // A zero ADC code is valid at zero setpoint or with no load.
+        g_analog_board_feedback_fault = 0U;
+    }
+
+    if (g_power_app.fault_latched)
+    {
+        if (g_analog_board_fault_shutdown_active == 0U)
+        {
+            ++g_analog_board_fault_shutdown_count;
+        }
+        g_analog_board_fault_shutdown_active = 1U;
+    }
+    else
+    {
+        g_analog_board_fault_shutdown_active = 0U;
+    }
+
+    if ((feedback_fault_active != 0U) ||
+        (g_analog_board_fault_shutdown_active != 0U))
+    {
+        analog_io_test_shutdown_board_outputs();
+        return 1U;
+    }
+#endif
+
+    return 0U;
+}
+
 static void analog_io_test_try_auto_follow(void)
 {
 #if PSU_ANALOG_IO_AUTO_FOLLOW_ENABLE
+#if PSU_ENABLE_ANALOG_BOARD_BRINGUP
+    if (g_power_app.fault_latched ||
+        (g_adc_vout_raw >= PSU_ANALOG_BOARD_ADC_SATURATION_CODE) ||
+        (g_adc_iout_raw >= PSU_ANALOG_BOARD_ADC_SATURATION_CODE))
+    {
+        return;
+    }
+#endif
+
     if ((g_adc_test_enabled != 1U) ||
         (s_dac_test_auto_follow_attempted != 0U) ||
         !gmp_base_is_delay_elapsed(g_dac_test_auto_follow_start_tick,
-                                   PSU_ANALOG_IO_AUTO_FOLLOW_DELAY_MS))
+                                   PSU_ANALOG_IO_ACTIVE_AUTO_FOLLOW_DELAY_MS))
     {
         return;
     }
@@ -147,6 +241,25 @@ static void analog_io_test_process_follow_ui(void)
     uint16_t current_ma = power_app_get_current_ma();
     uint16_t voltage_code;
     uint16_t current_code;
+
+#if PSU_ENABLE_ANALOG_BOARD_BRINGUP
+    if (voltage_mv > PSU_ANALOG_BOARD_VOLTAGE_LIMIT_MV)
+    {
+        voltage_mv = PSU_ANALOG_BOARD_VOLTAGE_LIMIT_MV;
+        power_app_set_voltage_mv(voltage_mv);
+        ++g_analog_board_voltage_clamp_count;
+    }
+
+    if (current_ma > PSU_ANALOG_BOARD_CURRENT_LIMIT_MA)
+    {
+        current_ma = PSU_ANALOG_BOARD_CURRENT_LIMIT_MA;
+        power_app_set_current_ma(current_ma);
+        ++g_analog_board_current_clamp_count;
+    }
+
+    g_analog_board_applied_voltage_mv = voltage_mv;
+    g_analog_board_applied_current_ma = current_ma;
+#endif
 
     // Synchronize once on mode entry, then write only when a UI setpoint changes.
     if ((s_dac_test_follow_ui_was_active == 0U) ||
@@ -299,9 +412,21 @@ void analog_io_test_init(void)
     g_dac_test_auto_follow_completed = 0U;
     g_dac_test_auto_follow_count = 0U;
     g_dac_test_auto_follow_start_tick = gmp_base_get_system_tick();
+    g_analog_board_voltage_clamp_count = 0U;
+    g_analog_board_current_clamp_count = 0U;
+    g_analog_board_applied_voltage_mv = 0U;
+    g_analog_board_applied_current_ma = 0U;
+    g_analog_board_fault_shutdown_count = 0U;
+    g_analog_board_fault_shutdown_active = 0U;
+    g_analog_board_feedback_fault = 0U;
+    g_analog_board_feedback_fault_count = 0U;
+    g_analog_board_last_vout_raw = 0U;
+    g_analog_board_last_iout_raw = 0U;
     s_dac_test_outputs_zeroed = 0U;
     s_dac_test_follow_ui_was_active = 0U;
     s_dac_test_auto_follow_attempted = 0U;
+    power_app_set_voltage_mv(0U);
+    power_app_set_current_ma(0U);
     analog_io_test_force_dac_zero();
 
 #if PSU_ENABLE_ANALOG_IO_TEST
@@ -317,6 +442,10 @@ gmp_task_status_t analog_io_test_task(gmp_task_t* tsk)
 
 #if PSU_ENABLE_ANALOG_IO_TEST
     analog_io_test_copy_adc_diagnostics();
+    if (analog_io_test_handle_board_safety() != 0U)
+    {
+        return GMP_TASK_DONE;
+    }
     analog_io_test_process_dac_command();
     analog_io_test_try_auto_follow();
 #else
