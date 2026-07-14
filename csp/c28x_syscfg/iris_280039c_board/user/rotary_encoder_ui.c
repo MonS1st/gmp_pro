@@ -111,11 +111,23 @@ static void rotary_encoder_update_current(bool clockwise)
 {
     uint16_t current = power_app_get_current_ma();
     uint16_t limit = rotary_encoder_current_limit_ma();
+    uint16_t minimum = 0U;
     uint16_t next;
+
+#if PSU_ENABLE_ANALOG_BOARD_BRINGUP
+    if (power_app_get_voltage_mv() > 0U)
+    {
+        minimum = PSU_ANALOG_BOARD_MIN_CURRENT_MA;
+    }
+#endif
 
     if (current > limit)
     {
         current = limit;
+    }
+    if (current < minimum)
+    {
+        current = minimum;
     }
 
     if (clockwise)
@@ -127,8 +139,10 @@ static void rotary_encoder_update_current(bool clockwise)
     }
     else
     {
-        next = (current < PSU_CURRENT_STEP_MA) ?
-                   0U : (uint16_t)(current - PSU_CURRENT_STEP_MA);
+        next = ((uint32_t)PSU_CURRENT_STEP_MA >
+                ((uint32_t)current - (uint32_t)minimum)) ?
+                   minimum :
+                   (uint16_t)(current - PSU_CURRENT_STEP_MA);
     }
 
     if (next == power_app_get_current_ma())
