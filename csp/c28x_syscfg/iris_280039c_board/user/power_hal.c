@@ -9,6 +9,9 @@
 static volatile bool s_power_output_hw_enabled = false;
 static volatile bool s_power_output_hw_requested = false;
 static volatile bool s_power_output_hw_update_pending = true;
+static volatile bool s_power_output_hw_readback_pending = false;
+
+volatile uint16_t g_fpga_relay_r0_readback = 0xFFFFU;
 
 #define POWER_FPGA_RELAY_ADDR  (0x00U)
 
@@ -124,18 +127,30 @@ void power_output_hw_service(void)
     s_power_output_hw_requested = false;
     s_power_output_hw_enabled = false;
     s_power_output_hw_update_pending = false;
+    s_power_output_hw_readback_pending = false;
+    g_fpga_relay_r0_readback = 0U;
 #else
     bool requested;
 
-    if (!s_power_output_hw_update_pending)
+    if (s_power_output_hw_update_pending)
     {
+        requested = s_power_output_hw_requested;
+        s_power_output_hw_update_pending = false;
+        SPI_writeReg(POWER_FPGA_RELAY_ADDR, requested ? 0x0001U : 0x0000U);
+        s_power_output_hw_enabled = requested;
+
+        // Read back on the next service call instead of immediately after the
+        // write. This keeps the diagnostic from recreating the prior
+        // back-to-back SPI write/read timing problem.
+        s_power_output_hw_readback_pending = true;
         return;
     }
 
-    requested = s_power_output_hw_requested;
-    s_power_output_hw_update_pending = false;
-    SPI_writeReg(POWER_FPGA_RELAY_ADDR, requested ? 0x0001U : 0x0000U);
-    s_power_output_hw_enabled = requested;
+    if (s_power_output_hw_readback_pending)
+    {
+        s_power_output_hw_readback_pending = false;
+        g_fpga_relay_r0_readback = SPI_readReg(POWER_FPGA_RELAY_ADDR);
+    }
 #endif
 }
 
