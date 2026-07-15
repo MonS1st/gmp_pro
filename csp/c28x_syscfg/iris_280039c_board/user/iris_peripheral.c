@@ -1446,8 +1446,12 @@ gmp_task_status_t oled_show_task(gmp_task_t* tsk)
 
     if ((display_mode != s_oled_last_mode) ||
         (using_test_data != s_oled_last_using_test_data) ||
-        (control_strategy != s_oled_last_control_strategy) ||
-        (output_state != s_oled_last_output_state))
+        (control_strategy != s_oled_last_control_strategy))
+    {
+        g_oled_pending_mask |= OLED_PENDING_MODE_STATUS;
+    }
+
+    if (output_state != s_oled_last_output_state)
     {
         g_oled_pending_mask |= OLED_PENDING_MODE_STATUS |
                                OLED_PENDING_OUTPUT_STATE;
