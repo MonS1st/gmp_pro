@@ -155,7 +155,8 @@ static void power_app_clear_mode_confirmation(void)
 static bool power_app_physical_output_forbidden(void)
 {
     return PSU_SAFE_BRINGUP || !PSU_ALLOW_OUTPUT_REQUEST ||
-           !PSU_ALLOW_PHYSICAL_OUTPUT_ENABLE;
+           !PSU_ALLOW_PHYSICAL_OUTPUT_ENABLE ||
+           !PSU_OUTPUT_SWITCH_PHYSICAL_RELAY_ENABLE;
 }
 
 static bool power_app_output_switch_fault_active(void)
@@ -196,7 +197,8 @@ static void power_app_output_switch_set_off(power_state_t state)
     g_output_switch_precharge_complete = 0U;
     g_output_switch_requested = 0U;
     g_output_switch_precharge_start_tick = 0U;
-    g_output_switch_physical_relay_available = 0U;
+    g_output_switch_physical_relay_available =
+        PSU_OUTPUT_SWITCH_PHYSICAL_RELAY_ENABLE ? 1U : 0U;
     g_output_switch_relay_command = 0U;
 
     g_power_app.output_requested = false;
@@ -254,9 +256,8 @@ void power_app_output_switch_policy_reset(void)
 static void power_app_update_output_switch(void)
 {
 #if PSU_ENABLE_LOGICAL_OUTPUT_SWITCH
-    g_output_switch_physical_relay_available = 0U;
-    g_output_switch_relay_command = 0U;
-    power_output_hw_set(false);
+    g_output_switch_physical_relay_available =
+        PSU_OUTPUT_SWITCH_PHYSICAL_RELAY_ENABLE ? 1U : 0U;
 
     if (power_app_output_switch_fault_active())
     {
@@ -267,6 +268,9 @@ static void power_app_update_output_switch(void)
 
     if (g_output_switch_precharge_active != 0U)
     {
+        g_output_switch_relay_command = 0U;
+        power_output_hw_set(false);
+
         if (g_output_switch_requested == 0U)
         {
             power_app_output_switch_set_off(POWER_STATE_OFF);
@@ -281,6 +285,25 @@ static void power_app_update_output_switch(void)
             g_output_switch_precharge_complete = 1U;
             g_output_switch_dac_gate_active = 1U;
             g_power_app.output_requested = true;
+            power_output_hw_set(true);
+            power_output_hw_service();
+
+            if (power_app_output_switch_fault_active())
+            {
+                power_app_output_switch_fault_shutdown();
+                analog_io_test_force_safe_outputs();
+                return;
+            }
+
+            if (!power_output_hw_get())
+            {
+                ++g_output_switch_reject_count;
+                power_app_output_switch_set_off(POWER_STATE_OFF);
+                analog_io_test_force_safe_outputs();
+                return;
+            }
+
+            g_output_switch_relay_command = 1U;
             g_power_app.output_enabled = true;
             g_power_app.state = POWER_STATE_CV;
             g_output_switch_active = 1U;
@@ -296,12 +319,27 @@ static void power_app_update_output_switch(void)
         {
             power_app_output_switch_set_off(POWER_STATE_OFF);
             analog_io_test_force_safe_outputs();
+            return;
         }
+
+        if (!power_output_hw_get())
+        {
+            ++g_output_switch_reject_count;
+            power_app_output_switch_set_off(POWER_STATE_OFF);
+            analog_io_test_force_safe_outputs();
+            return;
+        }
+
+        g_output_switch_relay_command = 1U;
+        g_power_app.output_requested = true;
+        g_power_app.output_enabled = true;
         return;
     }
 
     if (g_output_switch_requested == 0U)
     {
+        g_output_switch_relay_command = 0U;
+        power_output_hw_set(false);
         g_power_app.output_requested = false;
         g_power_app.output_enabled = false;
         g_power_app.state = POWER_STATE_OFF;
@@ -320,6 +358,8 @@ static void power_app_update_output_switch(void)
     g_output_switch_precharge_complete = 0U;
     g_output_switch_dac_gate_active = 0U;
     g_output_switch_active = 0U;
+    g_output_switch_relay_command = 0U;
+    power_output_hw_set(false);
     g_power_app.output_requested = false;
     g_power_app.output_enabled = false;
     g_power_app.state = POWER_STATE_STARTING;
@@ -504,7 +544,8 @@ void power_app_init(void)
     g_output_switch_precharge_active = 0U;
     g_output_switch_precharge_complete = 0U;
     g_output_switch_dac_gate_active = 0U;
-    g_output_switch_physical_relay_available = 0U;
+    g_output_switch_physical_relay_available =
+        PSU_OUTPUT_SWITCH_PHYSICAL_RELAY_ENABLE ? 1U : 0U;
     g_output_switch_relay_command = 0U;
     g_output_switch_toggle_count = 0U;
     g_output_switch_enable_count = 0U;
@@ -975,6 +1016,8 @@ void power_app_fast_step(void)
 
 void power_app_slow_step(void)
 {
+    power_output_hw_service();
+
 #if PSU_SOFT_TEST_MODE
     power_self_test_step();
 #endif

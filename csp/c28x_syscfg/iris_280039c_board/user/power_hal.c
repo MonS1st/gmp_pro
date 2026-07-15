@@ -1,10 +1,20 @@
 #include "power_hal.h"
 
+#include <gmp_core.h>
+#include <xplt.peripheral.h>
 #include <ctrl_settings.h>
 #include <driverlib.h>
 #include <board.h>
 
 static volatile bool s_power_output_hw_enabled = false;
+static volatile bool s_power_output_hw_requested = false;
+static volatile bool s_power_output_hw_update_pending = true;
+
+static uint16_t s_fpga_r1_shadow = 0U;
+static bool s_fpga_r1_shadow_valid = false;
+
+#define POWER_FPGA_R1_ADDR               (0x01U)
+#define POWER_FPGA_R1_RELAY_ALLOW_MASK   (0x0010U)
 
 #if !PSU_ENABLE_ANALOG_IO_TEST
 static void power_dac_force_physical_zero(void)
@@ -90,23 +100,92 @@ void power_dac_set_zero(void)
 #endif
 }
 
+bool power_fpga_r1_write_masked(uint16_t mask, uint16_t value)
+{
+    uint16_t updated_value;
+
+    if (!s_fpga_r1_shadow_valid)
+    {
+        s_fpga_r1_shadow = SPI_readReg(POWER_FPGA_R1_ADDR);
+        s_fpga_r1_shadow_valid = true;
+    }
+
+    updated_value = (s_fpga_r1_shadow & (uint16_t)(~mask)) |
+                    (value & mask);
+    if (updated_value == s_fpga_r1_shadow)
+    {
+        return true;
+    }
+
+    SPI_writeReg(POWER_FPGA_R1_ADDR, updated_value);
+    s_fpga_r1_shadow = SPI_readReg(POWER_FPGA_R1_ADDR);
+
+    return s_fpga_r1_shadow == updated_value;
+}
+
 void power_output_hw_set(bool enable)
 {
-#if PSU_SAFE_BRINGUP || !PSU_ALLOW_PHYSICAL_OUTPUT_ENABLE
-    // The relay, MOSFET, and gate-enable pins are unconfirmed. Do not touch a
-    // GPIO in safe bringup, regardless of the requested software state.
+#if PSU_SAFE_BRINGUP || !PSU_ALLOW_PHYSICAL_OUTPUT_ENABLE || \
+    !PSU_OUTPUT_SWITCH_PHYSICAL_RELAY_ENABLE
     (void)enable;
+    s_power_output_hw_requested = false;
     s_power_output_hw_enabled = false;
 #else
-    // TODO: Bind this software state to the confirmed relay or MOSFET enable pin.
-    // No GPIO is touched until the hardware output-enable connection is known.
-    s_power_output_hw_enabled = enable;
+    if (enable != s_power_output_hw_requested)
+    {
+        s_power_output_hw_requested = enable;
+        s_power_output_hw_update_pending = true;
+    }
+
+    if (!enable)
+    {
+        s_power_output_hw_enabled = false;
+    }
+#endif
+}
+
+void power_output_hw_service(void)
+{
+#if PSU_SAFE_BRINGUP || !PSU_ALLOW_PHYSICAL_OUTPUT_ENABLE || \
+    !PSU_OUTPUT_SWITCH_PHYSICAL_RELAY_ENABLE
+    s_power_output_hw_requested = false;
+    s_power_output_hw_enabled = false;
+    s_power_output_hw_update_pending = false;
+#else
+    bool requested;
+    bool update_ok;
+
+    if (!s_power_output_hw_update_pending)
+    {
+        return;
+    }
+
+    requested = s_power_output_hw_requested;
+    s_power_output_hw_update_pending = false;
+    update_ok = power_fpga_r1_write_masked(
+        POWER_FPGA_R1_RELAY_ALLOW_MASK,
+        requested ? POWER_FPGA_R1_RELAY_ALLOW_MASK : 0U);
+
+    // A fast-loop fault may revoke the request while the background SPI
+    // transaction is in progress. Never report enabled, and restore cutoff.
+    if (requested && (!update_ok || !s_power_output_hw_requested))
+    {
+        (void)power_fpga_r1_write_masked(
+            POWER_FPGA_R1_RELAY_ALLOW_MASK, 0U);
+        s_power_output_hw_requested = false;
+        s_power_output_hw_update_pending = false;
+        s_power_output_hw_enabled = false;
+        return;
+    }
+
+    s_power_output_hw_enabled = requested && update_ok;
 #endif
 }
 
 bool power_output_hw_get(void)
 {
-#if PSU_SAFE_BRINGUP || !PSU_ALLOW_PHYSICAL_OUTPUT_ENABLE
+#if PSU_SAFE_BRINGUP || !PSU_ALLOW_PHYSICAL_OUTPUT_ENABLE || \
+    !PSU_OUTPUT_SWITCH_PHYSICAL_RELAY_ENABLE
     s_power_output_hw_enabled = false;
     return false;
 #else

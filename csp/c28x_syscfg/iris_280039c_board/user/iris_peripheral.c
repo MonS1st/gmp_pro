@@ -9,6 +9,7 @@
 #include "analog_io_test.h"
 #include "power_app.h"
 #include "power_control_policy.h"
+#include "power_hal.h"
 #include "power_mode_monitor.h"
 #include "power_settings_store.h"
 #include "user_main.h"
@@ -1767,12 +1768,14 @@ gmp_task_status_t fpga_test_task(gmp_task_t* tsk)
     if (led_stat == 0)
     {
         led_stat = 1;
-        SPI_writeReg(0x01, 0x0003);
+        (void)power_fpga_r1_write_masked(
+            POWER_FPGA_R1_LED_MASK, 0x0003U);
     }
     else
     {
         led_stat = 0;
-        SPI_writeReg(0x01, 0x0000);
+        (void)power_fpga_r1_write_masked(
+            POWER_FPGA_R1_LED_MASK, 0x0000U);
     }
 
     SPI_writeReg(0x03, 0x00FF);

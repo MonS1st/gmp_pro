@@ -188,15 +188,15 @@
 
 #define PSU_ALLOW_PHYSICAL_DAC              (1)
 #define PSU_ALLOW_PHYSICAL_PWM              (0)
-#define PSU_ALLOW_PHYSICAL_OUTPUT_ENABLE    (0)
-#define PSU_ALLOW_OUTPUT_REQUEST            (0)
+#define PSU_ALLOW_PHYSICAL_OUTPUT_ENABLE    (1)
+#define PSU_ALLOW_OUTPUT_REQUEST            (1)
 
 #define PSU_ENABLE_BEEP                     (0)
 
 #define PSU_ENABLE_LOGICAL_OUTPUT_SWITCH        (1)
 #define PSU_OUTPUT_SWITCH_PRECHARGE_MS          (100U)
 #define PSU_OUTPUT_SWITCH_REQUIRE_SETTLED       (1)
-#define PSU_OUTPUT_SWITCH_PHYSICAL_RELAY_ENABLE (0)
+#define PSU_OUTPUT_SWITCH_PHYSICAL_RELAY_ENABLE (1)
 
 #endif
 
@@ -216,8 +216,9 @@
 #error "SAFE_BRINGUP forbids all physical power-output permissions"
 #endif
 
-#if PSU_OUTPUT_SWITCH_PHYSICAL_RELAY_ENABLE != 0
-#error "Logical output-switch test must not enable an unconfirmed physical relay"
+#if PSU_OUTPUT_SWITCH_PHYSICAL_RELAY_ENABLE && \
+    ((!PSU_ALLOW_PHYSICAL_OUTPUT_ENABLE) || (!PSU_ALLOW_OUTPUT_REQUEST))
+#error "Physical relay requires both output-enable and output-request permissions"
 #endif
 
 //=================================================================================================
