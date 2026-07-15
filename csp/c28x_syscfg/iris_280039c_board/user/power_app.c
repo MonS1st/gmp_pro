@@ -1,6 +1,7 @@
 #include "power_app.h"
 
 #include "analog_io_test.h"
+#include "power_control_policy.h"
 #include "power_hal.h"
 #include "power_protection.h"
 #include "power_self_test.h"
@@ -162,6 +163,8 @@ static bool power_app_output_switch_fault_active(void)
     return g_power_app.fault_latched ||
            (g_analog_board_feedback_fault != 0U) ||
            (g_analog_board_fault_hold_active != 0U) ||
+           (g_analog_board_fault_shutdown_active != 0U) ||
+           power_control_policy_fault_active() ||
            (g_power_app.state == POWER_STATE_FAULT);
 }
 
@@ -227,6 +230,24 @@ void power_app_output_switch_fault_shutdown(void)
 
     g_power_app.fault_reset_requested = false;
     power_app_output_switch_set_off(POWER_STATE_FAULT);
+#endif
+}
+
+void power_app_output_switch_policy_shutdown(void)
+{
+#if PSU_ENABLE_LOGICAL_OUTPUT_SWITCH
+    g_power_app.fault_reset_requested = false;
+    power_app_output_switch_set_off(POWER_STATE_FAULT);
+    analog_io_test_force_safe_outputs();
+#endif
+}
+
+void power_app_output_switch_policy_reset(void)
+{
+#if PSU_ENABLE_LOGICAL_OUTPUT_SWITCH
+    g_power_app.fault_reset_requested = false;
+    power_app_output_switch_set_off(POWER_STATE_OFF);
+    analog_io_test_force_safe_outputs();
 #endif
 }
 
@@ -328,6 +349,7 @@ static bool power_app_check_command_change(void)
     return false;
 }
 
+#if PSU_REAL_FEEDBACK_CONNECTED
 static void power_app_update_mode(void)
 {
     uint16_t voltage_meas_mv;
@@ -401,6 +423,7 @@ static void power_app_update_mode(void)
         }
     }
 }
+#endif
 
 static void power_app_set_output_off(power_state_t state)
 {
@@ -591,7 +614,9 @@ void power_app_fast_step(void)
 #if PSU_REAL_FEEDBACK_CONNECTED
     bool protection_enabled;
 #endif
+#if PSU_REAL_FEEDBACK_CONNECTED
     bool update_mode = false;
+#endif
     uint16_t voltage_meas_mv;
     uint16_t current_meas_ma;
     power_protection_result_t protection_result;
@@ -675,6 +700,10 @@ void power_app_fast_step(void)
             power_app_output_switch_fault_shutdown();
             analog_io_test_force_safe_outputs();
         }
+        else if (power_control_policy_fault_active())
+        {
+            power_app_output_switch_policy_shutdown();
+        }
         else if ((g_output_switch_active != 0U) ||
                  (g_output_switch_precharge_active != 0U) ||
                  (g_output_switch_dac_gate_active != 0U))
@@ -715,6 +744,12 @@ void power_app_fast_step(void)
             return;
         }
 
+        if (power_control_policy_fault_active())
+        {
+            power_app_output_switch_policy_shutdown();
+            return;
+        }
+
         g_power_app.fault_reset_requested = false;
         g_power_app.output_requested = (g_output_switch_active != 0U);
         g_power_app.output_enabled = (g_output_switch_active != 0U);
@@ -729,7 +764,9 @@ void power_app_fast_step(void)
             }
             if (!command_changed)
             {
+#if PSU_REAL_FEEDBACK_CONNECTED
                 power_app_update_mode();
+#endif
             }
         }
         else if (g_output_switch_precharge_active != 0U)
@@ -742,6 +779,14 @@ void power_app_fast_step(void)
             g_power_app.state = POWER_STATE_OFF;
             power_app_clear_mode_confirmation();
         }
+        return;
+    }
+#endif
+
+#if PSU_ENABLE_LOGICAL_OUTPUT_SWITCH
+    if (power_control_policy_fault_active())
+    {
+        power_app_output_switch_policy_shutdown();
         return;
     }
 #endif
@@ -903,7 +948,9 @@ void power_app_fast_step(void)
         g_power_app.output_enabled = power_output_hw_get();
         if (g_power_app.output_enabled)
         {
+#if PSU_REAL_FEEDBACK_CONNECTED
             update_mode = true;
+#endif
         }
         else
         {
@@ -917,10 +964,12 @@ void power_app_fast_step(void)
         break;
     }
 
+#if PSU_REAL_FEEDBACK_CONNECTED
         if (update_mode && !command_changed)
         {
             power_app_update_mode();
         }
+#endif
     }
 }
 

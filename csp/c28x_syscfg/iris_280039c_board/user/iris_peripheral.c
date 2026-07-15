@@ -8,6 +8,7 @@
 #include "ctl_main.h"
 #include "analog_io_test.h"
 #include "power_app.h"
+#include "power_control_policy.h"
 #include "power_mode_monitor.h"
 #include "user_main.h"
 #include <stdio.h>
@@ -70,6 +71,9 @@ static uint16_t s_oled_last_feedback_fault = 0xFFFFU;
 static uint16_t s_oled_last_mode = 0xFFFFU;
 static uint16_t s_oled_last_feedback_valid = 0xFFFFU;
 static uint16_t s_oled_last_using_test_data = 0xFFFFU;
+static uint16_t s_oled_last_control_strategy = 0xFFFFU;
+static uint16_t s_oled_last_policy_fault = 0xFFFFU;
+static uint16_t s_oled_last_policy_fault_latched = 0xFFFFU;
 static uint16_t s_key_consecutive_timeout_count = 0U;
 static uint16_t s_i2c_recovery_ht_stage = 0U;
 
@@ -587,6 +591,7 @@ static bool power_ui_is_mapped_key(uint16_t key_id)
     case PSU_KEY_CURRENT_DOWN_ID:
     case PSU_KEY_OUTPUT_TOGGLE_ID:
     case PSU_KEY_FAULT_RESET_ID:
+    case PSU_KEY_CONTROL_STRATEGY_ID:
         return true;
 
     default:
@@ -622,6 +627,8 @@ static bool power_ui_execute_key_action(uint16_t key_id)
     uint16_t limit;
     uint16_t minimum;
     uint32_t next;
+    psu_control_strategy_t strategy;
+    psu_control_strategy_t next_strategy;
     bool action_executed = true;
 
     if (((key_id == PSU_KEY_VOLTAGE_UP_ID) ||
@@ -701,6 +708,24 @@ static bool power_ui_execute_key_action(uint16_t key_id)
 
     case PSU_KEY_FAULT_RESET_ID:
         power_app_reset_fault();
+        power_control_policy_request_reset();
+        break;
+
+    case PSU_KEY_CONTROL_STRATEGY_ID:
+        strategy = power_control_policy_get_strategy();
+        if (strategy == PSU_CONTROL_STRATEGY_AUTO)
+        {
+            next_strategy = PSU_CONTROL_STRATEGY_CV_ONLY;
+        }
+        else if (strategy == PSU_CONTROL_STRATEGY_CV_ONLY)
+        {
+            next_strategy = PSU_CONTROL_STRATEGY_CC_ONLY;
+        }
+        else
+        {
+            next_strategy = PSU_CONTROL_STRATEGY_AUTO;
+        }
+        (void)power_control_policy_set_strategy(next_strategy);
         break;
 
     default:
@@ -1228,6 +1253,10 @@ gmp_task_status_t oled_show_task(gmp_task_t* tsk)
     uint16_t display_mode;
     uint16_t feedback_valid;
     uint16_t using_test_data;
+    uint16_t control_strategy;
+    uint16_t policy_fault;
+    uint16_t policy_fault_latched;
+    uint16_t hard_fault_active;
     ec_gt ret;
 #endif
     GMP_UNUSED_VAR(tsk);
@@ -1377,9 +1406,28 @@ gmp_task_status_t oled_show_task(gmp_task_t* tsk)
         voltage_meas_mv = g_power_app.voltage_meas_mv;
         current_meas_ma = g_power_app.current_meas_ma;
     }
-    output_state = g_power_app.fault_latched ? 1U : 0U;
+    if (g_output_switch_precharge_active != 0U)
+    {
+        output_state = 1U;
+    }
+    else if (g_output_switch_active != 0U)
+    {
+        output_state = 2U;
+    }
+    else
+    {
+        output_state = 0U;
+    }
     output_fault = (uint16_t)g_power_app.fault;
-    feedback_fault = g_analog_board_feedback_fault;
+    feedback_fault = ((g_analog_board_feedback_fault != 0U) ||
+                      (g_analog_board_fault_hold_active != 0U) ||
+                      (g_analog_board_fault_shutdown_active != 0U)) ? 1U : 0U;
+    hard_fault_active = (g_power_app.fault_latched ||
+                         (g_power_app.fault != POWER_FAULT_NONE) ||
+                         (feedback_fault != 0U)) ? 1U : 0U;
+    control_strategy = g_control_strategy;
+    policy_fault = g_control_policy_fault;
+    policy_fault_latched = g_control_policy_fault_latched;
 
     if ((voltage_set_mv != s_oled_last_voltage_mv) ||
         (current_set_ma != s_oled_last_current_ma))
@@ -1397,7 +1445,9 @@ gmp_task_status_t oled_show_task(gmp_task_t* tsk)
     }
 
     if ((display_mode != s_oled_last_mode) ||
-        (using_test_data != s_oled_last_using_test_data))
+        (using_test_data != s_oled_last_using_test_data) ||
+        (control_strategy != s_oled_last_control_strategy) ||
+        (output_state != s_oled_last_output_state))
     {
         g_oled_pending_mask |= OLED_PENDING_MODE_STATUS |
                                OLED_PENDING_OUTPUT_STATE;
@@ -1405,7 +1455,9 @@ gmp_task_status_t oled_show_task(gmp_task_t* tsk)
 
     if ((output_state != s_oled_last_output_state) ||
         (output_fault != s_oled_last_output_fault) ||
-        (feedback_fault != s_oled_last_feedback_fault))
+        (feedback_fault != s_oled_last_feedback_fault) ||
+        (policy_fault != s_oled_last_policy_fault) ||
+        (policy_fault_latched != s_oled_last_policy_fault_latched))
     {
         g_oled_pending_mask |= OLED_PENDING_OUTPUT_STATE;
     }
@@ -1423,7 +1475,7 @@ gmp_task_status_t oled_show_task(gmp_task_t* tsk)
     // Commit at most one pending line per scheduled OLED task.
     if ((g_oled_pending_mask & OLED_PENDING_OUTPUT_STATE) != 0U)
     {
-        if (display_mode == (uint16_t)PSU_MODE_DISPLAY_FAULT)
+        if (hard_fault_active != 0U)
         {
             if (output_fault == (uint16_t)POWER_FAULT_OVERVOLTAGE)
             {
@@ -1442,6 +1494,23 @@ gmp_task_status_t oled_show_task(gmp_task_t* tsk)
                 (void)snprintf(line4, sizeof(line4), "FAULT           ");
             }
         }
+        else if (policy_fault_latched != 0U)
+        {
+            if (policy_fault ==
+                (uint16_t)PSU_POLICY_FAULT_CV_REGULATION_LOST)
+            {
+                (void)snprintf(line4, sizeof(line4), "CV REG LOST     ");
+            }
+            else if (policy_fault ==
+                     (uint16_t)PSU_POLICY_FAULT_CC_REGULATION_LOST)
+            {
+                (void)snprintf(line4, sizeof(line4), "CC REG LOST     ");
+            }
+            else
+            {
+                (void)snprintf(line4, sizeof(line4), "POLICY FAULT    ");
+            }
+        }
         else
         {
             (void)snprintf(line4, sizeof(line4), "READY           ");
@@ -1453,39 +1522,50 @@ gmp_task_status_t oled_show_task(gmp_task_t* tsk)
             s_oled_last_output_state = output_state;
             s_oled_last_output_fault = output_fault;
             s_oled_last_feedback_fault = feedback_fault;
+            s_oled_last_policy_fault = policy_fault;
+            s_oled_last_policy_fault_latched = policy_fault_latched;
             g_oled_pending_mask &=
                 (uint16_t)(~OLED_PENDING_OUTPUT_STATE);
         }
     }
     else if ((g_oled_pending_mask & OLED_PENDING_MODE_STATUS) != 0U)
     {
-        switch ((psu_mode_display_t)display_mode)
+        const char *actual_text;
+        const char *strategy_text;
+        const char *test_mark;
+
+        strategy_text = power_control_policy_strategy_text(
+            (psu_control_strategy_t)control_strategy);
+        if (display_mode == (uint16_t)PSU_MODE_DISPLAY_CV)
         {
-        case PSU_MODE_DISPLAY_START:
-            (void)snprintf(line3, sizeof(line3), "OUT START MODE--");
-            break;
-        case PSU_MODE_DISPLAY_NO_FEEDBACK:
-            (void)snprintf(line3, sizeof(line3), "OUT ON MODE --  ");
-            break;
-        case PSU_MODE_DISPLAY_CV:
+            actual_text = "CV";
+        }
+        else if (display_mode == (uint16_t)PSU_MODE_DISPLAY_CC)
+        {
+            actual_text = "CC";
+        }
+        else
+        {
+            actual_text = "--";
+        }
+        test_mark = ((using_test_data != 0U) &&
+                     ((display_mode == (uint16_t)PSU_MODE_DISPLAY_CV) ||
+                      (display_mode == (uint16_t)PSU_MODE_DISPLAY_CC))) ?
+                        "*" : " ";
+
+        if (output_state == 1U)
+        {
+            (void)snprintf(line3, sizeof(line3), "START %-4s ACT--",
+                           strategy_text);
+        }
+        else
+        {
             (void)snprintf(line3, sizeof(line3),
-                           (using_test_data != 0U) ?
-                               "OUT ON MODE CV* " :
-                               "OUT ON MODE CV  ");
-            break;
-        case PSU_MODE_DISPLAY_CC:
-            (void)snprintf(line3, sizeof(line3),
-                           (using_test_data != 0U) ?
-                               "OUT ON MODE CC* " :
-                               "OUT ON MODE CC  ");
-            break;
-        case PSU_MODE_DISPLAY_FAULT:
-            (void)snprintf(line3, sizeof(line3), "OUT OFF MODE FLT");
-            break;
-        case PSU_MODE_DISPLAY_OFF:
-        default:
-            (void)snprintf(line3, sizeof(line3), "OUT OFF MODE -- ");
-            break;
+                           "%-3s %-4s ACT%s%s ",
+                           (output_state == 2U) ? "ON" : "OFF",
+                           strategy_text,
+                           actual_text,
+                           test_mark);
         }
 
         ret = oled_show_line_checked(0U, 4U, line3);
@@ -1493,6 +1573,7 @@ gmp_task_status_t oled_show_task(gmp_task_t* tsk)
         {
             s_oled_last_mode = display_mode;
             s_oled_last_using_test_data = using_test_data;
+            s_oled_last_control_strategy = control_strategy;
             g_oled_pending_mask &= (uint16_t)(~OLED_PENDING_MODE_STATUS);
         }
     }

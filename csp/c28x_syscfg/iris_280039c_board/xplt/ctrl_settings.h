@@ -95,6 +95,7 @@
 #define PSU_KEY_CURRENT_DOWN_ID         (4U)
 #define PSU_KEY_OUTPUT_TOGGLE_ID        (5U)
 #define PSU_KEY_FAULT_RESET_ID          (6U)
+#define PSU_KEY_CONTROL_STRATEGY_ID      (7U)
 
 #define PSU_VOLTAGE_STEP_MV             (100U)
 #define PSU_CURRENT_STEP_MA             (1U)
@@ -164,6 +165,12 @@
 #define PSU_MODE_MONITOR_TASK_PERIOD_MS               (10U)
 #define PSU_MODE_MONITOR_CONFIRM_COUNT                (5U)
 #define PSU_MODE_MONITOR_TEST_INJECTION               (1)
+#define PSU_CONTROL_POLICY_ENABLE                     (1)
+#define PSU_CONTROL_POLICY_TASK_PERIOD_MS             (10U)
+#define PSU_CONTROL_POLICY_MISMATCH_CONFIRM_COUNT     (10U)
+#define PSU_CONTROL_POLICY_DEFAULT_STRATEGY \
+    PSU_CONTROL_STRATEGY_AUTO
+#define PSU_CONTROL_POLICY_TEST_TRIP_ENABLE           (1)
 #define PSU_ENABLE_CONSOLE_UI              (1)
 #define PSU_ENABLE_MANUAL_COMMAND          (1)
 

@@ -77,6 +77,8 @@ uint16_t power_app_get_current_ma(void);
 void power_app_request_output(bool enable);
 void power_app_request_logical_output(bool enable);
 void power_app_output_switch_fault_shutdown(void);
+void power_app_output_switch_policy_shutdown(void);
+void power_app_output_switch_policy_reset(void);
 void power_app_reset_fault(void);
 void power_app_fast_step(void);
 void power_app_slow_step(void);

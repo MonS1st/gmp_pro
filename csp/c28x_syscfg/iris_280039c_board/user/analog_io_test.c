@@ -567,9 +567,11 @@ static void analog_io_test_process_dac_command(void)
 #if PSU_ENABLE_ANALOG_BOARD_BRINGUP
     uint16_t write_voltage;
     uint16_t write_current;
+#if PSU_ENABLE_LOW_RANGE_BRINGUP_LIMITS
     uint16_t min_current_code;
     uint16_t resulting_voltage_code;
     uint16_t resulting_current_code;
+#endif
 #endif
 
     if (command > PSU_DAC_TEST_COMMAND_CLEAR_AND_DISARM)
@@ -605,6 +607,32 @@ static void analog_io_test_process_dac_command(void)
         g_dac_test_command = PSU_DAC_TEST_COMMAND_NONE;
         return;
     }
+
+#if PSU_ENABLE_LOGICAL_OUTPUT_SWITCH
+    if (g_output_switch_precharge_active != 0U)
+    {
+        analog_io_test_apply_output_precharge(
+            power_app_get_current_ma());
+        if (command != PSU_DAC_TEST_COMMAND_NONE)
+        {
+            ++g_dac_test_reject_count;
+            g_dac_test_command = PSU_DAC_TEST_COMMAND_NONE;
+        }
+        return;
+    }
+
+    if ((g_output_switch_active != 1U) ||
+        (g_output_switch_dac_gate_active != 1U))
+    {
+        analog_io_test_apply_inactive_outputs();
+        if (command != PSU_DAC_TEST_COMMAND_NONE)
+        {
+            ++g_dac_test_reject_count;
+            g_dac_test_command = PSU_DAC_TEST_COMMAND_NONE;
+        }
+        return;
+    }
+#endif
 
     if (g_dac_test_follow_ui_enable == 1U)
     {
@@ -642,6 +670,7 @@ static void analog_io_test_process_dac_command(void)
     write_current = ((command == PSU_DAC_TEST_COMMAND_WRITE_DACB) ||
                      (command == PSU_DAC_TEST_COMMAND_WRITE_BOTH)) ? 1U : 0U;
 
+#if PSU_ENABLE_LOW_RANGE_BRINGUP_LIMITS
     min_current_code =
         power_current_ma_to_dac(PSU_ANALOG_BOARD_MIN_CURRENT_MA);
     resulting_voltage_code = (write_voltage != 0U) ?
@@ -657,6 +686,7 @@ static void analog_io_test_process_dac_command(void)
         write_current = 1U;
         ++g_analog_board_min_current_clamp_count;
     }
+#endif
     if (write_current != 0U)
     {
         DAC_setShadowValue(IRIS_DACB_BASE, current_code);
