@@ -119,6 +119,7 @@
 #define PSU_HT16K33_DISPLAY_INITIAL_DELAY_MS      (250U)
 #define PSU_OLED_TASK_PERIOD_MS                   (100U)
 #define PSU_OLED_TASK_INITIAL_DELAY_MS            (100U)
+#define PSU_USE_INCREMENTAL_OLED_UI                (1)
 
 #define PSU_I2C_TIMEOUT_TRIGGER_COUNT              (3U)
 #define PSU_I2C_RECOVERY_INITIAL_DELAY_MS          (100U)

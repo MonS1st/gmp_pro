@@ -1250,7 +1250,7 @@ gmp_task_status_t tsk_key_flush(gmp_task_t* tsk)
 
 gmp_task_status_t oled_show_task(gmp_task_t* tsk)
 {
-#if PSU_SAFE_BRINGUP
+#if PSU_USE_INCREMENTAL_OLED_UI
     char line1[20];
     char line2[20];
     char line3[20];
@@ -1279,7 +1279,7 @@ gmp_task_status_t oled_show_task(gmp_task_t* tsk)
         return GMP_TASK_DONE;
     }
 
-#if PSU_SAFE_BRINGUP
+#if PSU_USE_INCREMENTAL_OLED_UI
     switch (g_oled_init_state)
     {
     case OLED_INIT_WAIT_POWER:
