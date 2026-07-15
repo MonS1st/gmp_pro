@@ -40,38 +40,24 @@ static uint32_t s_encoder_previous_position = 0U;
 
 static uint16_t rotary_encoder_voltage_limit_mv(void)
 {
-    uint16_t limit = PSU_VOLTAGE_CMD_MAX_MV;
-
-#if PSU_ENABLE_ANALOG_BOARD_BRINGUP
-    if (limit > PSU_ANALOG_BOARD_VOLTAGE_LIMIT_MV)
-    {
-        limit = PSU_ANALOG_BOARD_VOLTAGE_LIMIT_MV;
-    }
-#endif
-
-    return limit;
+    return PSU_COMMAND_VOLTAGE_LIMIT_MV;
 }
 
 static uint16_t rotary_encoder_current_limit_ma(void)
 {
-    uint16_t limit = PSU_CURRENT_CMD_MAX_MA;
-
-#if PSU_ENABLE_ANALOG_BOARD_BRINGUP
-    if (limit > PSU_ANALOG_BOARD_CURRENT_LIMIT_MA)
-    {
-        limit = PSU_ANALOG_BOARD_CURRENT_LIMIT_MA;
-    }
-#endif
-
-    return limit;
+    return PSU_COMMAND_CURRENT_LIMIT_MA;
 }
 
 static bool rotary_encoder_setpoint_change_allowed(void)
 {
-    return ((g_power_app.fault_latched == 0) &&
+    return ((g_power_app.fault_latched == 0)
+#if PSU_REAL_FEEDBACK_CONNECTED
+            &&
             (g_analog_board_feedback_fault == 0U) &&
             (g_analog_board_fault_hold_active == 0U) &&
-            (g_analog_board_feedback_settled == 1U));
+            (g_analog_board_feedback_settled == 1U)
+#endif
+            );
 }
 
 static void rotary_encoder_update_voltage(bool clockwise)
@@ -115,7 +101,7 @@ static void rotary_encoder_update_current(bool clockwise)
     uint16_t minimum = 0U;
     uint16_t next;
 
-#if PSU_ENABLE_ANALOG_BOARD_BRINGUP
+#if PSU_ENABLE_LOW_RANGE_BRINGUP_LIMITS
     if (power_app_get_voltage_mv() > 0U)
     {
         minimum = PSU_ANALOG_BOARD_MIN_CURRENT_MA;

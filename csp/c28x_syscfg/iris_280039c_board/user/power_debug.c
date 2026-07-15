@@ -40,8 +40,9 @@ void power_debug_process_command(void)
     case POWER_DEBUG_CMD_VOLTAGE_UP:
         current = power_app_get_voltage_mv();
         next = (uint32_t)current + (uint32_t)PSU_VOLTAGE_STEP_MV;
-        power_app_set_voltage_mv((next > PSU_VOLTAGE_CMD_MAX_MV) ?
-                                     PSU_VOLTAGE_CMD_MAX_MV : (uint16_t)next);
+        power_app_set_voltage_mv((next > PSU_COMMAND_VOLTAGE_LIMIT_MV) ?
+                                     PSU_COMMAND_VOLTAGE_LIMIT_MV :
+                                     (uint16_t)next);
         power_ui_request_led_setpoint_update_from_command();
         break;
 
@@ -55,8 +56,9 @@ void power_debug_process_command(void)
     case POWER_DEBUG_CMD_CURRENT_UP:
         current = power_app_get_current_ma();
         next = (uint32_t)current + (uint32_t)PSU_CURRENT_STEP_MA;
-        power_app_set_current_ma((next > PSU_CURRENT_CMD_MAX_MA) ?
-                                     PSU_CURRENT_CMD_MAX_MA : (uint16_t)next);
+        power_app_set_current_ma((next > PSU_COMMAND_CURRENT_LIMIT_MA) ?
+                                     PSU_COMMAND_CURRENT_LIMIT_MA :
+                                     (uint16_t)next);
         power_ui_request_led_setpoint_update_from_command();
         break;
 

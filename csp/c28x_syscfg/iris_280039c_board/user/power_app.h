@@ -46,6 +46,7 @@ typedef struct
 } power_app_t;
 
 extern volatile power_app_t g_power_app;
+extern volatile uint16_t g_analog_board_real_feedback_active;
 
 extern volatile uint16_t g_output_switch_requested;
 extern volatile uint16_t g_output_switch_active;

@@ -44,7 +44,7 @@ uint16_t power_current_ma_to_dac(uint16_t current_ma)
         limited_ma = PSU_CURRENT_CMD_MAX_MA;
     }
 
-    // V_ISET(mV) = 20 * I_cmd(mA); DAC code = V_ISET / 3300 mV * 4096.
+    // V_ISET(mV) = 22 * I_cmd(mA); DAC code = V_ISET / 3300 mV * 4096.
     code = limited_ma * PSU_ISET_GAIN_MV_PER_MA * PSU_DAC_CODE_SCALE / PSU_DAC_VREF_MV;
     return power_limit_dac_code(code);
 }

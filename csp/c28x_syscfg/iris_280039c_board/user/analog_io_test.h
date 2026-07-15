@@ -14,7 +14,7 @@ extern "C"
 
 #define PSU_DAC_TEST_ARM_KEY                    (0xA55AU)
 #define PSU_DAC_TEST_VOLTAGE_MAX_CODE           (3103U)
-#define PSU_DAC_TEST_CURRENT_MAX_CODE           (2482U)
+#define PSU_DAC_TEST_CURRENT_MAX_CODE           (2731U)
 
 #define PSU_DAC_TEST_COMMAND_NONE               (0U)
 #define PSU_DAC_TEST_COMMAND_WRITE_DACA         (1U)

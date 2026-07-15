@@ -7,6 +7,7 @@
 // user main header
 #include "ctl_main.h"
 #include "analog_io_test.h"
+#include "power_mode_monitor.h"
 #include "rotary_encoder_ui.h"
 #include "user_main.h"
 #include <stdlib.h>
@@ -353,6 +354,10 @@ static gmp_task_t task_startup =
     {"startup", tsk_startup, 250, 0, 1, NULL};
 static gmp_task_t task_power_app =
     {"power_app", tsk_power_app, 1, 0, 1, NULL};
+static gmp_task_t task_power_mode_monitor =
+    {"mode_monitor", power_mode_monitor_task,
+     PSU_MODE_MONITOR_TASK_PERIOD_MS, 0,
+     PSU_MODE_MONITOR_ENABLE, NULL};
 static gmp_task_t task_power_command =
     {"power_cmd", tsk_power_debug_command, 10, 0,
      PSU_ENABLE_MANUAL_COMMAND, NULL};
@@ -372,6 +377,7 @@ static gmp_task_t *const tasks[] = {
     &task_analog_io_test,
     &task_rotary_encoder_ui,
     &task_power_app,
+    &task_power_mode_monitor,
     &task_power_command,
     &task_power_console,
 };
@@ -386,6 +392,7 @@ void init(void) GMP_NO_OPT_SUFFIX
 
     analog_io_test_init();
     rotary_encoder_ui_init();
+    power_mode_monitor_init();
 
     // init scheduler
     gmp_scheduler_init(&sched);

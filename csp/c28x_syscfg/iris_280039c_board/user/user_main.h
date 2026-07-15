@@ -151,6 +151,8 @@ extern volatile uint16_t s_key_release_count;
 #define OLED_PENDING_CURRENT (1U << 1)
 #define OLED_PENDING_KEY     (1U << 2)
 #define OLED_PENDING_OUTPUT_STATE (1U << 3)
+#define OLED_PENDING_MODE_STATUS (1U << 4)
+#define OLED_PENDING_FEEDBACK_STATUS (1U << 5)
 
 #define OLED_INIT_WAIT_POWER  (0U)
 #define OLED_INIT_PROBE_3C    (1U)

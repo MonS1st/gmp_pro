@@ -8,7 +8,8 @@
 #include <ctrl_settings.h>
 #include <gmp_core.h>
 #if !PSU_SOFT_TEST_MODE || \
-    (PSU_ENABLE_ANALOG_BOARD_BRINGUP && PSU_ANALOG_BOARD_USE_REAL_ADC)
+    (PSU_ENABLE_ANALOG_BOARD_BRINGUP && PSU_ANALOG_BOARD_USE_REAL_ADC && \
+     PSU_REAL_FEEDBACK_CONNECTED)
 #include <xplt.peripheral.h>
 #endif
 
@@ -40,7 +41,8 @@ static uint16_t s_last_voltage_set_mv;
 static uint16_t s_last_current_set_ma;
 
 #if !PSU_SOFT_TEST_MODE || \
-    (PSU_ENABLE_ANALOG_BOARD_BRINGUP && PSU_ANALOG_BOARD_USE_REAL_ADC)
+    (PSU_ENABLE_ANALOG_BOARD_BRINGUP && PSU_ANALOG_BOARD_USE_REAL_ADC && \
+     PSU_REAL_FEEDBACK_CONNECTED)
 static uint16_t power_float_to_u16(float value)
 {
     if (value <= 0.0f)
@@ -55,7 +57,8 @@ static uint16_t power_float_to_u16(float value)
 }
 #endif
 
-#if PSU_ENABLE_ANALOG_BOARD_BRINGUP && PSU_ANALOG_BOARD_USE_REAL_ADC
+#if PSU_ENABLE_ANALOG_BOARD_BRINGUP && PSU_ANALOG_BOARD_USE_REAL_ADC && \
+    PSU_REAL_FEEDBACK_CONNECTED
 static power_protection_result_t power_app_update_analog_board_protection(
     uint16_t voltage_mv,
     uint16_t current_ma)
@@ -132,13 +135,13 @@ static power_protection_result_t power_app_update_analog_board_protection(
 
 static void power_app_limit_commands(void)
 {
-    if (g_power_app.voltage_set_mv > PSU_VOLTAGE_CMD_MAX_MV)
+    if (g_power_app.voltage_set_mv > PSU_COMMAND_VOLTAGE_LIMIT_MV)
     {
-        g_power_app.voltage_set_mv = PSU_VOLTAGE_CMD_MAX_MV;
+        g_power_app.voltage_set_mv = PSU_COMMAND_VOLTAGE_LIMIT_MV;
     }
-    if (g_power_app.current_set_ma > PSU_CURRENT_CMD_MAX_MA)
+    if (g_power_app.current_set_ma > PSU_COMMAND_CURRENT_LIMIT_MA)
     {
-        g_power_app.current_set_ma = PSU_CURRENT_CMD_MAX_MA;
+        g_power_app.current_set_ma = PSU_COMMAND_CURRENT_LIMIT_MA;
     }
 }
 
@@ -172,7 +175,7 @@ static bool power_app_output_switch_ready(void)
         return false;
     }
 
-#if PSU_OUTPUT_SWITCH_REQUIRE_SETTLED
+#if PSU_OUTPUT_SWITCH_REQUIRE_SETTLED && PSU_REAL_FEEDBACK_CONNECTED
     if (g_analog_board_feedback_settled != 1U)
     {
         return false;
@@ -443,7 +446,7 @@ static void power_app_apply_commands(void)
 void power_app_init(void)
 {
     g_power_app.voltage_set_mv = 0U;
-#if PSU_ENABLE_ANALOG_BOARD_BRINGUP
+#if PSU_ENABLE_LOW_RANGE_BRINGUP_LIMITS
     g_power_app.current_set_ma = PSU_ANALOG_BOARD_MIN_CURRENT_MA;
 #else
     g_power_app.current_set_ma = 0U;
@@ -495,14 +498,16 @@ void power_app_init(void)
 
 void power_app_set_voltage_mv(uint16_t voltage_mv)
 {
-    g_power_app.voltage_set_mv = (voltage_mv > PSU_VOLTAGE_CMD_MAX_MV) ?
-                                     PSU_VOLTAGE_CMD_MAX_MV : voltage_mv;
+    g_power_app.voltage_set_mv =
+        (voltage_mv > PSU_COMMAND_VOLTAGE_LIMIT_MV) ?
+            PSU_COMMAND_VOLTAGE_LIMIT_MV : voltage_mv;
 }
 
 void power_app_set_current_ma(uint16_t current_ma)
 {
-    g_power_app.current_set_ma = (current_ma > PSU_CURRENT_CMD_MAX_MA) ?
-                                     PSU_CURRENT_CMD_MAX_MA : current_ma;
+    g_power_app.current_set_ma =
+        (current_ma > PSU_COMMAND_CURRENT_LIMIT_MA) ?
+            PSU_COMMAND_CURRENT_LIMIT_MA : current_ma;
 }
 
 uint16_t power_app_get_voltage_mv(void)
@@ -583,13 +588,16 @@ void power_app_reset_fault(void)
 void power_app_fast_step(void)
 {
     bool command_changed;
+#if PSU_REAL_FEEDBACK_CONNECTED
     bool protection_enabled;
+#endif
     bool update_mode = false;
     uint16_t voltage_meas_mv;
     uint16_t current_meas_ma;
     power_protection_result_t protection_result;
 #if PSU_SOFT_TEST_MODE && \
-    !(PSU_ENABLE_ANALOG_BOARD_BRINGUP && PSU_ANALOG_BOARD_USE_REAL_ADC)
+    !(PSU_ENABLE_ANALOG_BOARD_BRINGUP && PSU_ANALOG_BOARD_USE_REAL_ADC && \
+      PSU_REAL_FEEDBACK_CONNECTED)
     uint16_t virtual_voltage_mv;
     uint16_t virtual_current_ma;
 #endif
@@ -597,7 +605,8 @@ void power_app_fast_step(void)
     power_app_limit_commands();
     command_changed = power_app_check_command_change();
 
-#if PSU_ENABLE_ANALOG_BOARD_BRINGUP && PSU_ANALOG_BOARD_USE_REAL_ADC
+#if PSU_ENABLE_ANALOG_BOARD_BRINGUP && PSU_ANALOG_BOARD_USE_REAL_ADC && \
+    PSU_REAL_FEEDBACK_CONNECTED
     g_power_app.voltage_meas_mv =
         power_float_to_u16(g_vout_meas_v * 1000.0f);
     g_power_app.current_meas_ma = power_float_to_u16(g_iout_meas_ma);
@@ -618,7 +627,8 @@ void power_app_fast_step(void)
     g_power_app.current_meas_ma = power_float_to_u16(g_iout_meas_ma);
 #endif
 
-#if PSU_ENABLE_ANALOG_BOARD_BRINGUP && PSU_ANALOG_BOARD_USE_REAL_ADC
+#if PSU_ENABLE_ANALOG_BOARD_BRINGUP && PSU_ANALOG_BOARD_USE_REAL_ADC && \
+    PSU_REAL_FEEDBACK_CONNECTED
     voltage_meas_mv = g_power_app.voltage_meas_mv;
     current_meas_ma = g_power_app.current_meas_ma;
     if (!g_power_app.fault_latched)
@@ -643,7 +653,7 @@ void power_app_fast_step(void)
     }
 #endif
 
-#if PSU_ENABLE_ANALOG_BOARD_BRINGUP
+#if PSU_ENABLE_ANALOG_BOARD_BRINGUP && PSU_REAL_FEEDBACK_CONNECTED
     if (g_analog_board_feedback_settled != 1U)
     {
         voltage_meas_mv = g_power_app.voltage_meas_mv;
@@ -771,13 +781,16 @@ void power_app_fast_step(void)
         else
         {
             g_power_app.fault_reset_requested = false;
-#if PSU_ENABLE_ANALOG_BOARD_BRINGUP && PSU_ANALOG_BOARD_USE_REAL_ADC
+#if PSU_REAL_FEEDBACK_CONNECTED && PSU_ENABLE_ANALOG_BOARD_BRINGUP && \
+    PSU_ANALOG_BOARD_USE_REAL_ADC
             // The dedicated 20 kHz bring-up filter already ran above.
             protection_result = POWER_PROTECTION_RESULT_NONE;
-#else
+#elif PSU_REAL_FEEDBACK_CONNECTED
             protection_result = power_protection_step(voltage_meas_mv,
                                                       current_meas_ma,
                                                       true);
+#else
+            protection_result = POWER_PROTECTION_RESULT_NONE;
 #endif
             if (protection_result == POWER_PROTECTION_RESULT_OVERVOLTAGE)
             {
@@ -837,16 +850,21 @@ void power_app_fast_step(void)
         return;
     }
 
+#if PSU_REAL_FEEDBACK_CONNECTED
     protection_enabled = (g_power_app.state == POWER_STATE_STARTING) ||
                          (g_power_app.state == POWER_STATE_CV) ||
                          (g_power_app.state == POWER_STATE_CC);
-#if PSU_ENABLE_ANALOG_BOARD_BRINGUP && PSU_ANALOG_BOARD_USE_REAL_ADC
+#endif
+#if PSU_REAL_FEEDBACK_CONNECTED && PSU_ENABLE_ANALOG_BOARD_BRINGUP && \
+    PSU_ANALOG_BOARD_USE_REAL_ADC
     // The dedicated 20 kHz bring-up filter already ran above.
     protection_result = POWER_PROTECTION_RESULT_NONE;
-#else
+#elif PSU_REAL_FEEDBACK_CONNECTED
     protection_result = power_protection_step(voltage_meas_mv,
                                               current_meas_ma,
                                               protection_enabled);
+#else
+    protection_result = POWER_PROTECTION_RESULT_NONE;
 #endif
 
     if (protection_result == POWER_PROTECTION_RESULT_OVERVOLTAGE)

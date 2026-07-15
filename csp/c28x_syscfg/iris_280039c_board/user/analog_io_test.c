@@ -156,9 +156,9 @@ static void analog_io_test_apply_output_precharge(uint16_t current_ma)
     {
         current_ma = PSU_ANALOG_BOARD_MIN_CURRENT_MA;
     }
-    if (current_ma > PSU_ANALOG_BOARD_CURRENT_LIMIT_MA)
+    if (current_ma > PSU_COMMAND_CURRENT_LIMIT_MA)
     {
-        current_ma = PSU_ANALOG_BOARD_CURRENT_LIMIT_MA;
+        current_ma = PSU_COMMAND_CURRENT_LIMIT_MA;
     }
 
     current_code = power_current_ma_to_dac(current_ma);
@@ -273,7 +273,7 @@ static uint16_t analog_io_test_update_protection_grace(void)
 
 static uint16_t analog_io_test_update_feedback_settle(void)
 {
-#if PSU_ENABLE_ANALOG_BOARD_BRINGUP
+#if PSU_ENABLE_ANALOG_BOARD_BRINGUP && PSU_REAL_FEEDBACK_CONNECTED
     if (g_analog_board_feedback_settled == 1U)
     {
         return 1U;
@@ -356,7 +356,7 @@ static void analog_io_test_shutdown_board_outputs(void)
 
 static uint16_t analog_io_test_handle_board_safety(void)
 {
-#if PSU_ENABLE_ANALOG_BOARD_BRINGUP
+#if PSU_ENABLE_ANALOG_BOARD_BRINGUP && PSU_REAL_FEEDBACK_CONNECTED
     uint16_t vout_raw = g_adc_vout_raw;
     uint16_t iout_raw = g_adc_iout_raw;
     uint16_t adc_saturated;
@@ -426,15 +426,20 @@ static void analog_io_test_try_auto_follow(void)
 #if PSU_ENABLE_ANALOG_BOARD_BRINGUP
     if ((g_analog_board_iset_precharge_complete != 1U) ||
         (g_analog_board_protection_grace_active != 0U) ||
-        (g_analog_board_feedback_settled != 1U) ||
+        g_power_app.fault_latched)
+    {
+        return;
+    }
+#if PSU_REAL_FEEDBACK_CONNECTED
+    if ((g_analog_board_feedback_settled != 1U) ||
         (g_analog_board_fault_hold_active != 0U) ||
         (g_analog_board_feedback_fault != 0U) ||
-        g_power_app.fault_latched ||
         (g_adc_vout_raw >= PSU_ANALOG_BOARD_ADC_SATURATION_CODE) ||
         (g_adc_iout_raw >= PSU_ANALOG_BOARD_ADC_SATURATION_CODE))
     {
         return;
     }
+#endif
 #endif
 
     if ((g_adc_test_enabled != 1U) ||
@@ -475,20 +480,21 @@ static void analog_io_test_process_follow_ui(void)
     uint16_t current_code;
 
 #if PSU_ENABLE_ANALOG_BOARD_BRINGUP
-    if (voltage_mv > PSU_ANALOG_BOARD_VOLTAGE_LIMIT_MV)
+    if (voltage_mv > PSU_COMMAND_VOLTAGE_LIMIT_MV)
     {
-        voltage_mv = PSU_ANALOG_BOARD_VOLTAGE_LIMIT_MV;
+        voltage_mv = PSU_COMMAND_VOLTAGE_LIMIT_MV;
         power_app_set_voltage_mv(voltage_mv);
         ++g_analog_board_voltage_clamp_count;
     }
 
-    if (current_ma > PSU_ANALOG_BOARD_CURRENT_LIMIT_MA)
+    if (current_ma > PSU_COMMAND_CURRENT_LIMIT_MA)
     {
-        current_ma = PSU_ANALOG_BOARD_CURRENT_LIMIT_MA;
+        current_ma = PSU_COMMAND_CURRENT_LIMIT_MA;
         power_app_set_current_ma(current_ma);
         ++g_analog_board_current_clamp_count;
     }
 
+#if PSU_ENABLE_LOW_RANGE_BRINGUP_LIMITS
     if ((voltage_mv > 0U) &&
         (current_ma < PSU_ANALOG_BOARD_MIN_CURRENT_MA))
     {
@@ -496,6 +502,7 @@ static void analog_io_test_process_follow_ui(void)
         power_app_set_current_ma(current_ma);
         ++g_analog_board_min_current_clamp_count;
     }
+#endif
 
 #if PSU_ENABLE_LOGICAL_OUTPUT_SWITCH
     if (g_output_switch_precharge_active != 0U)
@@ -555,6 +562,8 @@ static void analog_io_test_process_dac_command(void)
     uint16_t command = g_dac_test_command;
     uint16_t voltage_code;
     uint16_t current_code;
+    uint16_t voltage_limit_code;
+    uint16_t current_limit_code;
 #if PSU_ENABLE_ANALOG_BOARD_BRINGUP
     uint16_t write_voltage;
     uint16_t write_current;
@@ -616,10 +625,16 @@ static void analog_io_test_process_dac_command(void)
         return;
     }
 
+    voltage_limit_code = analog_io_test_limit_code(
+        power_voltage_mv_to_dac(PSU_COMMAND_VOLTAGE_LIMIT_MV),
+        PSU_DAC_TEST_VOLTAGE_MAX_CODE);
+    current_limit_code = analog_io_test_limit_code(
+        power_current_ma_to_dac(PSU_COMMAND_CURRENT_LIMIT_MA),
+        PSU_DAC_TEST_CURRENT_MAX_CODE);
     voltage_code = analog_io_test_limit_code(
-        g_dac_test_voltage_code, PSU_DAC_TEST_VOLTAGE_MAX_CODE);
+        g_dac_test_voltage_code, voltage_limit_code);
     current_code = analog_io_test_limit_code(
-        g_dac_test_current_code, PSU_DAC_TEST_CURRENT_MAX_CODE);
+        g_dac_test_current_code, current_limit_code);
 
 #if PSU_ENABLE_ANALOG_BOARD_BRINGUP
     write_voltage = ((command == PSU_DAC_TEST_COMMAND_WRITE_DACA) ||
@@ -742,13 +757,16 @@ void analog_io_test_init(void)
     s_dac_test_follow_ui_was_active = 0U;
     s_dac_test_auto_follow_attempted = 0U;
     power_app_set_voltage_mv(0U);
-#if PSU_ENABLE_ANALOG_BOARD_BRINGUP
+#if PSU_ENABLE_LOW_RANGE_BRINGUP_LIMITS
     power_app_set_current_ma(PSU_ANALOG_BOARD_MIN_CURRENT_MA);
+#else
+    power_app_set_current_ma(0U);
+#endif
+#if PSU_ENABLE_ANALOG_BOARD_BRINGUP
     g_analog_board_iset_precharge_active = 1U;
     ++g_analog_board_iset_precharge_count;
     s_analog_board_iset_precharge_start_tick = gmp_base_get_system_tick();
 #else
-    power_app_set_current_ma(0U);
     s_analog_board_iset_precharge_start_tick = 0U;
 #endif
     analog_io_test_apply_inactive_outputs();
