@@ -66,7 +66,7 @@ MEMORY
 //   FLASH_BANK1_SEC15 : origin = 0x09F000, length = 0x001000
 
   /* BANK 2 */
-   FLASH_BANK2       : origin = 0x0A0000, length = 0x00FFF0
+   FLASH_BANK2       : origin = 0x0A0000, length = 0x00E000
 //   FLASH_BANK2_SEC0  : origin = 0x0A0000, length = 0x001000
 //   FLASH_BANK2_SEC1  : origin = 0x0A1000, length = 0x001000
 //   FLASH_BANK2_SEC2  : origin = 0x0A2000, length = 0x001000
@@ -81,10 +81,10 @@ MEMORY
 //   FLASH_BANK2_SEC11 : origin = 0x0AB000, length = 0x001000
 //   FLASH_BANK2_SEC12 : origin = 0x0AC000, length = 0x001000
 //   FLASH_BANK2_SEC13 : origin = 0x0AD000, length = 0x001000
-//   FLASH_BANK2_SEC14 : origin = 0x0AE000, length = 0x001000
-//   FLASH_BANK2_SEC15 : origin = 0x0AF000, length = 0x000FF0
+   FLASH_SETTINGS    : origin = 0x0AE000, length = 0x001000
+   FLASH_BANK2_SEC15 : origin = 0x0AF000, length = 0x000FF0
 
-// FLASH_BANK0_SEC15_RSVD     : origin = 0x0AFFF0, length = 0x000010  /* Reserve and do not use for code as per the errata advisory "Memory: Prefetching Beyond Valid Memory" */
+// FLASH_BANK2_SEC15_RSVD     : origin = 0x0AFFF0, length = 0x000010  /* Reserve and do not use for code as per the errata advisory "Memory: Prefetching Beyond Valid Memory" */
 
    CLA1_MSGRAMLOW   : origin = 0x001480, length = 0x000080
    CLA1_MSGRAMHIGH  : origin = 0x001500, length = 0x000080
@@ -125,8 +125,12 @@ SECTIONS
    IQmath           : > FLASH_BANK0_SEC1, ALIGN(8)
    IQmathTables     : > FLASH_BANK0_SEC2, ALIGN(8)
 
-   .TI.ramfunc      : LOAD = FLASH_BANK0_SEC1,
-                      RUN = RAMLS0,
+   GROUP
+   {
+      .TI.ramfunc
+      { -l FAPI_F28003x_EABI_v1.58.10.lib }
+   }                  LOAD = FLASH_BANK0_SEC1,
+                      RUN = RAMGS2,
                       LOAD_START(RamfuncsLoadStart),
                       LOAD_SIZE(RamfuncsLoadSize),
                       LOAD_END(RamfuncsLoadEnd),

@@ -54,6 +54,7 @@
 									<listOptionValue builtIn="false" value="${COM_TI_C2000WARE_INSTALL_DIR}/device_support/f28003x/headers/include"/>
 									<listOptionValue builtIn="false" value="${COM_TI_C2000WARE_INSTALL_DIR}/device_support/f28003x/common/include"/>
 									<listOptionValue builtIn="false" value="${COM_TI_C2000WARE_INSTALL_DIR}/driverlib/f28003x/driverlib/"/>
+									<listOptionValue builtIn="false" value="${COM_TI_C2000WARE_INSTALL_DIR}/libraries/flash_api/f28003x/include/FlashAPI"/>
 								</option>
 								<option id="com.ti.ccstudio.buildDefinitions.C2000_22.6.compilerID.DEBUGGING_MODEL.673129913" name="Debugging model" superClass="com.ti.ccstudio.buildDefinitions.C2000_22.6.compilerID.DEBUGGING_MODEL" value="com.ti.ccstudio.buildDefinitions.C2000_22.6.compilerID.DEBUGGING_MODEL.SYMDEBUG__DWARF" valueType="enumerated"/>
 								<option IS_BUILTIN_EMPTY="false" IS_VALUE_EMPTY="false" id="com.ti.ccstudio.buildDefinitions.C2000_22.6.compilerID.DIAG_WARNING.1663855667" name="Treat diagnostic &lt;id&gt; as warning (--diag_warning, -pdsw)" superClass="com.ti.ccstudio.buildDefinitions.C2000_22.6.compilerID.DIAG_WARNING" valueType="stringList">
@@ -93,6 +94,7 @@
 									<listOptionValue builtIn="false" value="${COM_TI_COM_GMP_CORE_C28X_SDK_LIBRARY_PATH}"/>
 									<listOptionValue builtIn="false" value="${CG_TOOL_ROOT}/lib"/>
 									<listOptionValue builtIn="false" value="${CG_TOOL_ROOT}/include"/>
+									<listOptionValue builtIn="false" value="${COM_TI_C2000WARE_INSTALL_DIR}/libraries/flash_api/f28003x/lib"/>
 								</option>
 								<option id="com.ti.ccstudio.buildDefinitions.C2000_22.6.linkerID.DIAG_WRAP.739860578" name="Wrap diagnostic messages (--diag_wrap) [deprecated]" superClass="com.ti.ccstudio.buildDefinitions.C2000_22.6.linkerID.DIAG_WRAP" value="com.ti.ccstudio.buildDefinitions.C2000_22.6.linkerID.DIAG_WRAP.off" valueType="enumerated"/>
 								<option id="com.ti.ccstudio.buildDefinitions.C2000_22.6.linkerID.DISPLAY_ERROR_NUMBER.2068852905" name="Emit diagnostic identifier numbers (--display_error_number)" superClass="com.ti.ccstudio.buildDefinitions.C2000_22.6.linkerID.DISPLAY_ERROR_NUMBER" value="true" valueType="boolean"/>

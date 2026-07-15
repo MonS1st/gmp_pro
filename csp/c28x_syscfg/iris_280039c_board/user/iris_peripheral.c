@@ -10,6 +10,7 @@
 #include "power_app.h"
 #include "power_control_policy.h"
 #include "power_mode_monitor.h"
+#include "power_settings_store.h"
 #include "user_main.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -74,6 +75,7 @@ static uint16_t s_oled_last_using_test_data = 0xFFFFU;
 static uint16_t s_oled_last_control_strategy = 0xFFFFU;
 static uint16_t s_oled_last_policy_fault = 0xFFFFU;
 static uint16_t s_oled_last_policy_fault_latched = 0xFFFFU;
+static uint16_t s_oled_last_settings_result = 0xFFFFU;
 static uint16_t s_key_consecutive_timeout_count = 0U;
 static uint16_t s_i2c_recovery_ht_stage = 0U;
 
@@ -592,6 +594,7 @@ static bool power_ui_is_mapped_key(uint16_t key_id)
     case PSU_KEY_OUTPUT_TOGGLE_ID:
     case PSU_KEY_FAULT_RESET_ID:
     case PSU_KEY_CONTROL_STRATEGY_ID:
+    case PSU_KEY_SETTINGS_SAVE_ID:
         return true;
 
     default:
@@ -630,6 +633,11 @@ static bool power_ui_execute_key_action(uint16_t key_id)
     psu_control_strategy_t strategy;
     psu_control_strategy_t next_strategy;
     bool action_executed = true;
+
+    if (key_id != PSU_KEY_SETTINGS_SAVE_ID)
+    {
+        g_settings_result = PSU_SETTINGS_RESULT_IDLE;
+    }
 
     if (((key_id == PSU_KEY_VOLTAGE_UP_ID) ||
          (key_id == PSU_KEY_VOLTAGE_DOWN_ID) ||
@@ -726,6 +734,10 @@ static bool power_ui_execute_key_action(uint16_t key_id)
             next_strategy = PSU_CONTROL_STRATEGY_AUTO;
         }
         (void)power_control_policy_set_strategy(next_strategy);
+        break;
+
+    case PSU_KEY_SETTINGS_SAVE_ID:
+        power_settings_store_request_save();
         break;
 
     default:
@@ -1256,6 +1268,7 @@ gmp_task_status_t oled_show_task(gmp_task_t* tsk)
     uint16_t control_strategy;
     uint16_t policy_fault;
     uint16_t policy_fault_latched;
+    uint16_t settings_result;
     uint16_t hard_fault_active;
     ec_gt ret;
 #endif
@@ -1428,6 +1441,7 @@ gmp_task_status_t oled_show_task(gmp_task_t* tsk)
     control_strategy = g_control_strategy;
     policy_fault = g_control_policy_fault;
     policy_fault_latched = g_control_policy_fault_latched;
+    settings_result = g_settings_result;
 
     if ((voltage_set_mv != s_oled_last_voltage_mv) ||
         (current_set_ma != s_oled_last_current_ma))
@@ -1461,7 +1475,8 @@ gmp_task_status_t oled_show_task(gmp_task_t* tsk)
         (output_fault != s_oled_last_output_fault) ||
         (feedback_fault != s_oled_last_feedback_fault) ||
         (policy_fault != s_oled_last_policy_fault) ||
-        (policy_fault_latched != s_oled_last_policy_fault_latched))
+        (policy_fault_latched != s_oled_last_policy_fault_latched) ||
+        (settings_result != s_oled_last_settings_result))
     {
         g_oled_pending_mask |= OLED_PENDING_OUTPUT_STATE;
     }
@@ -1515,6 +1530,18 @@ gmp_task_status_t oled_show_task(gmp_task_t* tsk)
                 (void)snprintf(line4, sizeof(line4), "POLICY FAULT    ");
             }
         }
+        else if (settings_result == PSU_SETTINGS_RESULT_SAVE_OK)
+        {
+            (void)snprintf(line4, sizeof(line4), "SETTINGS SAVED  ");
+        }
+        else if (settings_result == PSU_SETTINGS_RESULT_FLASH_ERROR)
+        {
+            (void)snprintf(line4, sizeof(line4), "SAVE ERROR      ");
+        }
+        else if (settings_result == PSU_SETTINGS_RESULT_SAVE_REJECTED)
+        {
+            (void)snprintf(line4, sizeof(line4), "SAVE OFF ONLY   ");
+        }
         else
         {
             (void)snprintf(line4, sizeof(line4), "READY           ");
@@ -1528,6 +1555,7 @@ gmp_task_status_t oled_show_task(gmp_task_t* tsk)
             s_oled_last_feedback_fault = feedback_fault;
             s_oled_last_policy_fault = policy_fault;
             s_oled_last_policy_fault_latched = policy_fault_latched;
+            s_oled_last_settings_result = settings_result;
             g_oled_pending_mask &=
                 (uint16_t)(~OLED_PENDING_OUTPUT_STATE);
         }

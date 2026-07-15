@@ -96,6 +96,7 @@
 #define PSU_KEY_OUTPUT_TOGGLE_ID        (5U)
 #define PSU_KEY_FAULT_RESET_ID          (6U)
 #define PSU_KEY_CONTROL_STRATEGY_ID      (7U)
+#define PSU_KEY_SETTINGS_SAVE_ID         (8U)
 
 #define PSU_VOLTAGE_STEP_MV             (100U)
 #define PSU_CURRENT_STEP_MA             (1U)

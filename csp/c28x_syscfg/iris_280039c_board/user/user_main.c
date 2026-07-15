@@ -9,6 +9,7 @@
 #include "analog_io_test.h"
 #include "power_control_policy.h"
 #include "power_mode_monitor.h"
+#include "power_settings_store.h"
 #include "rotary_encoder_ui.h"
 #include "user_main.h"
 #include <stdlib.h>
@@ -368,6 +369,15 @@ static gmp_task_t task_power_control_policy =
     PSU_CONTROL_POLICY_ENABLE,
     NULL
 };
+static gmp_task_t task_power_settings_store =
+{
+    "settings_store",
+    power_settings_store_task,
+    20U,
+    0,
+    1,
+    NULL
+};
 static gmp_task_t task_power_command =
     {"power_cmd", tsk_power_debug_command, 10, 0,
      PSU_ENABLE_MANUAL_COMMAND, NULL};
@@ -389,6 +399,7 @@ static gmp_task_t *const tasks[] = {
     &task_power_app,
     &task_power_mode_monitor,
     &task_power_control_policy,
+    &task_power_settings_store,
     &task_power_command,
     &task_power_console,
 };
@@ -405,6 +416,7 @@ void init(void) GMP_NO_OPT_SUFFIX
     rotary_encoder_ui_init();
     power_mode_monitor_init();
     power_control_policy_init();
+    power_settings_store_init();
 
     // init scheduler
     gmp_scheduler_init(&sched);
