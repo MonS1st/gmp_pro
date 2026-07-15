@@ -182,10 +182,10 @@
 
 #define PSU_PERIODIC_STATUS_PERIOD_MS      (1000U)
 
-#define PSU_SAFE_BRINGUP                    (1)
+#define PSU_SAFE_BRINGUP                    (0)
 #define PSU_SOFT_TEST_MODE                  (1)
 
-#define PSU_ALLOW_PHYSICAL_DAC              (0)
+#define PSU_ALLOW_PHYSICAL_DAC              (1)
 #define PSU_ALLOW_PHYSICAL_PWM              (0)
 #define PSU_ALLOW_PHYSICAL_OUTPUT_ENABLE    (0)
 #define PSU_ALLOW_OUTPUT_REQUEST            (0)
