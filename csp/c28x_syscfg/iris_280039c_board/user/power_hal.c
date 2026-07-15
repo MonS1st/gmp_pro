@@ -10,8 +10,10 @@ static volatile bool s_power_output_hw_enabled = false;
 static volatile bool s_power_output_hw_requested = false;
 static volatile bool s_power_output_hw_update_pending = true;
 static volatile bool s_power_output_hw_readback_pending = false;
+static volatile bool s_fpga_reset_released = false;
 
 volatile uint16_t g_fpga_relay_r0_readback = 0xFFFFU;
+volatile uint16_t g_fpga_reset_pin_level = 0U;
 
 #define POWER_FPGA_RELAY_ADDR  (0x00U)
 
@@ -22,6 +24,22 @@ static void power_dac_force_physical_zero(void)
     DAC_setShadowValue(IRIS_DACB_BASE, 0U);
 }
 #endif
+
+static void power_fpga_release_reset(void)
+{
+    if (!s_fpga_reset_released)
+    {
+        // GPIO55 is the active-low FPGA/SPI bridge reset. SysConfig only
+        // configures the pin direction, so release reset explicitly before
+        // the first register transaction.
+        GPIO_writePin(IRIS_GPIO_SPI_RST, 1U);
+        DEVICE_DELAY_US(10U);
+        s_fpga_reset_released = true;
+    }
+
+    g_fpga_reset_pin_level =
+        (uint16_t)GPIO_readPin(IRIS_GPIO_SPI_RST);
+}
 
 static uint16_t power_limit_dac_code(uint32_t code)
 {
@@ -129,8 +147,11 @@ void power_output_hw_service(void)
     s_power_output_hw_update_pending = false;
     s_power_output_hw_readback_pending = false;
     g_fpga_relay_r0_readback = 0U;
+    g_fpga_reset_pin_level = 0U;
 #else
     bool requested;
+
+    power_fpga_release_reset();
 
     if (s_power_output_hw_update_pending)
     {
