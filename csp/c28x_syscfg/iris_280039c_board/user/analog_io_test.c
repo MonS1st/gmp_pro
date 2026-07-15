@@ -91,6 +91,24 @@ static uint16_t analog_io_test_limit_code(uint16_t code, uint16_t limit)
     return (code > limit) ? limit : code;
 }
 
+static uint16_t analog_io_test_physical_dac_code(uint16_t requested_code)
+{
+#if PSU_ALLOW_PHYSICAL_DAC == 0
+    // Preserve the logical request while forcing the physical DAC target low.
+    (void)requested_code;
+    return 0U;
+#else
+    return requested_code;
+#endif
+}
+
+static void analog_io_test_set_dac_shadow(uint32_t base,
+                                          uint16_t requested_code)
+{
+    DAC_setShadowValue(base,
+                       analog_io_test_physical_dac_code(requested_code));
+}
+
 static void analog_io_test_apply_inactive_outputs(void)
 {
 #if PSU_ENABLE_ANALOG_BOARD_BRINGUP
@@ -101,11 +119,13 @@ static void analog_io_test_apply_inactive_outputs(void)
     if ((s_dac_test_outputs_zeroed == 0U) ||
         (g_dac_test_voltage_applied_code != voltage_code) ||
         (g_dac_test_current_applied_code != current_code) ||
-        (DAC_getShadowValue(IRIS_DACA_BASE) != voltage_code) ||
-        (DAC_getShadowValue(IRIS_DACB_BASE) != current_code))
+        (DAC_getShadowValue(IRIS_DACA_BASE) !=
+         analog_io_test_physical_dac_code(voltage_code)) ||
+        (DAC_getShadowValue(IRIS_DACB_BASE) !=
+         analog_io_test_physical_dac_code(current_code)))
     {
-        DAC_setShadowValue(IRIS_DACB_BASE, current_code);
-        DAC_setShadowValue(IRIS_DACA_BASE, voltage_code);
+        analog_io_test_set_dac_shadow(IRIS_DACB_BASE, current_code);
+        analog_io_test_set_dac_shadow(IRIS_DACA_BASE, voltage_code);
     }
 
     g_dac_test_voltage_applied_code = voltage_code;
@@ -122,8 +142,8 @@ static void analog_io_test_apply_inactive_outputs(void)
         (DAC_getShadowValue(IRIS_DACA_BASE) != 0U) ||
         (DAC_getShadowValue(IRIS_DACB_BASE) != 0U))
     {
-        DAC_setShadowValue(IRIS_DACA_BASE, 0U);
-        DAC_setShadowValue(IRIS_DACB_BASE, 0U);
+        analog_io_test_set_dac_shadow(IRIS_DACA_BASE, 0U);
+        analog_io_test_set_dac_shadow(IRIS_DACB_BASE, 0U);
     }
 
     g_dac_test_voltage_applied_code = 0U;
@@ -162,8 +182,8 @@ static void analog_io_test_apply_output_precharge(uint16_t current_ma)
     }
 
     current_code = power_current_ma_to_dac(current_ma);
-    DAC_setShadowValue(IRIS_DACB_BASE, current_code);
-    DAC_setShadowValue(IRIS_DACA_BASE, voltage_code);
+    analog_io_test_set_dac_shadow(IRIS_DACB_BASE, current_code);
+    analog_io_test_set_dac_shadow(IRIS_DACA_BASE, voltage_code);
 
     g_dac_test_voltage_applied_code = voltage_code;
     g_dac_test_current_applied_code = current_code;
@@ -459,9 +479,11 @@ static void analog_io_test_try_auto_follow(void)
     analog_io_test_apply_inactive_outputs();
 
     if ((DAC_getShadowValue(IRIS_DACA_BASE) ==
-         power_voltage_mv_to_dac(0U)) &&
+         analog_io_test_physical_dac_code(
+             power_voltage_mv_to_dac(0U))) &&
         (DAC_getShadowValue(IRIS_DACB_BASE) ==
-         power_current_ma_to_dac(PSU_ANALOG_BOARD_MIN_CURRENT_MA)))
+         analog_io_test_physical_dac_code(
+             power_current_ma_to_dac(PSU_ANALOG_BOARD_MIN_CURRENT_MA))))
     {
         g_dac_test_enable = 1U;
         g_dac_test_arm = PSU_DAC_TEST_ARM_KEY;
@@ -531,11 +553,11 @@ static void analog_io_test_process_follow_ui(void)
         current_code = power_current_ma_to_dac(current_ma);
 
 #if PSU_ENABLE_ANALOG_BOARD_BRINGUP
-        DAC_setShadowValue(IRIS_DACB_BASE, current_code);
-        DAC_setShadowValue(IRIS_DACA_BASE, voltage_code);
+        analog_io_test_set_dac_shadow(IRIS_DACB_BASE, current_code);
+        analog_io_test_set_dac_shadow(IRIS_DACA_BASE, voltage_code);
 #else
-        DAC_setShadowValue(IRIS_DACA_BASE, voltage_code);
-        DAC_setShadowValue(IRIS_DACB_BASE, current_code);
+        analog_io_test_set_dac_shadow(IRIS_DACA_BASE, voltage_code);
+        analog_io_test_set_dac_shadow(IRIS_DACB_BASE, current_code);
 #endif
 
         g_dac_test_voltage_applied_code = voltage_code;
@@ -689,7 +711,7 @@ static void analog_io_test_process_dac_command(void)
 #endif
     if (write_current != 0U)
     {
-        DAC_setShadowValue(IRIS_DACB_BASE, current_code);
+        analog_io_test_set_dac_shadow(IRIS_DACB_BASE, current_code);
         g_dac_test_current_applied_code = current_code;
         g_dac_test_current_expected_v =
             analog_io_test_dac_expected_v(current_code);
@@ -697,7 +719,7 @@ static void analog_io_test_process_dac_command(void)
 
     if (write_voltage != 0U)
     {
-        DAC_setShadowValue(IRIS_DACA_BASE, voltage_code);
+        analog_io_test_set_dac_shadow(IRIS_DACA_BASE, voltage_code);
         g_dac_test_voltage_applied_code = voltage_code;
         g_dac_test_voltage_expected_v =
             analog_io_test_dac_expected_v(voltage_code);
@@ -706,7 +728,7 @@ static void analog_io_test_process_dac_command(void)
     if ((command == PSU_DAC_TEST_COMMAND_WRITE_DACA) ||
         (command == PSU_DAC_TEST_COMMAND_WRITE_BOTH))
     {
-        DAC_setShadowValue(IRIS_DACA_BASE, voltage_code);
+        analog_io_test_set_dac_shadow(IRIS_DACA_BASE, voltage_code);
         g_dac_test_voltage_applied_code = voltage_code;
         g_dac_test_voltage_expected_v =
             analog_io_test_dac_expected_v(voltage_code);
@@ -715,7 +737,7 @@ static void analog_io_test_process_dac_command(void)
     if ((command == PSU_DAC_TEST_COMMAND_WRITE_DACB) ||
         (command == PSU_DAC_TEST_COMMAND_WRITE_BOTH))
     {
-        DAC_setShadowValue(IRIS_DACB_BASE, current_code);
+        analog_io_test_set_dac_shadow(IRIS_DACB_BASE, current_code);
         g_dac_test_current_applied_code = current_code;
         g_dac_test_current_expected_v =
             analog_io_test_dac_expected_v(current_code);

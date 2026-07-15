@@ -161,7 +161,7 @@
 #define PSU_ANALOG_BOARD_OVP_CONFIRM_COUNT            (2000U)
 #define PSU_ANALOG_BOARD_STARTUP_DELAY_MS            (500U)
 #define PSU_ANALOG_BOARD_FEEDBACK_SETTLE_MS          (100U)
-#define PSU_REAL_FEEDBACK_CONNECTED                   (0)
+#define PSU_REAL_FEEDBACK_CONNECTED                   (1)
 #define PSU_MODE_MONITOR_ENABLE                       (1)
 #define PSU_MODE_MONITOR_TASK_PERIOD_MS               (10U)
 #define PSU_MODE_MONITOR_CONFIRM_COUNT                (5U)
