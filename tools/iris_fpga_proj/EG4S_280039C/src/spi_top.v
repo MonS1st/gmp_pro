@@ -57,15 +57,15 @@ module top_soc (
     // 3. 内存映射 (Memory Mapping) 核心路由
     // ---------------------------------------------------------
     
-    // R0 (0x00): 保留配置寄存器 (读写回环)
+    // R0 (0x00): relay control register (read/write loopback)
     assign spi_in_wires[15:0]   = spi_out_regs[15:0];
     
     // R1 (0x01): GPIO 输出寄存器 (读写回环，低4位接LED)
     assign spi_in_wires[31:16]  = spi_out_regs[31:16];
     assign led = spi_out_regs[19:16]; // 取 R1 的低 4 位控制 LED
 
-    // R1 bit4: relay_allow. OUT24 is active high for load cutoff.
-    assign relay_allow = spi_out_regs[20];
+    // R0 bit0: relay_allow. OUT24 is active high for load cutoff.
+    assign relay_allow = spi_out_regs[0];
     assign gpio[3] = ~relay_allow;
     
     // R2 (0x02): GPIO 输入寄存器 (只读，低4位接Encoder)
