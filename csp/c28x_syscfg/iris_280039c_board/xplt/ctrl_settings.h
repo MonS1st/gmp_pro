@@ -139,7 +139,6 @@
 #define PSU_PRESET_AUTO_SAVE_DELAY_MS              (2000U)
 #define PSU_HT16K33_DISPLAY_PERIOD_MS             (500U)
 #define PSU_HT16K33_DISPLAY_INITIAL_DELAY_MS      (250U)
-#define PSU_HT16K33_MAPPING_SCAN_STEP_MS           (500U)
 #define PSU_OLED_TASK_PERIOD_MS                   (100U)
 #define PSU_OLED_TASK_INITIAL_DELAY_MS            (100U)
 #define PSU_USE_INCREMENTAL_OLED_UI                (1)
@@ -219,6 +218,9 @@
 #define PSU_ENABLE_FAULT_BUZZER             (1)
 
 #define PSU_FAULT_BUZZER_PULSE_MS           (300U)
+#define PSU_FAULT_LED_TEST_DURATION_MS      (1000U)
+#define PSU_FAULT_LED_SELECTED_NUMBER       (6U)
+#define PSU_FAULT_LED_GPIO_NUMBER           (44U)
 
 #define PSU_FAULT_BUZZER_TYPE_UNKNOWN        (0U)
 #define PSU_FAULT_BUZZER_TYPE_ACTIVE         (1U)

@@ -15,6 +15,7 @@
 #error "Beeper active and inactive levels must differ"
 #endif
 
+volatile uint16_t g_fault_alarm_led_active = 0U;
 volatile uint16_t g_fault_alarm_buzzer_active = 0U;
 volatile uint16_t g_fault_alarm_reason = PSU_FAULT_ALARM_REASON_NONE;
 volatile uint16_t g_fault_alarm_event_issued = 0U;
@@ -24,15 +25,25 @@ volatile uint32_t g_fault_alarm_start_tick = 0U;
 volatile uint32_t g_fault_alarm_last_duration_ms = 0U;
 
 volatile uint16_t g_fault_alarm_hardware_ready = 0U;
+volatile uint16_t g_fault_alarm_led_hardware_ready = 0U;
 volatile uint16_t g_fault_alarm_buzzer_hardware_ready = 0U;
+volatile uint16_t g_fault_alarm_selected_led_number = 0U;
+volatile uint16_t g_fault_alarm_led_gpio_number = 0U;
 volatile uint16_t g_fault_alarm_buzzer_type = PSU_FAULT_BUZZER_TYPE_UNKNOWN;
 
+volatile uint16_t g_fault_alarm_led_apply_pending = 0U;
 volatile uint16_t g_fault_alarm_buzzer_start_pending = 0U;
 volatile uint16_t g_fault_alarm_buzzer_stop_pending = 0U;
 
+volatile uint16_t g_fault_alarm_led_test_command = 0U;
+volatile uint32_t g_fault_alarm_led_test_count = 0U;
 volatile uint16_t g_fault_alarm_buzzer_test_command = 0U;
 volatile uint32_t g_fault_alarm_buzzer_test_count = 0U;
 
+static volatile uint16_t s_fault_led_desired = 0U;
+static uint16_t s_led_test_active = 0U;
+static uint32_t s_led_test_start_tick = 0U;
+static uint32_t s_led_test_start_pulse_count = 0U;
 static uint16_t s_fault_buzzer_pulse_active = 0U;
 static uint16_t s_buzzer_test_active = 0U;
 static uint32_t s_buzzer_test_start_tick = 0U;
@@ -66,6 +77,84 @@ static void fault_alarm_buzzer_set(bool active)
 #else
     (void)active;
 #endif
+}
+
+static void fault_alarm_apply_led_pending(void)
+{
+    uint16_t desired_active;
+
+    if (g_fault_alarm_led_apply_pending == 0U)
+    {
+        return;
+    }
+
+    desired_active = s_fault_led_desired;
+    if (desired_active != 0U)
+    {
+        fault_led_on();
+    }
+    else
+    {
+        fault_led_off();
+    }
+    g_fault_alarm_led_active = desired_active;
+
+    if (s_fault_led_desired == desired_active)
+    {
+        g_fault_alarm_led_apply_pending = 0U;
+    }
+}
+
+static void fault_alarm_led_test_finish(void)
+{
+    s_led_test_active = 0U;
+    s_led_test_start_tick = 0U;
+    g_fault_alarm_led_test_command = 0U;
+
+    // A real fault owns the LED once latched. Otherwise a rejected, aborted,
+    // or completed manual test always returns GPIO44 to its safe LOW state.
+    if (g_fault_alarm_event_issued == 0U)
+    {
+        fault_led_off();
+        g_fault_alarm_led_active = 0U;
+    }
+}
+
+static void fault_alarm_led_test_service(uint32_t current_tick)
+{
+    if (s_led_test_active != 0U)
+    {
+        if ((g_fault_alarm_led_test_command != 1U) ||
+            (g_fault_alarm_pulse_count != s_led_test_start_pulse_count) ||
+            (g_fault_alarm_event_issued != 0U) ||
+            !fault_alarm_manual_test_safe() ||
+            ((current_tick - s_led_test_start_tick) >=
+             PSU_FAULT_LED_TEST_DURATION_MS))
+        {
+            fault_alarm_led_test_finish();
+        }
+        return;
+    }
+
+    if (g_fault_alarm_led_test_command == 0U)
+    {
+        return;
+    }
+    if ((g_fault_alarm_led_test_command != 1U) ||
+        (g_fault_alarm_led_hardware_ready == 0U) ||
+        (g_fault_alarm_event_issued != 0U) ||
+        !fault_alarm_manual_test_safe())
+    {
+        g_fault_alarm_led_test_command = 0U;
+        return;
+    }
+
+    fault_led_on();
+    g_fault_alarm_led_active = 1U;
+    s_led_test_active = 1U;
+    s_led_test_start_tick = current_tick;
+    s_led_test_start_pulse_count = g_fault_alarm_pulse_count;
+    ++g_fault_alarm_led_test_count;
 }
 
 static void fault_alarm_stop_buzzer_pending(uint32_t current_tick)
@@ -190,6 +279,7 @@ static void fault_alarm_buzzer_test_service(uint32_t current_tick)
 
 void fault_alarm_init(void)
 {
+    g_fault_alarm_led_active = 0U;
     g_fault_alarm_buzzer_active = 0U;
     g_fault_alarm_reason = PSU_FAULT_ALARM_REASON_NONE;
     g_fault_alarm_event_issued = 0U;
@@ -198,19 +288,31 @@ void fault_alarm_init(void)
     g_fault_alarm_start_tick = 0U;
     g_fault_alarm_last_duration_ms = 0U;
 
+    g_fault_alarm_led_hardware_ready = 1U;
 #if PSU_ENABLE_BEEP && PSU_ENABLE_FAULT_BUZZER && !PSU_SAFE_BRINGUP
     g_fault_alarm_buzzer_hardware_ready = 1U;
 #else
     g_fault_alarm_buzzer_hardware_ready = 0U;
 #endif
-    g_fault_alarm_hardware_ready = g_fault_alarm_buzzer_hardware_ready;
+    g_fault_alarm_hardware_ready =
+        g_fault_alarm_buzzer_hardware_ready &&
+        g_fault_alarm_led_hardware_ready;
+    g_fault_alarm_selected_led_number = PSU_FAULT_LED_SELECTED_NUMBER;
+    g_fault_alarm_led_gpio_number = PSU_FAULT_LED_GPIO_NUMBER;
     g_fault_alarm_buzzer_type = PSU_FAULT_BUZZER_TYPE;
 
+    s_fault_led_desired = 0U;
+    g_fault_alarm_led_apply_pending = 1U;
     g_fault_alarm_buzzer_start_pending = 0U;
     g_fault_alarm_buzzer_stop_pending = 1U;
+    g_fault_alarm_led_test_command = 0U;
+    g_fault_alarm_led_test_count = 0U;
     g_fault_alarm_buzzer_test_command = 0U;
     g_fault_alarm_buzzer_test_count = 0U;
 
+    s_led_test_active = 0U;
+    s_led_test_start_tick = 0U;
+    s_led_test_start_pulse_count = 0U;
     s_fault_buzzer_pulse_active = 0U;
     s_buzzer_test_active = 0U;
     s_buzzer_test_start_tick = 0U;
@@ -238,6 +340,8 @@ void fault_alarm_on_fault_latched(psu_fault_alarm_reason_t reason)
 
     g_fault_alarm_reason = (uint16_t)reason;
     g_fault_alarm_event_issued = 1U;
+    s_fault_led_desired = 1U;
+    g_fault_alarm_led_apply_pending = 1U;
     g_fault_alarm_buzzer_start_pending = 1U;
     g_fault_alarm_last_duration_ms = 0U;
     ++g_fault_alarm_pulse_count;
@@ -245,6 +349,8 @@ void fault_alarm_on_fault_latched(psu_fault_alarm_reason_t reason)
 
 void fault_alarm_on_fault_cleared(void)
 {
+    s_fault_led_desired = 0U;
+    g_fault_alarm_led_apply_pending = 1U;
     g_fault_alarm_buzzer_start_pending = 0U;
     g_fault_alarm_buzzer_stop_pending = 1U;
     g_fault_alarm_reason = PSU_FAULT_ALARM_REASON_NONE;
@@ -263,6 +369,8 @@ void fault_alarm_task(uint32_t current_tick)
     }
 
     // Physical GPIO operations are serialized in this 1 ms background task.
+    fault_alarm_apply_led_pending();
+    fault_alarm_led_test_service(current_tick);
     fault_alarm_stop_buzzer_pending(current_tick);
     fault_alarm_start_buzzer_pending(current_tick);
     fault_alarm_fault_buzzer_timeout(current_tick);

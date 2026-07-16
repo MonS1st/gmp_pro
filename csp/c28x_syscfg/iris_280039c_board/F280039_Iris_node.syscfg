@@ -522,6 +522,9 @@ gpio3.direction       = "GPIO_DIR_MODE_OUT";
 gpio3.gpioPin.$assign = "GPIO40";
 
 gpio4.$name           = "IRIS_GPIO4";
+gpio4.direction       = "GPIO_DIR_MODE_OUT";
+gpio4.writeInitialValue = true;
+gpio4.initialValue    = 0;
 gpio4.gpioPin.$assign = "GPIO44";
 
 gpio5.$name           = "IRIS_GPIO5";

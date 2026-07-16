@@ -61,6 +61,7 @@ adc_gt idc_src;
 extern iic_halt iic_bus;
 extern gpio_halt user_led;
 extern gpio_halt gpio_beep;
+extern gpio_halt gpio_fault_led;
 
 //
 // Function to configure I2C A in FIFO mode.
@@ -348,6 +349,9 @@ void setup_peripheral(void)
 #if PSU_ENABLE_BEEP && !PSU_SAFE_BRINGUP
     gpio_beep = IRIS_GPIO1;
 #endif
+
+    gpio_fault_led = IRIS_GPIO4;
+    gmp_hal_gpio_write(gpio_fault_led, 0U);
 
 }
 

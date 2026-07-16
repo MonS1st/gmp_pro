@@ -28,6 +28,7 @@
 
 
 gpio_halt gpio_beep;
+gpio_halt gpio_fault_led;
 
 void beep_on()
 {
@@ -41,6 +42,16 @@ void beep_off()
 #if PSU_ENABLE_BEEP && !PSU_SAFE_BRINGUP
     gmp_hal_gpio_write(gpio_beep, PSU_BUZZER_INACTIVE_LEVEL);
 #endif
+}
+
+void fault_led_on(void)
+{
+    gmp_hal_gpio_write(gpio_fault_led, 1U);
+}
+
+void fault_led_off(void)
+{
+    gmp_hal_gpio_write(gpio_fault_led, 0U);
 }
 
 //=================================================================================================
@@ -61,8 +72,6 @@ static uint16_t s_key_vote_age = 0U;
 static uint16_t s_led_last_voltage_mv = 0xFFFFU;
 static uint16_t s_led_last_current_ma = 0xFFFFU;
 static time_gt s_ht16k33_display_test_start_tick = 0U;
-static time_gt s_ht16k33_mapping_scan_point_start_tick = 0U;
-static uint16_t s_ht16k33_mapping_scan_aborted = 0U;
 #endif
 static uint16_t s_oled_last_voltage_mv = 0xFFFFU;
 static uint16_t s_oled_last_current_ma = 0xFFFFU;
@@ -93,11 +102,6 @@ static uint16_t s_i2c_recovery_ht_stage = 0U;
 #define OLED_INIT_RETRY_SLOW_MS     (1000U)
 #define OLED_KEY_DEFER_MS            (100U)
 #define HT16K33_DISPLAY_TEST_HOLD_MS (1000U)
-
-#if PSU_ENABLE_HT16K33_DISPLAY && \
-    (HT16K33_CFG_DISP_RAM_SIZE != 16U)
-#error "The HT16K33 128-point mapping scan requires 16 display RAM bytes"
-#endif
 
 static data_gt s_oled_blank_page[OLED_CLEAR_PAGE_BYTES] = {0U};
 static data_gt s_oled_probe_command = 0xAEU;
@@ -1057,8 +1061,8 @@ void update_led_content_8byte(ht16k33_dev_t* dev, uint16_t ch1, uint16_t ch2, ui
     uint16_t i;
 
     // Normal rendering owns the complete 16-byte shadow. In particular, clear
-    // the odd RAM addresses left set by the startup all-on test or a mapping
-    // scan before writing the eight board-specific digit bytes.
+    // the odd RAM addresses left set by the startup all-on test before writing
+    // the eight board-specific digit bytes.
     for (i = 0U; i < HT16K33_CFG_DISP_RAM_SIZE; ++i)
     {
         dev->display_ram[i] = 0U;
@@ -1075,18 +1079,7 @@ void update_led_content_8byte(ht16k33_dev_t* dev, uint16_t ch1, uint16_t ch2, ui
     dev->is_dirty = 1;
 }
 
-static bool power_ui_mapping_scan_owns_display(void)
-{
-#if !PSU_ENABLE_HT16K33_DISPLAY
-    return false;
-#else
-    return (g_ht16k33_mapping_scan_state != HT16K33_MAPPING_SCAN_IDLE) ||
-           (g_ht16k33_mapping_scan_command ==
-            HT16K33_MAPPING_SCAN_COMMAND_START);
-#endif
-}
-
-static void power_ui_render_led_setpoints_owned(bool force_update)
+static void power_ui_render_led_setpoints(bool force_update)
 {
 #if !PSU_ENABLE_HT16K33_DISPLAY
     GMP_UNUSED_VAR(force_update);
@@ -1131,16 +1124,6 @@ static void power_ui_render_led_setpoints_owned(bool force_update)
 #endif
 }
 
-static void power_ui_render_led_setpoints(bool force_update)
-{
-    if (power_ui_mapping_scan_owns_display())
-    {
-        return;
-    }
-
-    power_ui_render_led_setpoints_owned(force_update);
-}
-
 static void power_ui_request_led_setpoint_update(void)
 {
     power_ui_render_led_setpoints(false);
@@ -1150,179 +1133,6 @@ void power_ui_request_led_setpoint_update_from_command(void)
 {
     power_ui_request_led_setpoint_update();
 }
-
-#if PSU_ENABLE_HT16K33_DISPLAY
-static void power_ui_mapping_scan_publish_point(uint16_t point)
-{
-    g_ht16k33_mapping_scan_point = point;
-    g_ht16k33_mapping_scan_ram_address = point >> 3U;
-    g_ht16k33_mapping_scan_bit_mask =
-        (uint16_t)(1U << (point & 0x0007U));
-}
-
-static void power_ui_mapping_scan_process_command(void)
-{
-    uint16_t command = g_ht16k33_mapping_scan_command;
-
-    if (command == HT16K33_MAPPING_SCAN_COMMAND_NONE)
-    {
-        return;
-    }
-    g_ht16k33_mapping_scan_command = HT16K33_MAPPING_SCAN_COMMAND_NONE;
-
-    if (command == HT16K33_MAPPING_SCAN_COMMAND_START)
-    {
-        power_ui_mapping_scan_publish_point(0U);
-        g_ht16k33_mapping_scan_result = GMP_EC_NOT_READY;
-        g_ht16k33_mapping_scan_state = HT16K33_MAPPING_SCAN_POINT_PENDING;
-        g_ht16k33_display_test_state = HT16K33_DISPLAY_TEST_NORMAL;
-        s_ht16k33_mapping_scan_aborted = 0U;
-        ++g_ht16k33_mapping_scan_start_count;
-        return;
-    }
-
-    if (command == HT16K33_MAPPING_SCAN_COMMAND_ABORT)
-    {
-        if (g_ht16k33_mapping_scan_state != HT16K33_MAPPING_SCAN_IDLE)
-        {
-            if (s_ht16k33_mapping_scan_aborted == 0U)
-            {
-                ++g_ht16k33_mapping_scan_abort_count;
-            }
-            s_ht16k33_mapping_scan_aborted = 1U;
-            g_ht16k33_mapping_scan_state =
-                HT16K33_MAPPING_SCAN_RESTORE_PENDING;
-        }
-        return;
-    }
-
-    ++g_ht16k33_mapping_scan_reject_count;
-}
-
-static void power_ui_mapping_scan_prepare_point(ht16k33_dev_t* dev)
-{
-    uint16_t i;
-
-    for (i = 0U; i < HT16K33_CFG_DISP_RAM_SIZE; ++i)
-    {
-        dev->display_ram[i] = 0U;
-    }
-    dev->display_ram[g_ht16k33_mapping_scan_ram_address] =
-        g_ht16k33_mapping_scan_bit_mask;
-    dev->is_dirty = 1U;
-}
-
-static bool power_ui_mapping_scan_service(ht16k33_dev_t* dev)
-{
-    uint16_t state = g_ht16k33_mapping_scan_state;
-    uint16_t point;
-    ec_gt ret;
-
-    if (state == HT16K33_MAPPING_SCAN_IDLE)
-    {
-        return false;
-    }
-
-    if (state == HT16K33_MAPPING_SCAN_HOLD_POINT)
-    {
-        if ((time_gt)(gmp_base_get_system_tick() -
-                      s_ht16k33_mapping_scan_point_start_tick) <
-            (time_gt)g_ht16k33_mapping_scan_step_ms)
-        {
-            return true;
-        }
-
-        point = g_ht16k33_mapping_scan_point;
-        if ((point + 1U) >= HT16K33_MAPPING_SCAN_POINT_COUNT)
-        {
-            g_ht16k33_mapping_scan_state =
-                HT16K33_MAPPING_SCAN_RESTORE_PENDING;
-            state = HT16K33_MAPPING_SCAN_RESTORE_PENDING;
-        }
-        else
-        {
-            power_ui_mapping_scan_publish_point(point + 1U);
-            g_ht16k33_mapping_scan_state =
-                HT16K33_MAPPING_SCAN_POINT_PENDING;
-            state = HT16K33_MAPPING_SCAN_POINT_PENDING;
-        }
-    }
-
-    if (state == HT16K33_MAPPING_SCAN_POINT_PENDING)
-    {
-        if ((g_ht16k33_mapping_scan_point >=
-             HT16K33_MAPPING_SCAN_POINT_COUNT) ||
-            (g_ht16k33_mapping_scan_ram_address >=
-             HT16K33_CFG_DISP_RAM_SIZE))
-        {
-            s_ht16k33_mapping_scan_aborted = 1U;
-            g_ht16k33_mapping_scan_result = GMP_EC_GENERAL_ERROR;
-            g_ht16k33_mapping_scan_state =
-                HT16K33_MAPPING_SCAN_RESTORE_PENDING;
-            return true;
-        }
-
-        power_ui_mapping_scan_prepare_point(dev);
-        ret = ht16k33_update_display(dev);
-        g_ht16k33_mapping_scan_result = ret;
-        g_led_update_result = ret;
-        if (ret != GMP_EC_OK)
-        {
-            dev->is_dirty = 1U;
-            return true;
-        }
-
-        g_key_ignore_scan_count = 1U;
-        ++g_led_update_count;
-        ++g_ht16k33_mapping_scan_update_count;
-        g_ht16k33_mapping_scan_last_point =
-            g_ht16k33_mapping_scan_point;
-        s_ht16k33_mapping_scan_point_start_tick =
-            gmp_base_get_system_tick();
-        g_ht16k33_mapping_scan_state = HT16K33_MAPPING_SCAN_HOLD_POINT;
-        return true;
-    }
-
-    if (state == HT16K33_MAPPING_SCAN_RESTORE_PENDING)
-    {
-        // Keep exclusive ownership until the complete normal frame has been
-        // accepted by the controller; a failed or deferred abort cannot leave
-        // one mapping point latched indefinitely.
-        power_ui_render_led_setpoints_owned(true);
-        ret = ht16k33_update_display(dev);
-        g_ht16k33_mapping_scan_result = ret;
-        g_led_update_result = ret;
-        if (ret != GMP_EC_OK)
-        {
-            dev->is_dirty = 1U;
-            return true;
-        }
-
-        g_key_ignore_scan_count = 1U;
-        ++g_led_update_count;
-        ++g_ht16k33_mapping_scan_restore_count;
-        if (s_ht16k33_mapping_scan_aborted == 0U)
-        {
-            ++g_ht16k33_mapping_scan_complete_count;
-        }
-        g_ht16k33_mapping_scan_point =
-            HT16K33_MAPPING_SCAN_POINT_INVALID;
-        g_ht16k33_mapping_scan_ram_address =
-            HT16K33_MAPPING_SCAN_POINT_INVALID;
-        g_ht16k33_mapping_scan_bit_mask = 0U;
-        g_ht16k33_display_test_state = HT16K33_DISPLAY_TEST_NORMAL;
-        s_ht16k33_mapping_scan_aborted = 0U;
-        g_ht16k33_mapping_scan_state = HT16K33_MAPPING_SCAN_IDLE;
-        return true;
-    }
-
-    s_ht16k33_mapping_scan_aborted = 1U;
-    g_ht16k33_mapping_scan_result = GMP_EC_GENERAL_ERROR;
-    g_ht16k33_mapping_scan_state =
-        HT16K33_MAPPING_SCAN_RESTORE_PENDING;
-    return true;
-}
-#endif
 
 gmp_task_status_t tsk_LED_flush(gmp_task_t* tsk)
 {
@@ -1338,16 +1148,9 @@ gmp_task_status_t tsk_LED_flush(gmp_task_t* tsk)
         uint16_t i;
         ec_gt ret;
 
-        power_ui_mapping_scan_process_command();
-
         if ((g_i2c_fault_active != 0U) ||
             (g_i2c_recovery_state != PSU_I2C_RECOVERY_IDLE) ||
             (g_key_scan_ready == 0U))
-        {
-            return GMP_TASK_DONE;
-        }
-
-        if (power_ui_mapping_scan_service(dev))
         {
             return GMP_TASK_DONE;
         }
