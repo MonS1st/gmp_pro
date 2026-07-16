@@ -66,7 +66,7 @@ module top_soc (
 
     // R0 bit0: relay_allow. OUT24 is active high for load cutoff.
     assign relay_allow = spi_out_regs[0];
-    assign gpio[3] = ~relay_allow;
+    assign gpio[3] = relay_allow ? 1'b0 : 1'b1;
     
     // R2 (0x02): GPIO 输入寄存器 (只读，低4位接Encoder)
     // 高12位补0，低4位实时读取外部引脚电平

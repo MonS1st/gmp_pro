@@ -67,6 +67,11 @@ module spi_slave_regs_easy (
     reg        is_write;      
     reg [6:0]  cmd_addr;      
 
+    // Include the MOSI bit sampled on the current rising edge.  The shift
+    // register itself is not updated until the end of this clock cycle.
+    wire [15:0] rx_word_complete =
+        {rx_shift_reg[14:0], mosi_sync[1]};
+
     assign spi_miso = (cs_active) ? tx_shift_reg[15] : 1'bz;
 
     always @(posedge clk or negedge rst_n) begin
@@ -88,7 +93,7 @@ module spi_slave_regs_easy (
             end else begin
                 // --- 采样 MOSI (SCLK 上升沿) ---
                 if (sclk_rise) begin
-                    rx_shift_reg <= {rx_shift_reg[14:0], mosi_sync[1]};
+                    rx_shift_reg <= rx_word_complete;
                     bit_cnt <= bit_cnt + 1'b1;
                     
                     if (bit_cnt == 5'd15) begin
@@ -98,15 +103,15 @@ module spi_slave_regs_easy (
                             // 【命令帧解析完毕】
                             is_data_phase <= 1'b1;
                             // 规则：最高位(Bit 15)为 1 是读，0 是写
-                            is_write      <= ~rx_shift_reg[14];    
-                            cmd_addr      <= rx_shift_reg[13:7];   
+                            is_write      <= ~rx_word_complete[15];
+                            cmd_addr      <= rx_word_complete[14:8];
                         end else begin
                             // 【数据帧解析完毕】
                             is_data_phase <= 1'b0; 
                             
                             // 只有判定为写操作，才更新 out_regs
                             if (is_write && (cmd_addr < 7'h10)) begin
-                                out_regs[(cmd_addr * 16) +: 16] <= {rx_shift_reg[14:0], mosi_sync[1]};
+                                out_regs[(cmd_addr * 16) +: 16] <= rx_word_complete;
                                 write_pulse <= 1'b1; 
                             end
                         end
