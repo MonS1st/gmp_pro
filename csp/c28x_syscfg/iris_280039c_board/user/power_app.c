@@ -1,6 +1,7 @@
 #include "power_app.h"
 
 #include "analog_io_test.h"
+#include "fault_alarm.h"
 #include "power_control_policy.h"
 #include "power_hal.h"
 #include "power_protection.h"
@@ -232,6 +233,38 @@ static bool power_app_physical_output_forbidden(void)
            !PSU_OUTPUT_SWITCH_PHYSICAL_RELAY_ENABLE;
 }
 
+static psu_fault_alarm_reason_t power_app_fault_alarm_reason(
+    power_fault_t fault)
+{
+    bool ovp_confirmed = (fault == POWER_FAULT_OVERVOLTAGE);
+    bool ocp_confirmed = (fault == POWER_FAULT_OVERCURRENT);
+
+    // Reuse the existing verified confirmation counters. This does not add a
+    // second OVP/OCP threshold decision path.
+    ovp_confirmed = ovp_confirmed ||
+        (g_power_protection.ovp_confirm_count >= PSU_OVP_CONFIRM_COUNT) ||
+        (g_analog_board_ovp_confirm_count >=
+         PSU_ANALOG_BOARD_OVP_CONFIRM_COUNT);
+    ocp_confirmed = ocp_confirmed ||
+        (g_power_protection.ocp_confirm_count >= PSU_OCP_CONFIRM_COUNT) ||
+        (g_analog_board_ocp_confirm_count >=
+         PSU_ANALOG_BOARD_OCP_CONFIRM_COUNT);
+
+    if (ovp_confirmed && ocp_confirmed)
+    {
+        return PSU_FAULT_ALARM_REASON_OVP_OCP;
+    }
+    if (ovp_confirmed)
+    {
+        return PSU_FAULT_ALARM_REASON_OVP;
+    }
+    if (ocp_confirmed)
+    {
+        return PSU_FAULT_ALARM_REASON_OCP;
+    }
+    return PSU_FAULT_ALARM_REASON_NONE;
+}
+
 static bool power_relay_cutoff_should_assert(void)
 {
     bool output_fully_on;
@@ -368,6 +401,8 @@ static void power_app_complete_fault_reset(void)
     analog_io_test_force_safe_outputs();
     // Reset leaves Output OFF, so the unified safety gate keeps cutoff HIGH.
     power_relay_cutoff_sync();
+    // Only this successful reset path may clear the latched alarm indication.
+    fault_alarm_on_fault_cleared();
 }
 
 static bool power_app_process_fault_reset_request(uint16_t voltage_mv,
@@ -695,6 +730,9 @@ static void power_app_trip(power_fault_t fault,
         g_power_app.fault_latched = true;
         g_power_app.trip_voltage_mv = voltage_mv;
         g_power_app.trip_current_ma = current_ma;
+        fault_alarm_on_fault_latched(
+            power_app_fault_alarm_reason(fault),
+            (uint32_t)gmp_base_get_system_tick());
     }
 
     g_power_app.output_requested = false;
@@ -720,6 +758,7 @@ static void power_app_apply_commands(void)
 void power_app_init(void)
 {
     power_relay_cutoff_epwm_set(true);
+    fault_alarm_init();
     g_user_voltage_set_mv = 0U;
 #if PSU_ENABLE_LOW_RANGE_BRINGUP_LIMITS
     g_user_current_set_ma = PSU_ANALOG_BOARD_MIN_CURRENT_MA;
@@ -1291,6 +1330,9 @@ void power_app_fast_step(void)
 void power_app_slow_step(void)
 {
     power_output_hw_service();
+
+    // The 1 ms background power task owns the non-blocking pulse timeout.
+    fault_alarm_task((uint32_t)gmp_base_get_system_tick());
 
 #if PSU_SOFT_TEST_MODE
     power_self_test_step();

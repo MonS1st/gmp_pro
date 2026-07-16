@@ -215,6 +215,27 @@
 
 #define PSU_ENABLE_BEEP                     (0)
 
+// Fault alarm hardware is intentionally fail-dark until the board schematic
+// confirms one unused LED6/LED7/LED8 and the beeper type/polarity. The only
+// historical beeper candidate, GPIO58/IRIS_GPIO1, is explicitly unconfirmed
+// and remains an input in SysConfig. Do not set HARDWARE_READY without filling
+// every mapping below from verified board-level data.
+#define PSU_FAULT_BUZZER_PULSE_MS            (300U)
+#define PSU_FAULT_ALARM_HARDWARE_READY       (0U)
+
+#define PSU_FAULT_LED_SELECTED_NUMBER        (0U)
+#define PSU_FAULT_LED_GPIO                   (0xFFFFU)
+#define PSU_FAULT_LED_ACTIVE_LEVEL           (0U)
+#define PSU_FAULT_LED_INACTIVE_LEVEL         (0U)
+
+#define PSU_FAULT_BUZZER_TYPE_UNKNOWN        (0U)
+#define PSU_FAULT_BUZZER_TYPE_ACTIVE         (1U)
+#define PSU_FAULT_BUZZER_TYPE_PASSIVE        (2U)
+#define PSU_FAULT_BUZZER_TYPE                PSU_FAULT_BUZZER_TYPE_UNKNOWN
+#define PSU_BUZZER_GPIO                      (0xFFFFU)
+#define PSU_BUZZER_ACTIVE_LEVEL              (0U)
+#define PSU_BUZZER_INACTIVE_LEVEL            (0U)
+
 #define PSU_ENABLE_LOGICAL_OUTPUT_SWITCH        (1)
 #define PSU_OUTPUT_SWITCH_PRECHARGE_MS          (100U)
 #define PSU_OUTPUT_SWITCH_REQUIRE_SETTLED       (1)
