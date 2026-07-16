@@ -10,6 +10,7 @@
 #define OLED_PAGE_COUNT          8U
 #define OLED_TEXT_CELL_WIDTH     8U
 #define OLED_FONT8_GLYPH_WIDTH   6U
+#define OLED_I2C_COMPAT_SINGLE_BYTE_MODE (1U)
 #define OLED_I2C_MAX_TRANSACTION_BYTES  (16U)
 #define OLED_I2C_MAX_PAYLOAD_BYTES      \
     (OLED_I2C_MAX_TRANSACTION_BYTES - 1U)
@@ -33,6 +34,11 @@ volatile uint16_t g_oled_last_control_byte = 0U;
 volatile uint16_t g_oled_last_payload_length = 0U;
 volatile uint16_t g_oled_last_addr_length = 0U;
 volatile uint32_t g_oled_timeout_count = 0U;
+volatile uint32_t g_oled_single_byte_tx_count = 0U;
+volatile uint32_t g_oled_single_byte_error_count = 0U;
+volatile uint16_t g_oled_compat_single_byte_active =
+    OLED_I2C_COMPAT_SINGLE_BYTE_MODE;
+volatile uint16_t g_oled_last_failed_payload_index = 0U;
 volatile ec_gt g_oled_probe_result = GMP_EC_NOT_READY;
 volatile uint32_t g_oled_probe_ok_count = 0U;
 volatile uint32_t g_oled_probe_error_count = 0U;
@@ -74,6 +80,15 @@ void oled_reset_init_sequence(void)
     g_oled_init_command_result = GMP_EC_NOT_READY;
 }
 
+void oled_reset_transfer_diagnostics(void)
+{
+    g_oled_single_byte_tx_count = 0U;
+    g_oled_single_byte_error_count = 0U;
+    g_oled_compat_single_byte_active =
+        OLED_I2C_COMPAT_SINGLE_BYTE_MODE;
+    g_oled_last_failed_payload_index = 0U;
+}
+
 static ec_gt oled_write_active(uint16_t control_byte,
                                const data_gt *payload, size_gt length)
 {
@@ -83,7 +98,44 @@ static ec_gt oled_write_active(uint16_t control_byte,
     {
         return GMP_EC_NOT_READY;
     }
+    if ((payload == NULL) || (length == 0U))
+    {
+        return GMP_EC_INVALID_PARAM;
+    }
 
+#if OLED_I2C_COMPAT_SINGLE_BYTE_MODE
+    {
+        size_gt index;
+
+        for (index = 0U; index < length; ++index)
+        {
+            g_oled_last_slave_address = s_oled_active_address;
+            g_oled_last_control_byte = control_byte;
+            g_oled_last_payload_length = 1U;
+            g_oled_last_addr_length = 1U;
+            ret = gmp_hal_iic_write_mem(
+                iic_bus, s_oled_active_address,
+                (addr32_gt)control_byte, 1U,
+                &payload[index], 1U,
+                (time_gt)OLED_I2C_TIMEOUT_TICKS);
+            ++g_oled_single_byte_tx_count;
+
+            if (ret != GMP_EC_OK)
+            {
+                ++g_oled_single_byte_error_count;
+                g_oled_last_failed_payload_index = (uint16_t)index;
+                if (ret == GMP_EC_TIMEOUT)
+                {
+                    ++g_oled_timeout_count;
+                }
+
+                return ret;
+            }
+        }
+
+        return GMP_EC_OK;
+    }
+#else
     g_oled_last_slave_address = s_oled_active_address;
     g_oled_last_control_byte = control_byte;
     g_oled_last_payload_length = (uint16_t)length;
@@ -97,6 +149,7 @@ static ec_gt oled_write_active(uint16_t control_byte,
     }
 
     return ret;
+#endif
 }
 
 static void oled_prepare_diagnostics(void)

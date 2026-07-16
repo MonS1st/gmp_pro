@@ -581,6 +581,7 @@ gmp_task_status_t tsk_startup(gmp_task_t* tsk)
     g_oled_last_payload_length = 0U;
     g_oled_last_addr_length = 0U;
     g_oled_timeout_count = 0U;
+    oled_reset_transfer_diagnostics();
     g_oled_init_command_index = 0U;
     g_oled_init_command_result = GMP_EC_NOT_READY;
     g_oled_last_failed_command = 0U;

@@ -28,6 +28,10 @@ extern volatile uint16_t g_oled_last_control_byte;
 extern volatile uint16_t g_oled_last_payload_length;
 extern volatile uint16_t g_oled_last_addr_length;
 extern volatile uint32_t g_oled_timeout_count;
+extern volatile uint32_t g_oled_single_byte_tx_count;
+extern volatile uint32_t g_oled_single_byte_error_count;
+extern volatile uint16_t g_oled_compat_single_byte_active;
+extern volatile uint16_t g_oled_last_failed_payload_index;
 extern volatile ec_gt g_oled_probe_result;
 extern volatile uint32_t g_oled_probe_ok_count;
 extern volatile uint32_t g_oled_probe_error_count;
@@ -45,6 +49,9 @@ uint16_t oled_get_active_address(void);
 
 /** Restart the asynchronous logical-command initialization sequence at index 0. */
 void oled_reset_init_sequence(void);
+
+/** Reset diagnostics for the configured OLED transfer compatibility mode. */
+void oled_reset_transfer_diagnostics(void);
 
 /**
  * @brief  Set the OLED page/column position and return the raw I2C result.
