@@ -26,6 +26,8 @@ adc_channel_t adc_iout;
 
 volatile uint16_t g_adc_vout_raw = 0U;
 volatile uint16_t g_adc_iout_raw = 0U;
+volatile uint16_t g_fpga_spi_last_rx0 = 0xFFFFU;
+volatile uint16_t g_fpga_spi_last_rx1 = 0xFFFFU;
 
 volatile float g_vout_meas_v = 0.0f;
 volatile float g_iout_meas_a = 0.0f;
@@ -608,12 +610,25 @@ interrupt void INT_IRIS_UART_USB_RX_ISR(void)
 // 1. SPI 读写底层函数封装
 //=========================================================
 
+static void fpga_spi_clear_rx_fifo(void)
+{
+    while(SPI_getRxFIFOStatus(IRIS_SPI_FPGA_BRIDGE_BASE) !=
+          SPI_FIFO_RXEMPTY)
+    {
+        (void)SPI_readDataBlockingFIFO(IRIS_SPI_FPGA_BRIDGE_BASE);
+    }
+}
+
 // 向 FPGA 写入寄存器
 // 协议: 帧1=[15位=1(写), 14:8=地址, 7:0=保留] -> 帧2=[16位数据]
 void SPI_writeReg(uint16_t addr, uint16_t data)
 {
     // 构造写命令，最高位为 0
     uint16_t cmd = 0x0000 | ((addr & 0x7F) << 8); // 最高位自然是 0
+
+    fpga_spi_clear_rx_fifo();
+    GPIO_writePin(IRIS_GPIO_SPI_CS, 0U);
+    DEVICE_DELAY_US(2U);
 
     // 将两个 16-bit word 压入 TX FIFO 发送
     SPI_writeDataBlockingFIFO(IRIS_SPI_FPGA_BRIDGE_BASE, cmd);
@@ -626,6 +641,10 @@ void SPI_writeReg(uint16_t addr, uint16_t data)
     // 把接收到的这两个废数据读出，清空 RX FIFO，防止影响后续通信
     SPI_readDataBlockingFIFO(IRIS_SPI_FPGA_BRIDGE_BASE);
     SPI_readDataBlockingFIFO(IRIS_SPI_FPGA_BRIDGE_BASE);
+
+    DEVICE_DELAY_US(2U);
+    GPIO_writePin(IRIS_GPIO_SPI_CS, 1U);
+    DEVICE_DELAY_US(2U);
 }
 
 // 从 FPGA 读取寄存器
@@ -635,6 +654,12 @@ uint16_t SPI_readReg(uint16_t addr)
     // 构造读命令，最高位为 1
     uint16_t cmd = 0x8000 | ((addr & 0x7F) << 8); // 强制把最高位拉高
     uint16_t dummy_data = 0x0000; // 用于产生时钟的哑数据
+    uint16_t rx_word0;
+    uint16_t rx_word1;
+
+    fpga_spi_clear_rx_fifo();
+    GPIO_writePin(IRIS_GPIO_SPI_CS, 0U);
+    DEVICE_DELAY_US(2U);
 
     // 压入命令帧和数据帧
     SPI_writeDataBlockingFIFO(IRIS_SPI_FPGA_BRIDGE_BASE, cmd);
@@ -644,12 +669,18 @@ uint16_t SPI_readReg(uint16_t addr)
     while(SPI_getRxFIFOStatus(IRIS_SPI_FPGA_BRIDGE_BASE) < SPI_FIFO_RX2);
 
     // 读出的第一个字是发送命令帧时 FPGA 返回的（通常是状态位或全0，直接丢弃）
-    SPI_readDataBlockingFIFO(IRIS_SPI_FPGA_BRIDGE_BASE);
+    rx_word0 = SPI_readDataBlockingFIFO(IRIS_SPI_FPGA_BRIDGE_BASE);
 
     // 读出的第二个字才是我们要的真实数据帧
-    uint16_t read_data = SPI_readDataBlockingFIFO(IRIS_SPI_FPGA_BRIDGE_BASE);
+    rx_word1 = SPI_readDataBlockingFIFO(IRIS_SPI_FPGA_BRIDGE_BASE);
+    g_fpga_spi_last_rx0 = rx_word0;
+    g_fpga_spi_last_rx1 = rx_word1;
 
-    return read_data;
+    DEVICE_DELAY_US(2U);
+    GPIO_writePin(IRIS_GPIO_SPI_CS, 1U);
+    DEVICE_DELAY_US(2U);
+
+    return rx_word1;
 }
 
 
