@@ -490,7 +490,7 @@ gmp_task_status_t tsk_startup(gmp_task_t* tsk)
     g_ui_init_stage = 1U;
     g_ui_init_result = 0xFFFFU;
 
-#if PSU_ENABLE_BEEP && !PSU_SAFE_BRINGUP
+#if PSU_ENABLE_BEEP && PSU_ENABLE_STARTUP_BEEP && !PSU_SAFE_BRINGUP
     static uint16_t beep_counter = 0;
 
     if (beep_counter == 0)

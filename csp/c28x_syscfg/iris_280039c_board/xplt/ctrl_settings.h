@@ -213,27 +213,35 @@
 #define PSU_ALLOW_PHYSICAL_OUTPUT_ENABLE    (1)
 #define PSU_ALLOW_OUTPUT_REQUEST            (1)
 
-#define PSU_ENABLE_BEEP                     (0)
+#define PSU_ENABLE_BEEP                     (1)
+#define PSU_ENABLE_STARTUP_BEEP             (0)
+#define PSU_ENABLE_FAULT_BUZZER             (1)
 
-// Fault alarm hardware is intentionally fail-dark until the board schematic
-// confirms one unused LED6/LED7/LED8 and the beeper type/polarity. The only
-// historical beeper candidate, GPIO58/IRIS_GPIO1, is explicitly unconfirmed
-// and remains an input in SysConfig. Do not set HARDWARE_READY without filling
-// every mapping below from verified board-level data.
-#define PSU_FAULT_BUZZER_PULSE_MS            (300U)
-#define PSU_FAULT_ALARM_HARDWARE_READY       (0U)
+#define PSU_FAULT_BUZZER_PULSE_MS           (300U)
+#define PSU_FAULT_LED_TEST_DURATION_MS      (1000U)
 
-#define PSU_FAULT_LED_SELECTED_NUMBER        (0U)
-#define PSU_FAULT_LED_GPIO                   (0xFFFFU)
-#define PSU_FAULT_LED_ACTIVE_LEVEL           (0U)
-#define PSU_FAULT_LED_INACTIVE_LEVEL         (0U)
+#define PSU_FAULT_LED_BACKEND_FPGA          (1U)
+#define PSU_FAULT_FPGA_LED_REG              (0x01U)
+#define PSU_FAULT_FPGA_LED_LOW4_MASK        (0x000FU)
+// led[1] is the current panel-LED6 candidate. Only this definition needs to
+// change if the safe mapping test identifies a different FPGA LED output.
+#define PSU_FAULT_FPGA_LED_BIT              (1U)
+#define PSU_FAULT_FPGA_LED_MASK \
+    ((uint16_t)(1U << PSU_FAULT_FPGA_LED_BIT))
+#define PSU_FAULT_FPGA_LED_ACTIVE_HIGH      (1U)
+#define PSU_FAULT_LED_SELECTED_NUMBER       (6U)
+
+// Bound each FPGA transaction and rate-limit retries after a failed write so
+// a missing FPGA cannot monopolize the 1 ms background task.
+#define PSU_FAULT_FPGA_SPI_TIMEOUT_COUNT    (10000UL)
+#define PSU_FAULT_FPGA_LED_RETRY_MS         (10U)
 
 #define PSU_FAULT_BUZZER_TYPE_UNKNOWN        (0U)
 #define PSU_FAULT_BUZZER_TYPE_ACTIVE         (1U)
 #define PSU_FAULT_BUZZER_TYPE_PASSIVE        (2U)
-#define PSU_FAULT_BUZZER_TYPE                PSU_FAULT_BUZZER_TYPE_UNKNOWN
-#define PSU_BUZZER_GPIO                      (0xFFFFU)
-#define PSU_BUZZER_ACTIVE_LEVEL              (0U)
+#define PSU_FAULT_BUZZER_TYPE                PSU_FAULT_BUZZER_TYPE_ACTIVE
+#define PSU_BUZZER_GPIO                      IRIS_GPIO1
+#define PSU_BUZZER_ACTIVE_LEVEL              (1U)
 #define PSU_BUZZER_INACTIVE_LEVEL            (0U)
 
 #define PSU_ENABLE_LOGICAL_OUTPUT_SWITCH        (1)
@@ -426,11 +434,9 @@
 #define PHASE_V_BASE    IRIS_EPWM2_BASE
 #define PHASE_W_BASE    IRIS_EPWM3_BASE
 
-// LEGACY/UNCONFIRMED motor-template mappings. GPIO58/IRIS_GPIO1 conflicts
-// with the historical beeper mapping. Safe-bringup code must not reference
-// either port until the board schematic and active levels are confirmed.
+// GPIO58/IRIS_GPIO1 is reserved for the confirmed active beeper. The legacy
+// motor-template PWM enable alias must not create a second owner for that pin.
 #if !PSU_SAFE_BRINGUP
-#define PWM_ENABLE_PORT IRIS_GPIO1
 #define PWM_RESET_PORT  IRIS_GPIO3
 #endif
 

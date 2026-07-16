@@ -15,6 +15,7 @@ extern "C"
 {
 #endif // __cplusplus
 
+#include <stdbool.h>
 #include <gmp_core.h>
 
 // controller settings
@@ -80,6 +81,14 @@ uint16_t board_i2c_read_scl_level(void);
 
 uint16_t SPI_readReg(uint16_t addr);
 void SPI_writeReg(uint16_t addr, uint16_t data);
+bool SPI_try_writeReg(uint16_t addr,
+                      uint16_t data,
+                      uint32_t timeout_count);
+
+// R1 is shared by the four FPGA LED outputs. All LED owners update this
+// software shadow so changing one LED never writes a hard-coded whole value.
+bool board_fpga_led_set(uint16_t led_mask, bool active);
+uint16_t board_fpga_led_get_shadow(void);
 
 #ifdef __cplusplus
 }

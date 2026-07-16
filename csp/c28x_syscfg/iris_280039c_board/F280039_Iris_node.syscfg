@@ -508,9 +508,9 @@ eqep2.aQual.qualMode             = "GPIO_QUAL_3SAMPLE";
 eqep2.bQual.qualMode             = "GPIO_QUAL_3SAMPLE";
 
 gpio1.$name           = "IRIS_GPIO1";
-// GPIO58 has conflicting, unconfirmed historical uses. Keep it high-impedance
-// in safe bringup and do not drive it as a beeper or power-enable output.
-gpio1.direction       = "GPIO_DIR_MODE_IN";
+gpio1.direction       = "GPIO_DIR_MODE_OUT";
+gpio1.writeInitialValue = true;
+gpio1.initialValue    = 0;
 gpio1.gpioPin.$assign = "GPIO58";
 
 gpio2.$name           = "IRIS_GPIO2";

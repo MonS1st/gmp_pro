@@ -731,8 +731,7 @@ static void power_app_trip(power_fault_t fault,
         g_power_app.trip_voltage_mv = voltage_mv;
         g_power_app.trip_current_ma = current_ma;
         fault_alarm_on_fault_latched(
-            power_app_fault_alarm_reason(fault),
-            (uint32_t)gmp_base_get_system_tick());
+            power_app_fault_alarm_reason(fault));
     }
 
     g_power_app.output_requested = false;

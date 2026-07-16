@@ -25,15 +25,33 @@ extern volatile uint32_t g_fault_alarm_clear_count;
 extern volatile uint32_t g_fault_alarm_start_tick;
 extern volatile uint32_t g_fault_alarm_last_duration_ms;
 
-// These diagnostics remain zero until LED6/LED7/LED8 and the beeper are
-// confirmed from board-level hardware documentation.
 extern volatile uint16_t g_fault_alarm_hardware_ready;
+extern volatile uint16_t g_fault_alarm_led_hardware_ready;
+extern volatile uint16_t g_fault_alarm_buzzer_hardware_ready;
 extern volatile uint16_t g_fault_alarm_selected_led_number;
 extern volatile uint16_t g_fault_alarm_buzzer_type;
 
+extern volatile uint16_t g_fault_alarm_fpga_led_bit;
+extern volatile uint16_t g_fault_alarm_fpga_led_mask;
+extern volatile uint16_t g_fault_alarm_fpga_led_shadow;
+extern volatile uint16_t g_fault_alarm_led_mapping_verified;
+
+extern volatile uint32_t g_fault_alarm_fpga_write_count;
+extern volatile uint32_t g_fault_alarm_fpga_write_error_count;
+extern volatile uint32_t g_fault_alarm_fpga_write_timeout_count;
+
+extern volatile uint16_t g_fault_alarm_led_apply_pending;
+extern volatile uint16_t g_fault_alarm_buzzer_start_pending;
+extern volatile uint16_t g_fault_alarm_buzzer_stop_pending;
+
+extern volatile uint16_t g_fault_alarm_led_test_command;
+extern volatile uint16_t g_fault_alarm_led_test_active_bit;
+extern volatile uint32_t g_fault_alarm_led_test_count;
+extern volatile uint16_t g_fault_alarm_buzzer_test_command;
+extern volatile uint32_t g_fault_alarm_buzzer_test_count;
+
 void fault_alarm_init(void);
-void fault_alarm_on_fault_latched(psu_fault_alarm_reason_t reason,
-                                  uint32_t current_tick);
+void fault_alarm_on_fault_latched(psu_fault_alarm_reason_t reason);
 void fault_alarm_on_fault_cleared(void);
 void fault_alarm_task(uint32_t current_tick);
 

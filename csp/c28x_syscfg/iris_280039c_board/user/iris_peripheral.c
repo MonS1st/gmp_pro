@@ -32,14 +32,14 @@ gpio_halt gpio_beep;
 void beep_on()
 {
 #if PSU_ENABLE_BEEP && !PSU_SAFE_BRINGUP
-    gmp_hal_gpio_write(gpio_beep, 1);
+    gmp_hal_gpio_write(gpio_beep, PSU_BUZZER_ACTIVE_LEVEL);
 #endif
 }
 
 void beep_off()
 {
 #if PSU_ENABLE_BEEP && !PSU_SAFE_BRINGUP
-    gmp_hal_gpio_write(gpio_beep, 0);
+    gmp_hal_gpio_write(gpio_beep, PSU_BUZZER_INACTIVE_LEVEL);
 #endif
 }
 
@@ -1836,12 +1836,12 @@ gmp_task_status_t fpga_test_task(gmp_task_t* tsk)
     if (led_stat == 0)
     {
         led_stat = 1;
-        SPI_writeReg(0x01U, 0x0003U);
+        (void)board_fpga_led_set(0x0003U, true);
     }
     else
     {
         led_stat = 0;
-        SPI_writeReg(0x01U, 0x0000U);
+        (void)board_fpga_led_set(0x0003U, false);
     }
 
     SPI_writeReg(0x03, 0x00FF);
