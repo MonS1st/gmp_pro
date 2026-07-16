@@ -73,6 +73,7 @@ static uint16_t s_oled_last_mode = 0xFFFFU;
 static uint16_t s_oled_last_feedback_valid = 0xFFFFU;
 static uint16_t s_oled_last_using_test_data = 0xFFFFU;
 static uint16_t s_oled_last_control_strategy = 0xFFFFU;
+static uint16_t s_oled_last_active_preset_index = 0xFFFFU;
 static uint16_t s_oled_last_policy_fault = 0xFFFFU;
 static uint16_t s_oled_last_policy_fault_latched = 0xFFFFU;
 static uint16_t s_oled_last_settings_result = 0xFFFFU;
@@ -185,6 +186,7 @@ static void power_ui_schedule_oled_retry(uint32_t delay_ms)
     s_oled_last_mode = 0xFFFFU;
     s_oled_last_feedback_valid = 0xFFFFU;
     s_oled_last_using_test_data = 0xFFFFU;
+    s_oled_last_active_preset_index = 0xFFFFU;
 }
 
 static void power_ui_handle_oled_failure_with_delay(ec_gt result,
@@ -596,6 +598,16 @@ static void power_ui_advance_i2c_recovery(ht16k33_dev_t* dev)
 
 static bool power_ui_is_mapped_key(uint16_t key_id)
 {
+    if (((PSU_KEY_PRESET_1_ID != 0U) &&
+         (key_id == PSU_KEY_PRESET_1_ID)) ||
+        ((PSU_KEY_PRESET_2_ID != 0U) &&
+         (key_id == PSU_KEY_PRESET_2_ID)) ||
+        ((PSU_KEY_PRESET_3_ID != 0U) &&
+         (key_id == PSU_KEY_PRESET_3_ID)))
+    {
+        return true;
+    }
+
     switch (key_id)
     {
     case PSU_KEY_VOLTAGE_UP_ID:
@@ -605,7 +617,6 @@ static bool power_ui_is_mapped_key(uint16_t key_id)
     case PSU_KEY_OUTPUT_TOGGLE_ID:
     case PSU_KEY_FAULT_RESET_ID:
     case PSU_KEY_CONTROL_STRATEGY_ID:
-    case PSU_KEY_SETTINGS_SAVE_ID:
         return true;
 
     default:
@@ -645,9 +656,37 @@ static bool power_ui_execute_key_action(uint16_t key_id)
     psu_control_strategy_t next_strategy;
     bool action_executed = true;
 
-    if (key_id != PSU_KEY_SETTINGS_SAVE_ID)
+    g_settings_result = PSU_SETTINGS_RESULT_IDLE;
+
+    if ((PSU_KEY_PRESET_1_ID != 0U) &&
+        (key_id == PSU_KEY_PRESET_1_ID))
     {
-        g_settings_result = PSU_SETTINGS_RESULT_IDLE;
+        action_executed = power_presets_select(0U);
+        if (action_executed)
+        {
+            power_ui_request_led_setpoint_update();
+        }
+        return action_executed;
+    }
+    if ((PSU_KEY_PRESET_2_ID != 0U) &&
+        (key_id == PSU_KEY_PRESET_2_ID))
+    {
+        action_executed = power_presets_select(1U);
+        if (action_executed)
+        {
+            power_ui_request_led_setpoint_update();
+        }
+        return action_executed;
+    }
+    if ((PSU_KEY_PRESET_3_ID != 0U) &&
+        (key_id == PSU_KEY_PRESET_3_ID))
+    {
+        action_executed = power_presets_select(2U);
+        if (action_executed)
+        {
+            power_ui_request_led_setpoint_update();
+        }
+        return action_executed;
     }
 
     if (((key_id == PSU_KEY_VOLTAGE_UP_ID) ||
@@ -761,10 +800,6 @@ static bool power_ui_execute_key_action(uint16_t key_id)
             next_strategy = PSU_CONTROL_STRATEGY_AUTO;
         }
         (void)power_control_policy_set_strategy(next_strategy);
-        break;
-
-    case PSU_KEY_SETTINGS_SAVE_ID:
-        power_settings_store_request_save();
         break;
 
     default:
@@ -1293,6 +1328,7 @@ gmp_task_status_t oled_show_task(gmp_task_t* tsk)
     uint16_t feedback_valid;
     uint16_t using_test_data;
     uint16_t control_strategy;
+    uint16_t active_preset_index;
     uint16_t policy_fault;
     uint16_t policy_fault_latched;
     uint16_t settings_result;
@@ -1466,6 +1502,7 @@ gmp_task_status_t oled_show_task(gmp_task_t* tsk)
                          (g_power_app.fault != POWER_FAULT_NONE) ||
                          (feedback_fault != 0U)) ? 1U : 0U;
     control_strategy = g_control_strategy;
+    active_preset_index = g_active_preset_index;
     policy_fault = g_control_policy_fault;
     policy_fault_latched = g_control_policy_fault_latched;
     settings_result = g_settings_result;
@@ -1487,7 +1524,8 @@ gmp_task_status_t oled_show_task(gmp_task_t* tsk)
 
     if ((display_mode != s_oled_last_mode) ||
         (using_test_data != s_oled_last_using_test_data) ||
-        (control_strategy != s_oled_last_control_strategy))
+        (control_strategy != s_oled_last_control_strategy) ||
+        (active_preset_index != s_oled_last_active_preset_index))
     {
         g_oled_pending_mask |= OLED_PENDING_MODE_STATUS;
     }
@@ -1614,15 +1652,18 @@ gmp_task_status_t oled_show_task(gmp_task_t* tsk)
 
         if (output_state == 1U)
         {
-            (void)snprintf(line3, sizeof(line3), "START %-4s ACT--",
+            (void)snprintf(line3, sizeof(line3),
+                           "M%u %-4s START --",
+                           (unsigned int)(active_preset_index + 1U),
                            strategy_text);
         }
         else
         {
             (void)snprintf(line3, sizeof(line3),
-                           "%-3s %-4s ACT%s%s ",
-                           (output_state == 2U) ? "ON" : "OFF",
+                           "M%u %-4s %-3s %s%s",
+                           (unsigned int)(active_preset_index + 1U),
                            strategy_text,
+                           (output_state == 2U) ? "ON" : "OFF",
                            actual_text,
                            test_mark);
         }
@@ -1633,6 +1674,7 @@ gmp_task_status_t oled_show_task(gmp_task_t* tsk)
             s_oled_last_mode = display_mode;
             s_oled_last_using_test_data = using_test_data;
             s_oled_last_control_strategy = control_strategy;
+            s_oled_last_active_preset_index = active_preset_index;
             g_oled_pending_mask &= (uint16_t)(~OLED_PENDING_MODE_STATUS);
         }
     }

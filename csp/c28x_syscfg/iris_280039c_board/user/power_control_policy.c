@@ -3,6 +3,7 @@
 #include "analog_io_test.h"
 #include "power_app.h"
 #include "power_mode_monitor.h"
+#include "power_settings_store.h"
 
 #include <ctrl_settings.h>
 
@@ -204,6 +205,8 @@ void power_control_policy_init(void)
 
 bool power_control_policy_set_strategy(psu_control_strategy_t strategy)
 {
+    bool strategy_changed;
+
     if (((uint16_t)strategy > (uint16_t)PSU_CONTROL_STRATEGY_CC_ONLY) ||
         !power_control_policy_strategy_change_allowed())
     {
@@ -211,7 +214,9 @@ bool power_control_policy_set_strategy(psu_control_strategy_t strategy)
         return false;
     }
 
-    if (g_control_strategy != (uint16_t)strategy)
+    strategy_changed =
+        (g_control_strategy != (uint16_t)strategy);
+    if (strategy_changed)
     {
         g_control_strategy = (uint16_t)strategy;
         ++g_control_policy_strategy_change_count;
@@ -219,6 +224,10 @@ bool power_control_policy_set_strategy(psu_control_strategy_t strategy)
     power_app_update_effective_setpoints();
     power_control_policy_clear_mismatch();
     g_control_policy_target_active = 0U;
+    if (strategy_changed)
+    {
+        power_presets_capture_user_change();
+    }
     return true;
 }
 

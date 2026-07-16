@@ -113,7 +113,12 @@
 #define PSU_KEY_OUTPUT_TOGGLE_ID        (5U)
 #define PSU_KEY_FAULT_RESET_ID          (6U)
 #define PSU_KEY_CONTROL_STRATEGY_ID      (7U)
-#define PSU_KEY_SETTINGS_SAVE_ID         (8U)
+// No authoritative physical key map exists for the three spare buttons.
+// Leave these disabled until g_last_raw_key_id is observed on real hardware;
+// then assign three distinct, otherwise unused IDs in the 1..39 range.
+#define PSU_KEY_PRESET_1_ID              (0U)
+#define PSU_KEY_PRESET_2_ID              (0U)
+#define PSU_KEY_PRESET_3_ID              (0U)
 
 #define PSU_VOLTAGE_STEP_MV             (100U)
 #define PSU_CURRENT_STEP_MA             (1U)
@@ -132,6 +137,7 @@
 
 #define PSU_KEY_TASK_PERIOD_MS                    (20U)
 #define PSU_KEY_TASK_INITIAL_DELAY_MS             (10U)
+#define PSU_PRESET_AUTO_SAVE_DELAY_MS              (2000U)
 #define PSU_HT16K33_DISPLAY_PERIOD_MS             (500U)
 #define PSU_HT16K33_DISPLAY_INITIAL_DELAY_MS      (250U)
 #define PSU_OLED_TASK_PERIOD_MS                   (100U)

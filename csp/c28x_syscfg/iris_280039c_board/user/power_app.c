@@ -5,6 +5,7 @@
 #include "power_hal.h"
 #include "power_protection.h"
 #include "power_self_test.h"
+#include "power_settings_store.h"
 
 #include <ctrl_settings.h>
 #include <gmp_core.h>
@@ -787,30 +788,48 @@ void power_app_init(void)
 
 void power_app_set_voltage_mv(uint16_t voltage_mv)
 {
+    uint16_t next_voltage_mv;
+
     if (g_voltage_adjust_locked != 0U)
     {
         ++g_locked_adjust_reject_count;
         return;
     }
 
-    g_user_voltage_set_mv =
+    next_voltage_mv =
         (voltage_mv > PSU_COMMAND_VOLTAGE_LIMIT_MV) ?
             PSU_COMMAND_VOLTAGE_LIMIT_MV : voltage_mv;
+    if (next_voltage_mv == g_user_voltage_set_mv)
+    {
+        return;
+    }
+
+    g_user_voltage_set_mv = next_voltage_mv;
     power_app_update_effective_setpoints();
+    power_presets_capture_user_change();
 }
 
 void power_app_set_current_ma(uint16_t current_ma)
 {
+    uint16_t next_current_ma;
+
     if (g_current_adjust_locked != 0U)
     {
         ++g_locked_adjust_reject_count;
         return;
     }
 
-    g_user_current_set_ma =
+    next_current_ma =
         (current_ma > PSU_COMMAND_CURRENT_LIMIT_MA) ?
             PSU_COMMAND_CURRENT_LIMIT_MA : current_ma;
+    if (next_current_ma == g_user_current_set_ma)
+    {
+        return;
+    }
+
+    g_user_current_set_ma = next_current_ma;
     power_app_update_effective_setpoints();
+    power_presets_capture_user_change();
 }
 
 uint16_t power_app_get_voltage_mv(void)
