@@ -92,7 +92,7 @@ static uint16_t s_i2c_recovery_ht_stage = 0U;
 #define HT16K33_DISPLAY_TEST_HOLD_MS (1000U)
 
 static data_gt s_oled_blank_page[OLED_CLEAR_PAGE_BYTES] = {0U};
-static data_gt s_oled_probe_payload[2] = {0x00U, 0xAEU};
+static data_gt s_oled_probe_command = 0xAEU;
 
 static bool power_ui_tick_due(time_gt deadline)
 {
@@ -208,14 +208,21 @@ static void power_ui_handle_oled_failure(ec_gt result)
 
 static ec_gt power_ui_probe_oled_address(uint16_t address)
 {
+    ec_gt result;
+
     g_oled_last_slave_address = address;
-    // Keep one byte in the C28x TX FIFO before START.  With addr_len == 0,
-    // gmp_hal_iic_write_mem() starts the transaction while the FIFO is empty.
-    // Treating the OLED control byte as the one-byte memory address preserves
-    // the exact on-wire payload: 0x00, 0xAE.
-    return gmp_hal_iic_write_mem(
-        iic_bus, address, (addr32_gt)s_oled_probe_payload[0], 1U,
-        &s_oled_probe_payload[1], 1U, (time_gt)OLED_I2C_TIMEOUT_TICKS);
+    g_oled_last_control_byte = 0x00U;
+    g_oled_last_payload_length = 1U;
+    g_oled_last_addr_length = 1U;
+    result = gmp_hal_iic_write_mem(
+        iic_bus, address, 0x00U, 1U,
+        &s_oled_probe_command, 1U, (time_gt)OLED_I2C_TIMEOUT_TICKS);
+    if (result == GMP_EC_TIMEOUT)
+    {
+        ++g_oled_timeout_count;
+    }
+
+    return result;
 }
 
 static void power_ui_prepare_oled_address_scan(void)

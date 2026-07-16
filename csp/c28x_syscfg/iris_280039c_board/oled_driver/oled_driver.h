@@ -24,6 +24,10 @@ extern volatile uint16_t g_oled_fail_page;
 // Pixel-data bytes attempted; excludes the leading 0x40 control byte.
 extern volatile uint16_t g_oled_fail_length;
 extern volatile uint16_t g_oled_last_slave_address;
+extern volatile uint16_t g_oled_last_control_byte;
+extern volatile uint16_t g_oled_last_payload_length;
+extern volatile uint16_t g_oled_last_addr_length;
+extern volatile uint32_t g_oled_timeout_count;
 extern volatile ec_gt g_oled_probe_result;
 extern volatile uint32_t g_oled_probe_ok_count;
 extern volatile uint32_t g_oled_probe_error_count;
