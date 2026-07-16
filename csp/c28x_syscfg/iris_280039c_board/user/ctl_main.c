@@ -47,8 +47,8 @@
 
 void ctl_init()
 {
-    // Assert the fail-safe low force before any application state is created.
-    power_output_epwm_init();
+    // Keep the active-high OVP/OCP fault output low through initialization.
+    power_fault_epwm_init();
     power_app_init();
 }
 

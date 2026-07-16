@@ -8,8 +8,13 @@
 
 static volatile bool s_power_output_hw_enabled = false;
 
-#define POWER_OUTPUT_EPWM_BASE    (IRIS_EPWM4_BASE)
-#define POWER_OUTPUT_EPWM_PERIOD  (IRIS_EPWM4_TBPRD)
+volatile uint16_t g_epwm_fault_command = 0U;
+volatile uint16_t g_epwm_fault_level = 0U;
+volatile uint32_t g_epwm_fault_assert_count = 0U;
+volatile uint32_t g_epwm_fault_clear_count = 0U;
+
+#define POWER_FAULT_EPWM_BASE    (IRIS_EPWM4_BASE)
+#define POWER_FAULT_EPWM_PERIOD  (IRIS_EPWM4_TBPRD)
 
 #if !PSU_ENABLE_ANALOG_IO_TEST
 static void power_dac_force_physical_zero(void)
@@ -95,100 +100,118 @@ void power_dac_set_zero(void)
 #endif
 }
 
-void power_output_epwm_init(void)
+void power_fault_epwm_init(void)
 {
     // Assert the fail-safe state before changing any time-base or AQ setting.
     EPWM_setActionQualifierContSWForceShadowMode(
-        POWER_OUTPUT_EPWM_BASE, EPWM_AQ_SW_IMMEDIATE_LOAD);
+        POWER_FAULT_EPWM_BASE, EPWM_AQ_SW_IMMEDIATE_LOAD);
     EPWM_setActionQualifierContSWForceAction(
-        POWER_OUTPUT_EPWM_BASE, EPWM_AQ_OUTPUT_A, EPWM_AQ_SW_OUTPUT_LOW);
+        POWER_FAULT_EPWM_BASE, EPWM_AQ_OUTPUT_A, EPWM_AQ_SW_OUTPUT_LOW);
     EPWM_setActionQualifierContSWForceAction(
-        POWER_OUTPUT_EPWM_BASE, EPWM_AQ_OUTPUT_B, EPWM_AQ_SW_OUTPUT_LOW);
+        POWER_FAULT_EPWM_BASE, EPWM_AQ_OUTPUT_B, EPWM_AQ_SW_OUTPUT_LOW);
 
     // Configure this channel independently of EPWM1. EPWM1 remains the ADC
-    // SOCA/sample timebase; EPWM4A is only a static 3.3 V digital output.
-    EPWM_setClockPrescaler(POWER_OUTPUT_EPWM_BASE,
+    // SOCA/sample timebase; EPWM4A is an active-high OVP/OCP fault output.
+    EPWM_setClockPrescaler(POWER_FAULT_EPWM_BASE,
                            EPWM_CLOCK_DIVIDER_1,
                            EPWM_HSCLOCK_DIVIDER_1);
-    EPWM_selectPeriodLoadEvent(POWER_OUTPUT_EPWM_BASE,
+    EPWM_selectPeriodLoadEvent(POWER_FAULT_EPWM_BASE,
                                EPWM_SHADOW_LOAD_MODE_COUNTER_ZERO);
-    EPWM_setTimeBasePeriod(POWER_OUTPUT_EPWM_BASE,
-                           POWER_OUTPUT_EPWM_PERIOD);
-    EPWM_setTimeBaseCounter(POWER_OUTPUT_EPWM_BASE, 0U);
-    EPWM_setTimeBaseCounterMode(POWER_OUTPUT_EPWM_BASE,
+    EPWM_setTimeBasePeriod(POWER_FAULT_EPWM_BASE,
+                           POWER_FAULT_EPWM_PERIOD);
+    EPWM_setTimeBaseCounter(POWER_FAULT_EPWM_BASE, 0U);
+    EPWM_setTimeBaseCounterMode(POWER_FAULT_EPWM_BASE,
                                 EPWM_COUNTER_MODE_UP);
-    EPWM_setCountModeAfterSync(POWER_OUTPUT_EPWM_BASE,
+    EPWM_setCountModeAfterSync(POWER_FAULT_EPWM_BASE,
                                EPWM_COUNT_MODE_UP_AFTER_SYNC);
-    EPWM_disablePhaseShiftLoad(POWER_OUTPUT_EPWM_BASE);
-    EPWM_setPhaseShift(POWER_OUTPUT_EPWM_BASE, 0U);
-    EPWM_disableOneShotSync(POWER_OUTPUT_EPWM_BASE);
-    EPWM_disableSyncOutPulseSource(POWER_OUTPUT_EPWM_BASE,
+    EPWM_disablePhaseShiftLoad(POWER_FAULT_EPWM_BASE);
+    EPWM_setPhaseShift(POWER_FAULT_EPWM_BASE, 0U);
+    EPWM_disableOneShotSync(POWER_FAULT_EPWM_BASE);
+    EPWM_disableSyncOutPulseSource(POWER_FAULT_EPWM_BASE,
                                    EPWM_SYNC_OUT_PULSE_ON_ALL);
 
-    EPWM_setCounterCompareValue(POWER_OUTPUT_EPWM_BASE,
+    EPWM_setCounterCompareValue(POWER_FAULT_EPWM_BASE,
                                 EPWM_COUNTER_COMPARE_A, 0U);
-    EPWM_setCounterCompareShadowLoadMode(POWER_OUTPUT_EPWM_BASE,
+    EPWM_setCounterCompareShadowLoadMode(POWER_FAULT_EPWM_BASE,
                                          EPWM_COUNTER_COMPARE_A,
                                          EPWM_COMP_LOAD_ON_CNTR_ZERO);
 
     EPWM_setActionQualifierAction(
-        POWER_OUTPUT_EPWM_BASE, EPWM_AQ_OUTPUT_A, EPWM_AQ_OUTPUT_HIGH,
+        POWER_FAULT_EPWM_BASE, EPWM_AQ_OUTPUT_A, EPWM_AQ_OUTPUT_HIGH,
         EPWM_AQ_OUTPUT_ON_TIMEBASE_ZERO);
     EPWM_setActionQualifierAction(
-        POWER_OUTPUT_EPWM_BASE, EPWM_AQ_OUTPUT_A, EPWM_AQ_OUTPUT_LOW,
+        POWER_FAULT_EPWM_BASE, EPWM_AQ_OUTPUT_A, EPWM_AQ_OUTPUT_LOW,
         EPWM_AQ_OUTPUT_ON_TIMEBASE_UP_CMPA);
     EPWM_setActionQualifierAction(
-        POWER_OUTPUT_EPWM_BASE, EPWM_AQ_OUTPUT_A, EPWM_AQ_OUTPUT_NO_CHANGE,
+        POWER_FAULT_EPWM_BASE, EPWM_AQ_OUTPUT_A, EPWM_AQ_OUTPUT_NO_CHANGE,
         EPWM_AQ_OUTPUT_ON_TIMEBASE_PERIOD);
     EPWM_setActionQualifierAction(
-        POWER_OUTPUT_EPWM_BASE, EPWM_AQ_OUTPUT_A, EPWM_AQ_OUTPUT_NO_CHANGE,
+        POWER_FAULT_EPWM_BASE, EPWM_AQ_OUTPUT_A, EPWM_AQ_OUTPUT_NO_CHANGE,
         EPWM_AQ_OUTPUT_ON_TIMEBASE_DOWN_CMPA);
     EPWM_setActionQualifierAction(
-        POWER_OUTPUT_EPWM_BASE, EPWM_AQ_OUTPUT_A, EPWM_AQ_OUTPUT_NO_CHANGE,
+        POWER_FAULT_EPWM_BASE, EPWM_AQ_OUTPUT_A, EPWM_AQ_OUTPUT_NO_CHANGE,
         EPWM_AQ_OUTPUT_ON_TIMEBASE_UP_CMPB);
     EPWM_setActionQualifierAction(
-        POWER_OUTPUT_EPWM_BASE, EPWM_AQ_OUTPUT_A, EPWM_AQ_OUTPUT_NO_CHANGE,
+        POWER_FAULT_EPWM_BASE, EPWM_AQ_OUTPUT_A, EPWM_AQ_OUTPUT_NO_CHANGE,
         EPWM_AQ_OUTPUT_ON_TIMEBASE_DOWN_CMPB);
 
     // No complementary output path and no dead-band processing.
-    EPWM_setDeadBandOutputSwapMode(POWER_OUTPUT_EPWM_BASE,
+    EPWM_setDeadBandOutputSwapMode(POWER_FAULT_EPWM_BASE,
                                    EPWM_DB_OUTPUT_A, false);
-    EPWM_setDeadBandOutputSwapMode(POWER_OUTPUT_EPWM_BASE,
+    EPWM_setDeadBandOutputSwapMode(POWER_FAULT_EPWM_BASE,
                                    EPWM_DB_OUTPUT_B, false);
-    EPWM_setDeadBandDelayMode(POWER_OUTPUT_EPWM_BASE, EPWM_DB_RED, false);
-    EPWM_setDeadBandDelayMode(POWER_OUTPUT_EPWM_BASE, EPWM_DB_FED, false);
+    EPWM_setDeadBandDelayMode(POWER_FAULT_EPWM_BASE, EPWM_DB_RED, false);
+    EPWM_setDeadBandDelayMode(POWER_FAULT_EPWM_BASE, EPWM_DB_FED, false);
 
-    EPWM_disableInterrupt(POWER_OUTPUT_EPWM_BASE);
-    EPWM_disableADCTrigger(POWER_OUTPUT_EPWM_BASE, EPWM_SOC_A);
-    EPWM_disableADCTrigger(POWER_OUTPUT_EPWM_BASE, EPWM_SOC_B);
+    EPWM_disableInterrupt(POWER_FAULT_EPWM_BASE);
+    EPWM_disableADCTrigger(POWER_FAULT_EPWM_BASE, EPWM_SOC_A);
+    EPWM_disableADCTrigger(POWER_FAULT_EPWM_BASE, EPWM_SOC_B);
 
-    power_output_epwm_set(false);
+    power_fault_epwm_set(false);
 }
 
-void power_output_epwm_set(bool enable)
+void power_fault_epwm_set(bool fault_active)
 {
-    if (!enable)
+    uint16_t requested_level = fault_active ? 1U : 0U;
+    bool level_changed = (g_epwm_fault_level != requested_level);
+
+    g_epwm_fault_command = requested_level;
+
+    if (!fault_active)
     {
-        // Immediate continuous force makes FAULT/OFF independent of AQ event
-        // collisions at TBCTR zero or a compare boundary.
+        // Immediate continuous force makes the normal state independent of
+        // AQ event collisions at TBCTR zero or a compare boundary.
         EPWM_setActionQualifierContSWForceAction(
-            POWER_OUTPUT_EPWM_BASE, EPWM_AQ_OUTPUT_A,
+            POWER_FAULT_EPWM_BASE, EPWM_AQ_OUTPUT_A,
             EPWM_AQ_SW_OUTPUT_LOW);
-        EPWM_setCounterCompareValue(POWER_OUTPUT_EPWM_BASE,
+        EPWM_setCounterCompareValue(POWER_FAULT_EPWM_BASE,
                                     EPWM_COUNTER_COMPARE_A, 0U);
-        s_power_output_hw_enabled = false;
+        g_epwm_fault_level = 0U;
+        if (level_changed)
+        {
+            ++g_epwm_fault_clear_count;
+        }
         return;
     }
 
-    // Keep CMPA equal to TBPRD as the requested 100% representation, while
+    // Keep CMPA equal to TBPRD as the asserted-state representation, while
     // continuous HIGH guarantees no short low pulse at the period boundary.
-    EPWM_setCounterCompareValue(POWER_OUTPUT_EPWM_BASE,
+    EPWM_setCounterCompareValue(POWER_FAULT_EPWM_BASE,
                                 EPWM_COUNTER_COMPARE_A,
-                                POWER_OUTPUT_EPWM_PERIOD);
+                                POWER_FAULT_EPWM_PERIOD);
     EPWM_setActionQualifierContSWForceAction(
-        POWER_OUTPUT_EPWM_BASE, EPWM_AQ_OUTPUT_A,
+        POWER_FAULT_EPWM_BASE, EPWM_AQ_OUTPUT_A,
         EPWM_AQ_SW_OUTPUT_HIGH);
-    s_power_output_hw_enabled = true;
+    g_epwm_fault_level = 1U;
+    if (level_changed)
+    {
+        ++g_epwm_fault_assert_count;
+    }
+}
+
+bool power_fault_epwm_get(void)
+{
+    return g_epwm_fault_level != 0U;
 }
 
 void power_output_hw_set(bool enable)
@@ -196,25 +219,21 @@ void power_output_hw_set(bool enable)
 #if PSU_SAFE_BRINGUP || !PSU_ALLOW_PHYSICAL_OUTPUT_ENABLE || \
     !PSU_OUTPUT_SWITCH_PHYSICAL_RELAY_ENABLE
     (void)enable;
-    power_output_epwm_set(false);
+    s_power_output_hw_enabled = false;
 #else
-    power_output_epwm_set(enable);
+    s_power_output_hw_enabled = enable;
 #endif
 }
 
 void power_output_hw_service(void)
 {
-#if PSU_SAFE_BRINGUP || !PSU_ALLOW_PHYSICAL_OUTPUT_ENABLE || \
-    !PSU_OUTPUT_SWITCH_PHYSICAL_RELAY_ENABLE
-    power_output_epwm_set(false);
-#endif
+    // Output state is software-only. No EPWM, FPGA SPI, or blocking work.
 }
 
 bool power_output_hw_get(void)
 {
 #if PSU_SAFE_BRINGUP || !PSU_ALLOW_PHYSICAL_OUTPUT_ENABLE || \
     !PSU_OUTPUT_SWITCH_PHYSICAL_RELAY_ENABLE
-    power_output_epwm_set(false);
     return false;
 #else
     return s_power_output_hw_enabled;

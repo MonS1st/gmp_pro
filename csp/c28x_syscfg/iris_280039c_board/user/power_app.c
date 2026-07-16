@@ -159,6 +159,18 @@ static bool power_app_physical_output_forbidden(void)
            !PSU_OUTPUT_SWITCH_PHYSICAL_RELAY_ENABLE;
 }
 
+static bool power_fault_epwm_should_assert(void)
+{
+    return g_power_app.fault_latched &&
+           ((g_power_app.fault == POWER_FAULT_OVERVOLTAGE) ||
+            (g_power_app.fault == POWER_FAULT_OVERCURRENT));
+}
+
+static void power_fault_epwm_sync(void)
+{
+    power_fault_epwm_set(power_fault_epwm_should_assert());
+}
+
 static bool power_app_output_switch_fault_active(void)
 {
     return g_power_app.fault_latched ||
@@ -210,6 +222,9 @@ static void power_app_output_switch_set_off(power_state_t state)
 
 void power_app_output_switch_fault_shutdown(void)
 {
+    // ADC feedback/hold faults are not OVP/OCP indications. Keep a previously
+    // confirmed OVP/OCP asserted, but otherwise force the fault output low.
+    power_fault_epwm_sync();
 #if PSU_ENABLE_LOGICAL_OUTPUT_SWITCH
     if ((g_power_app.state != POWER_STATE_FAULT) ||
         (g_output_switch_requested != 0U) ||
@@ -237,6 +252,7 @@ void power_app_output_switch_fault_shutdown(void)
 
 void power_app_output_switch_policy_shutdown(void)
 {
+    power_fault_epwm_sync();
 #if PSU_ENABLE_LOGICAL_OUTPUT_SWITCH
     g_power_app.fault_reset_requested = false;
     power_app_output_switch_set_off(POWER_STATE_FAULT);
@@ -246,6 +262,7 @@ void power_app_output_switch_policy_shutdown(void)
 
 void power_app_output_switch_policy_reset(void)
 {
+    power_fault_epwm_sync();
 #if PSU_ENABLE_LOGICAL_OUTPUT_SWITCH
     g_power_app.fault_reset_requested = false;
     power_app_output_switch_set_off(POWER_STATE_OFF);
@@ -488,6 +505,17 @@ static void power_app_trip(power_fault_t fault,
         g_power_app.trip_current_ma = current_ma;
     }
 
+    // This is the confirmed protection-action point. Do not drive the fault
+    // output from individual ADC samples or from the low-speed task.
+    if (power_fault_epwm_should_assert())
+    {
+        power_fault_epwm_set(true);
+    }
+    else
+    {
+        power_fault_epwm_set(false);
+    }
+
     g_power_app.output_requested = false;
     g_power_app.fault_reset_requested = false;
 #if PSU_ENABLE_LOGICAL_OUTPUT_SWITCH
@@ -528,6 +556,7 @@ void power_app_init(void)
     g_power_app.output_requested = false;
     g_power_app.output_enabled = false;
     g_power_app.fault_latched = false;
+    power_fault_epwm_set(false);
     g_power_app.fault_reset_requested = false;
     s_last_voltage_set_mv = g_power_app.voltage_set_mv;
     s_last_current_set_ma = g_power_app.current_set_ma;
@@ -733,6 +762,7 @@ void power_app_fast_step(void)
         g_power_app.output_requested = false;
         g_power_app.output_enabled = false;
         g_power_app.fault_reset_requested = false;
+        power_fault_epwm_sync();
 #if PSU_ENABLE_LOGICAL_OUTPUT_SWITCH
         if (g_power_app.fault_latched ||
             (g_analog_board_feedback_fault != 0U) ||
@@ -771,6 +801,7 @@ void power_app_fast_step(void)
     if (power_app_physical_output_forbidden())
     {
         power_output_hw_set(false);
+        power_fault_epwm_sync();
         g_output_switch_physical_relay_available = 0U;
         g_output_switch_relay_command = 0U;
         g_power_app.dac_voltage_code = g_dac_test_voltage_applied_code;
@@ -837,6 +868,7 @@ void power_app_fast_step(void)
         // Keep every physical path off while the software model, measurement
         // override, protection counters, fault latch, and reset remain active.
         power_output_hw_set(false);
+        power_fault_epwm_sync();
         power_dac_set_zero();
         g_power_app.output_requested = false;
         g_power_app.output_enabled = false;
@@ -857,6 +889,7 @@ void power_app_fast_step(void)
             {
                 g_power_app.fault = POWER_FAULT_NONE;
                 g_power_app.fault_latched = false;
+                power_fault_epwm_set(false);
                 g_power_app.trip_voltage_mv = 0U;
                 g_power_app.trip_current_ma = 0U;
                 power_protection_reset();
@@ -880,17 +913,15 @@ void power_app_fast_step(void)
 #endif
             if (protection_result == POWER_PROTECTION_RESULT_OVERVOLTAGE)
             {
-                g_power_app.fault = POWER_FAULT_OVERVOLTAGE;
-                g_power_app.fault_latched = true;
-                g_power_app.trip_voltage_mv = voltage_meas_mv;
-                g_power_app.trip_current_ma = current_meas_ma;
+                power_app_trip(POWER_FAULT_OVERVOLTAGE,
+                               voltage_meas_mv,
+                               current_meas_ma);
             }
             else if (protection_result == POWER_PROTECTION_RESULT_OVERCURRENT)
             {
-                g_power_app.fault = POWER_FAULT_OVERCURRENT;
-                g_power_app.fault_latched = true;
-                g_power_app.trip_voltage_mv = voltage_meas_mv;
-                g_power_app.trip_current_ma = current_meas_ma;
+                power_app_trip(POWER_FAULT_OVERCURRENT,
+                               voltage_meas_mv,
+                               current_meas_ma);
             }
         }
 
@@ -918,6 +949,7 @@ void power_app_fast_step(void)
         {
             g_power_app.fault = POWER_FAULT_NONE;
             g_power_app.fault_latched = false;
+            power_fault_epwm_set(false);
             g_power_app.trip_voltage_mv = 0U;
             g_power_app.trip_current_ma = 0U;
             power_protection_reset();
