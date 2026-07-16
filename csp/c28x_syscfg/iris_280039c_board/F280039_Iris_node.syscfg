@@ -547,6 +547,9 @@ gpio8.gpioPin.$assign = "GPIO59";
 
 gpio9.$name           = "IRIS_GPIO_SPI_RST";
 gpio9.direction       = "GPIO_DIR_MODE_OUT";
+gpio9.padConfig       = "STD";
+gpio9.writeInitialValue = true;
+gpio9.initialValue    = 1;
 gpio9.gpioPin.$assign = "GPIO55";
 
 gpio10.$name           = "IRIS_ENCODER_SW";

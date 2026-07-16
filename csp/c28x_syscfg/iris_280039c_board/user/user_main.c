@@ -138,6 +138,7 @@ gmp_task_status_t tsk_dl_debug_device(gmp_task_t* tsk)
 // GPIO
 gpio_halt user_led;
 volatile uint16_t flag_init_cmpt = 0;
+volatile uint16_t g_fpga_reset_level = 0U;
 volatile uint16_t g_power_safe_bringup_self_test_failures = 0U;
 volatile uint32_t g_main_isr_count = 0U;
 volatile uint32_t g_scheduler_loop_count = 0U;
@@ -411,6 +412,11 @@ GMP_NO_OPT_PREFIX
 void init(void) GMP_NO_OPT_SUFFIX
 {
     int i;
+
+    // SysConfig released the active-low reset during Board_init(). Wait once
+    // before any FPGA SPI access, then capture the GPIO55 level for debug.
+    DEVICE_DELAY_US(10000U);
+    g_fpga_reset_level = (uint16_t)GPIO_readPin(IRIS_GPIO_SPI_RST);
 
     analog_io_test_init();
     rotary_encoder_ui_init();
