@@ -61,8 +61,8 @@
 #define PSU_DAC_CODE_SCALE             (4096UL)
 #define PSU_DAC_MAX_CODE               (4095U)
 
-#define PSU_VOLTAGE_CMD_MAX_MV         (10000U)
-#define PSU_CURRENT_CMD_MAX_MA         (100U)
+#define PSU_VOLTAGE_CMD_MAX_MV         (11000U)
+#define PSU_CURRENT_CMD_MAX_MA         (105U)
 #define PSU_ENABLE_LOW_RANGE_BRINGUP_LIMITS (0)
 #define PSU_VSET_DIVIDER               (4UL)
 #define PSU_ISET_GAIN_MV_PER_MA        (22UL)

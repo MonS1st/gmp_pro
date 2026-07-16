@@ -17,6 +17,9 @@ void power_dac_set_voltage_mv(uint16_t voltage_mv);
 void power_dac_set_current_ma(uint16_t current_ma);
 void power_dac_set_zero(void);
 
+// Dedicated digital output: ePWM4A on GPIO22 (DIMM/HSEC pin 41, label 22).
+void power_output_epwm_init(void);
+void power_output_epwm_set(bool enable);
 void power_output_hw_set(bool enable);
 void power_output_hw_service(void);
 bool power_output_hw_get(void);

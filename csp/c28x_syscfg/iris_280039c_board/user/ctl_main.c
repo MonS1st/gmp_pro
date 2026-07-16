@@ -17,6 +17,7 @@
 #include <ctrl_settings.h>
 
 #include "ctl_main.h"
+#include "power_hal.h"
 
 #include <xplt.peripheral.h>
 
@@ -46,6 +47,8 @@
 
 void ctl_init()
 {
+    // Assert the fail-safe low force before any application state is created.
+    power_output_epwm_init();
     power_app_init();
 }
 
