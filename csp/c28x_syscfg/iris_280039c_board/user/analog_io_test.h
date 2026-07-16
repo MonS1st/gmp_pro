@@ -3,6 +3,7 @@
 
 #include <gmp_core.h>
 #include <core/pm/function_scheduler.h>
+#include <stdbool.h>
 #include <stdint.h>
 
 #ifdef __cplusplus
@@ -86,6 +87,8 @@ extern gmp_task_t task_analog_io_test;
 
 void analog_io_test_init(void);
 void analog_io_test_force_safe_outputs(void);
+bool analog_io_test_prepare_power_fault_reset(void);
+bool analog_io_test_prepare_output_request(void);
 gmp_task_status_t analog_io_test_task(gmp_task_t* tsk);
 
 #ifdef __cplusplus

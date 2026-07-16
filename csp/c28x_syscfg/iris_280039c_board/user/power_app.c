@@ -220,6 +220,86 @@ static void power_app_output_switch_set_off(power_state_t state)
     power_app_clear_mode_confirmation();
 }
 
+static bool power_app_resettable_power_fault_active(void)
+{
+    return g_power_app.fault_latched &&
+           ((g_power_app.fault == POWER_FAULT_OVERVOLTAGE) ||
+            (g_power_app.fault == POWER_FAULT_OVERCURRENT));
+}
+
+static bool power_app_fault_reset_output_is_off(void)
+{
+    return (g_output_switch_requested == 0U) &&
+           (g_output_switch_active == 0U) &&
+           (g_output_switch_precharge_active == 0U) &&
+           (g_output_switch_dac_gate_active == 0U) &&
+           (g_output_switch_relay_command == 0U) &&
+           !g_power_app.output_requested &&
+           !g_power_app.output_enabled &&
+           !power_output_hw_get();
+}
+
+static bool power_app_fault_reset_safe(uint16_t voltage_mv,
+                                       uint16_t current_ma)
+{
+    if (!power_app_resettable_power_fault_active() ||
+        !power_app_fault_reset_output_is_off() ||
+        !power_protection_release_safe(voltage_mv, current_ma) ||
+        (g_analog_board_feedback_fault != 0U))
+    {
+        return false;
+    }
+
+    if (!analog_io_test_prepare_power_fault_reset())
+    {
+        return false;
+    }
+
+    return (g_analog_board_feedback_fault == 0U) &&
+           (g_analog_board_fault_hold_active == 0U) &&
+           (g_analog_board_fault_shutdown_active == 0U);
+}
+
+static void power_app_complete_fault_reset(void)
+{
+    g_power_app.fault = POWER_FAULT_NONE;
+    g_power_app.fault_latched = false;
+    g_power_app.fault_reset_requested = false;
+    g_power_app.trip_voltage_mv = 0U;
+    g_power_app.trip_current_ma = 0U;
+    g_analog_board_ovp_confirm_count = 0U;
+    g_analog_board_ocp_confirm_count = 0U;
+    power_protection_reset();
+    power_fault_epwm_set(false);
+    power_app_output_switch_set_off(POWER_STATE_OFF);
+    power_dac_set_zero();
+    analog_io_test_force_safe_outputs();
+}
+
+static bool power_app_process_fault_reset_request(uint16_t voltage_mv,
+                                                  uint16_t current_ma)
+{
+    if (!g_power_app.fault_latched ||
+        !g_power_app.fault_reset_requested)
+    {
+        return false;
+    }
+
+    // Consume exactly one request regardless of success or rejection.
+    g_power_app.fault_reset_requested = false;
+    if (!power_app_fault_reset_safe(voltage_mv, current_ma))
+    {
+        power_app_output_switch_set_off(POWER_STATE_FAULT);
+        power_dac_set_zero();
+        analog_io_test_force_safe_outputs();
+        power_fault_epwm_sync();
+        return false;
+    }
+
+    power_app_complete_fault_reset();
+    return true;
+}
+
 void power_app_output_switch_fault_shutdown(void)
 {
     // ADC feedback/hold faults are not OVP/OCP indications. Keep a previously
@@ -245,7 +325,10 @@ void power_app_output_switch_fault_shutdown(void)
         g_power_app.trip_current_ma = g_power_app.current_meas_ma;
     }
 
-    g_power_app.fault_reset_requested = false;
+    if (!power_app_resettable_power_fault_active())
+    {
+        g_power_app.fault_reset_requested = false;
+    }
     power_app_output_switch_set_off(POWER_STATE_FAULT);
 #endif
 }
@@ -254,7 +337,10 @@ void power_app_output_switch_policy_shutdown(void)
 {
     power_fault_epwm_sync();
 #if PSU_ENABLE_LOGICAL_OUTPUT_SWITCH
-    g_power_app.fault_reset_requested = false;
+    if (!power_app_resettable_power_fault_active())
+    {
+        g_power_app.fault_reset_requested = false;
+    }
     power_app_output_switch_set_off(POWER_STATE_FAULT);
     analog_io_test_force_safe_outputs();
 #endif
@@ -549,6 +635,9 @@ void power_app_init(void)
     g_power_app.dac_voltage_code = 0U;
     g_power_app.dac_current_code =
         power_current_ma_to_dac(g_power_app.current_set_ma);
+    g_vs_5v_dac_code = power_voltage_mv_to_dac(5000U);
+    g_vs_103v_dac_code = power_voltage_mv_to_dac(10300U);
+    g_vs_11v_dac_code = power_voltage_mv_to_dac(11000U);
     g_power_app.cc_confirm_count = 0U;
     g_power_app.cv_confirm_count = 0U;
     g_power_app.state = POWER_STATE_OFF;
@@ -666,6 +755,14 @@ void power_app_request_logical_output(bool enable)
         return;
     }
 
+    if (!analog_io_test_prepare_output_request())
+    {
+        ++g_output_switch_reject_count;
+        power_app_output_switch_set_off(POWER_STATE_OFF);
+        analog_io_test_force_safe_outputs();
+        return;
+    }
+
     g_output_switch_requested = 1U;
     g_power_app.output_requested = false;
 #else
@@ -721,6 +818,13 @@ void power_app_fast_step(void)
     g_power_app.voltage_meas_mv = power_float_to_u16(g_vout_meas_v * 1000.0f);
     g_power_app.current_meas_ma = power_float_to_u16(g_iout_meas_ma);
 #endif
+
+    if (power_app_process_fault_reset_request(
+            g_power_app.voltage_meas_mv,
+            g_power_app.current_meas_ma))
+    {
+        return;
+    }
 
 #if PSU_ENABLE_ANALOG_BOARD_BRINGUP && PSU_ANALOG_BOARD_USE_REAL_ADC && \
     PSU_REAL_FEEDBACK_CONNECTED
@@ -880,22 +984,9 @@ void power_app_fast_step(void)
 
         if (g_power_app.fault_latched)
         {
-#if PSU_ENABLE_ANALOG_BOARD_BRINGUP
-            // Bring-up faults remain latched; no reset may restart DAC follow.
+            // Any request was handled above using the same safety gate in
+            // bring-up and normal configurations.
             g_power_app.fault_reset_requested = false;
-#else
-            if (g_power_app.fault_reset_requested &&
-                power_protection_release_safe(voltage_meas_mv, current_meas_ma))
-            {
-                g_power_app.fault = POWER_FAULT_NONE;
-                g_power_app.fault_latched = false;
-                power_fault_epwm_set(false);
-                g_power_app.trip_voltage_mv = 0U;
-                g_power_app.trip_current_ma = 0U;
-                power_protection_reset();
-            }
-            g_power_app.fault_reset_requested = false;
-#endif
         }
         else
         {
@@ -937,24 +1028,9 @@ void power_app_fast_step(void)
     if (g_power_app.fault_latched)
     {
         power_app_set_output_off(POWER_STATE_FAULT);
-
-        if (!g_power_app.fault_reset_requested)
-        {
-            return;
-        }
-
+        // Requests are consumed by power_app_process_fault_reset_request()
+        // before any configuration-specific early return.
         g_power_app.fault_reset_requested = false;
-        if (!g_power_app.output_requested &&
-            power_protection_release_safe(voltage_meas_mv, current_meas_ma))
-        {
-            g_power_app.fault = POWER_FAULT_NONE;
-            g_power_app.fault_latched = false;
-            power_fault_epwm_set(false);
-            g_power_app.trip_voltage_mv = 0U;
-            g_power_app.trip_current_ma = 0U;
-            power_protection_reset();
-            power_app_set_output_off(POWER_STATE_OFF);
-        }
         return;
     }
 

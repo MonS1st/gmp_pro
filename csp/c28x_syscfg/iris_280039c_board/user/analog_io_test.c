@@ -166,6 +166,50 @@ void analog_io_test_force_safe_outputs(void)
     analog_io_test_apply_inactive_outputs();
 }
 
+bool analog_io_test_prepare_power_fault_reset(void)
+{
+    if (g_analog_board_feedback_fault != 0U)
+    {
+        return false;
+    }
+
+    // These two states are asserted as a consequence of a latched OVP/OCP.
+    // Release only this software hold; an independent ADC feedback fault is
+    // never cleared here and therefore continues to block the reset.
+    g_analog_board_fault_shutdown_active = 0U;
+    g_analog_board_fault_hold_active = 0U;
+    g_analog_board_fault_hold_current_ma = 0U;
+
+    return (g_analog_board_feedback_fault == 0U) &&
+           (g_analog_board_fault_hold_active == 0U) &&
+           (g_analog_board_fault_shutdown_active == 0U);
+}
+
+bool analog_io_test_prepare_output_request(void)
+{
+#if PSU_ENABLE_ANALOG_IO_TEST && PSU_ANALOG_IO_AUTO_FOLLOW_ENABLE
+    if ((g_dac_test_auto_follow_completed != 1U) ||
+        (g_dac_test_enable != 1U) ||
+        g_power_app.fault_latched ||
+        (g_analog_board_feedback_fault != 0U) ||
+        (g_analog_board_fault_hold_active != 0U) ||
+        (g_analog_board_fault_shutdown_active != 0U))
+    {
+        return false;
+    }
+
+    // A fault shutdown disarms DAC follow. Re-arm it only for an explicit
+    // Output ON request; the still-closed DAC gate keeps both channels in
+    // their inactive state until output precharge starts.
+    g_dac_test_arm = PSU_DAC_TEST_ARM_KEY;
+    g_dac_test_follow_ui_enable = 1U;
+    g_dac_test_follow_ui_active = 0U;
+    g_dac_test_command = PSU_DAC_TEST_COMMAND_NONE;
+#endif
+
+    return true;
+}
+
 static void analog_io_test_apply_output_precharge(uint16_t current_ma)
 {
 #if PSU_ENABLE_LOGICAL_OUTPUT_SWITCH && PSU_ENABLE_ANALOG_BOARD_BRINGUP
@@ -426,6 +470,12 @@ static uint16_t analog_io_test_handle_board_safety(void)
     else
     {
         g_analog_board_fault_shutdown_active = 0U;
+        if (g_analog_board_feedback_fault == 0U)
+        {
+            // Clear a stale OVP/OCP-induced hold after the latch is reset.
+            g_analog_board_fault_hold_active = 0U;
+            g_analog_board_fault_hold_current_ma = 0U;
+        }
     }
 
     if ((g_analog_board_feedback_fault != 0U) ||

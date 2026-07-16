@@ -10,6 +10,9 @@ extern "C"
 #endif
 
 // DACA drives Vset; DACB drives V_ISET.
+extern volatile uint16_t g_vs_5v_dac_code;
+extern volatile uint16_t g_vs_103v_dac_code;
+extern volatile uint16_t g_vs_11v_dac_code;
 uint16_t power_voltage_mv_to_dac(uint16_t voltage_mv);
 uint16_t power_current_ma_to_dac(uint16_t current_ma);
 

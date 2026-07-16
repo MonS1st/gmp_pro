@@ -8,6 +8,10 @@
 
 static volatile bool s_power_output_hw_enabled = false;
 
+volatile uint16_t g_vs_5v_dac_code = 0U;
+volatile uint16_t g_vs_103v_dac_code = 0U;
+volatile uint16_t g_vs_11v_dac_code = 0U;
+
 volatile uint16_t g_epwm_fault_command = 0U;
 volatile uint16_t g_epwm_fault_level = 0U;
 volatile uint32_t g_epwm_fault_assert_count = 0U;
@@ -32,16 +36,27 @@ static uint16_t power_limit_dac_code(uint32_t code)
 uint16_t power_voltage_mv_to_dac(uint16_t voltage_mv)
 {
     uint32_t limited_mv = voltage_mv;
-    uint32_t code;
+    uint64_t numerator;
+    uint64_t denominator;
+    uint64_t code;
 
     if (limited_mv > PSU_VOLTAGE_CMD_MAX_MV)
     {
         limited_mv = PSU_VOLTAGE_CMD_MAX_MV;
     }
 
-    // Vset = Vout_cmd / 4; DAC code = Vset / 3300 mV * 4096.
-    code = limited_mv * PSU_DAC_CODE_SCALE / (PSU_VSET_DIVIDER * PSU_DAC_VREF_MV);
-    return power_limit_dac_code(code);
+    // Hardware calibration: Vout / Vset = 3.611. Convert the requested Vout
+    // to the DACA VSET code with integer arithmetic and nearest-code rounding.
+    numerator =
+        (uint64_t)limited_mv *
+        (uint64_t)PSU_VOUT_PER_VSET_DENOMINATOR *
+        (uint64_t)PSU_DAC_CODE_SCALE;
+    denominator =
+        (uint64_t)PSU_VOUT_PER_VSET_NUMERATOR *
+        (uint64_t)PSU_DAC_VREF_MV;
+    code = (numerator + denominator / 2ULL) / denominator;
+
+    return power_limit_dac_code((uint32_t)code);
 }
 
 uint16_t power_current_ma_to_dac(uint16_t current_ma)

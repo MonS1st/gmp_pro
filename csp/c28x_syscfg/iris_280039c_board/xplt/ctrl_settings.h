@@ -64,7 +64,9 @@
 #define PSU_VOLTAGE_CMD_MAX_MV         (11000U)
 #define PSU_CURRENT_CMD_MAX_MA         (105U)
 #define PSU_ENABLE_LOW_RANGE_BRINGUP_LIMITS (0)
-#define PSU_VSET_DIVIDER               (4UL)
+// Measured hardware command gain: Vout / Vset = 3611 / 1000 = 3.611.
+#define PSU_VOUT_PER_VSET_NUMERATOR    (3611UL)
+#define PSU_VOUT_PER_VSET_DENOMINATOR  (1000UL)
 #define PSU_ISET_GAIN_MV_PER_MA        (22UL)
 
 // CV/CC mode hysteresis and consecutive-sample confirmation thresholds.

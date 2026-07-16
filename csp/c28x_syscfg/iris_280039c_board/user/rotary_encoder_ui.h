@@ -26,6 +26,10 @@ extern volatile uint16_t g_encoder_button_pressed;
 extern volatile uint16_t g_encoder_button_debounce_count;
 extern volatile uint32_t g_encoder_button_press_count;
 extern volatile uint32_t g_encoder_mode_switch_count;
+extern volatile uint32_t g_encoder_fault_reset_request_count;
+extern volatile uint32_t g_encoder_fault_reset_success_count;
+extern volatile uint32_t g_encoder_fault_reset_reject_count;
+extern volatile uint16_t g_encoder_fault_reset_pending;
 
 extern volatile uint32_t g_encoder_voltage_update_count;
 extern volatile uint32_t g_encoder_current_update_count;

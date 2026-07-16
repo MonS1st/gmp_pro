@@ -31,12 +31,42 @@ volatile uint16_t g_encoder_button_pressed = 0U;
 volatile uint16_t g_encoder_button_debounce_count = 0U;
 volatile uint32_t g_encoder_button_press_count = 0U;
 volatile uint32_t g_encoder_mode_switch_count = 0U;
+volatile uint32_t g_encoder_fault_reset_request_count = 0U;
+volatile uint32_t g_encoder_fault_reset_success_count = 0U;
+volatile uint32_t g_encoder_fault_reset_reject_count = 0U;
+volatile uint16_t g_encoder_fault_reset_pending = 0U;
 
 volatile uint32_t g_encoder_voltage_update_count = 0U;
 volatile uint32_t g_encoder_current_update_count = 0U;
 volatile uint32_t g_encoder_reject_count = 0U;
 
 static uint32_t s_encoder_previous_position = 0U;
+
+static bool rotary_encoder_resettable_power_fault_active(void)
+{
+    return (g_power_app.fault_latched != 0U) &&
+           ((g_power_app.fault == POWER_FAULT_OVERVOLTAGE) ||
+            (g_power_app.fault == POWER_FAULT_OVERCURRENT));
+}
+
+static void rotary_encoder_update_fault_reset_result(void)
+{
+    if (g_encoder_fault_reset_pending == 0U)
+    {
+        return;
+    }
+
+    if (g_power_app.fault_latched == 0U)
+    {
+        ++g_encoder_fault_reset_success_count;
+        g_encoder_fault_reset_pending = 0U;
+    }
+    else if (!g_power_app.fault_reset_requested)
+    {
+        ++g_encoder_fault_reset_reject_count;
+        g_encoder_fault_reset_pending = 0U;
+    }
+}
 
 static uint16_t rotary_encoder_voltage_limit_mv(void)
 {
@@ -283,11 +313,20 @@ static void rotary_encoder_process_button(void)
                 g_encoder_button_debounce_count = 0U;
                 ++g_encoder_button_press_count;
 
-                g_encoder_ui_mode =
-                    (g_encoder_ui_mode == PSU_ENCODER_MODE_VOLTAGE) ?
-                        PSU_ENCODER_MODE_CURRENT :
-                        PSU_ENCODER_MODE_VOLTAGE;
-                ++g_encoder_mode_switch_count;
+                if (rotary_encoder_resettable_power_fault_active())
+                {
+                    power_app_reset_fault();
+                    ++g_encoder_fault_reset_request_count;
+                    g_encoder_fault_reset_pending = 1U;
+                }
+                else
+                {
+                    g_encoder_ui_mode =
+                        (g_encoder_ui_mode == PSU_ENCODER_MODE_VOLTAGE) ?
+                            PSU_ENCODER_MODE_CURRENT :
+                            PSU_ENCODER_MODE_VOLTAGE;
+                    ++g_encoder_mode_switch_count;
+                }
             }
         }
         else
@@ -338,6 +377,10 @@ void rotary_encoder_ui_init(void)
     g_encoder_button_debounce_count = 0U;
     g_encoder_button_press_count = 0U;
     g_encoder_mode_switch_count = 0U;
+    g_encoder_fault_reset_request_count = 0U;
+    g_encoder_fault_reset_success_count = 0U;
+    g_encoder_fault_reset_reject_count = 0U;
+    g_encoder_fault_reset_pending = 0U;
 
     g_encoder_voltage_update_count = 0U;
     g_encoder_current_update_count = 0U;
@@ -353,6 +396,7 @@ gmp_task_status_t rotary_encoder_ui_task(gmp_task_t* tsk)
         return GMP_TASK_DONE;
     }
 
+    rotary_encoder_update_fault_reset_result();
     rotary_encoder_process_position();
     rotary_encoder_process_button();
 
