@@ -35,6 +35,18 @@ extern "C"
 #define HT16K33_DISPLAY_TEST_RESTORE       (3U)
 #define HT16K33_DISPLAY_TEST_NORMAL        (4U)
 
+#define HT16K33_MAPPING_SCAN_COMMAND_NONE   (0U)
+#define HT16K33_MAPPING_SCAN_COMMAND_START  (1U)
+#define HT16K33_MAPPING_SCAN_COMMAND_ABORT  (2U)
+
+#define HT16K33_MAPPING_SCAN_IDLE            (0U)
+#define HT16K33_MAPPING_SCAN_POINT_PENDING   (1U)
+#define HT16K33_MAPPING_SCAN_HOLD_POINT      (2U)
+#define HT16K33_MAPPING_SCAN_RESTORE_PENDING (3U)
+
+#define HT16K33_MAPPING_SCAN_POINT_COUNT   (128U)
+#define HT16K33_MAPPING_SCAN_POINT_INVALID (0xFFFFU)
+
 #define PSU_I2C_RECOVERY_IDLE               (0U)
 #define PSU_I2C_RECOVERY_WAIT               (1U)
 #define PSU_I2C_RECOVERY_BUS_CLEAR          (2U)
@@ -89,6 +101,20 @@ extern volatile ec_gt g_ht16k33_display_on_result;
 extern volatile ec_gt g_ht16k33_all_on_result;
 extern volatile uint16_t g_ht16k33_display_test_state;
 extern volatile uint32_t g_ht16k33_display_test_count;
+extern volatile uint16_t g_ht16k33_mapping_scan_command;
+extern volatile uint16_t g_ht16k33_mapping_scan_state;
+extern volatile uint16_t g_ht16k33_mapping_scan_point;
+extern volatile uint16_t g_ht16k33_mapping_scan_last_point;
+extern volatile uint16_t g_ht16k33_mapping_scan_ram_address;
+extern volatile uint16_t g_ht16k33_mapping_scan_bit_mask;
+extern volatile uint32_t g_ht16k33_mapping_scan_step_ms;
+extern volatile ec_gt g_ht16k33_mapping_scan_result;
+extern volatile uint32_t g_ht16k33_mapping_scan_start_count;
+extern volatile uint32_t g_ht16k33_mapping_scan_complete_count;
+extern volatile uint32_t g_ht16k33_mapping_scan_abort_count;
+extern volatile uint32_t g_ht16k33_mapping_scan_reject_count;
+extern volatile uint32_t g_ht16k33_mapping_scan_update_count;
+extern volatile uint32_t g_ht16k33_mapping_scan_restore_count;
 extern volatile uint16_t g_oled_pending_mask;
 extern volatile uint32_t g_oled_line_update_count;
 extern volatile uint16_t g_key_i2c_holdoff_count;

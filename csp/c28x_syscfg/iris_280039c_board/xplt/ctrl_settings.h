@@ -139,6 +139,7 @@
 #define PSU_PRESET_AUTO_SAVE_DELAY_MS              (2000U)
 #define PSU_HT16K33_DISPLAY_PERIOD_MS             (500U)
 #define PSU_HT16K33_DISPLAY_INITIAL_DELAY_MS      (250U)
+#define PSU_HT16K33_MAPPING_SCAN_STEP_MS           (500U)
 #define PSU_OLED_TASK_PERIOD_MS                   (100U)
 #define PSU_OLED_TASK_INITIAL_DELAY_MS            (100U)
 #define PSU_USE_INCREMENTAL_OLED_UI                (1)
@@ -218,23 +219,6 @@
 #define PSU_ENABLE_FAULT_BUZZER             (1)
 
 #define PSU_FAULT_BUZZER_PULSE_MS           (300U)
-#define PSU_FAULT_LED_TEST_DURATION_MS      (1000U)
-
-#define PSU_FAULT_LED_BACKEND_FPGA          (1U)
-#define PSU_FAULT_FPGA_LED_REG              (0x01U)
-#define PSU_FAULT_FPGA_LED_LOW4_MASK        (0x000FU)
-// led[1] is the current panel-LED6 candidate. Only this definition needs to
-// change if the safe mapping test identifies a different FPGA LED output.
-#define PSU_FAULT_FPGA_LED_BIT              (1U)
-#define PSU_FAULT_FPGA_LED_MASK \
-    ((uint16_t)(1U << PSU_FAULT_FPGA_LED_BIT))
-#define PSU_FAULT_FPGA_LED_ACTIVE_HIGH      (1U)
-#define PSU_FAULT_LED_SELECTED_NUMBER       (6U)
-
-// Bound each FPGA transaction and rate-limit retries after a failed write so
-// a missing FPGA cannot monopolize the 1 ms background task.
-#define PSU_FAULT_FPGA_SPI_TIMEOUT_COUNT    (10000UL)
-#define PSU_FAULT_FPGA_LED_RETRY_MS         (10U)
 
 #define PSU_FAULT_BUZZER_TYPE_UNKNOWN        (0U)
 #define PSU_FAULT_BUZZER_TYPE_ACTIVE         (1U)

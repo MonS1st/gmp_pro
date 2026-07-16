@@ -16,7 +16,6 @@ typedef enum
     PSU_FAULT_ALARM_REASON_OVP_OCP = 3U
 } psu_fault_alarm_reason_t;
 
-extern volatile uint16_t g_fault_alarm_led_active;
 extern volatile uint16_t g_fault_alarm_buzzer_active;
 extern volatile uint16_t g_fault_alarm_reason;
 extern volatile uint16_t g_fault_alarm_event_issued;
@@ -26,27 +25,12 @@ extern volatile uint32_t g_fault_alarm_start_tick;
 extern volatile uint32_t g_fault_alarm_last_duration_ms;
 
 extern volatile uint16_t g_fault_alarm_hardware_ready;
-extern volatile uint16_t g_fault_alarm_led_hardware_ready;
 extern volatile uint16_t g_fault_alarm_buzzer_hardware_ready;
-extern volatile uint16_t g_fault_alarm_selected_led_number;
 extern volatile uint16_t g_fault_alarm_buzzer_type;
 
-extern volatile uint16_t g_fault_alarm_fpga_led_bit;
-extern volatile uint16_t g_fault_alarm_fpga_led_mask;
-extern volatile uint16_t g_fault_alarm_fpga_led_shadow;
-extern volatile uint16_t g_fault_alarm_led_mapping_verified;
-
-extern volatile uint32_t g_fault_alarm_fpga_write_count;
-extern volatile uint32_t g_fault_alarm_fpga_write_error_count;
-extern volatile uint32_t g_fault_alarm_fpga_write_timeout_count;
-
-extern volatile uint16_t g_fault_alarm_led_apply_pending;
 extern volatile uint16_t g_fault_alarm_buzzer_start_pending;
 extern volatile uint16_t g_fault_alarm_buzzer_stop_pending;
 
-extern volatile uint16_t g_fault_alarm_led_test_command;
-extern volatile uint16_t g_fault_alarm_led_test_active_bit;
-extern volatile uint32_t g_fault_alarm_led_test_count;
 extern volatile uint16_t g_fault_alarm_buzzer_test_command;
 extern volatile uint32_t g_fault_alarm_buzzer_test_count;
 

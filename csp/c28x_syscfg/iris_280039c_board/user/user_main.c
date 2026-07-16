@@ -174,6 +174,25 @@ volatile ec_gt g_ht16k33_display_on_result = GMP_EC_NOT_READY;
 volatile ec_gt g_ht16k33_all_on_result = GMP_EC_NOT_READY;
 volatile uint16_t g_ht16k33_display_test_state = HT16K33_DISPLAY_TEST_WAIT_INIT;
 volatile uint32_t g_ht16k33_display_test_count = 0U;
+volatile uint16_t g_ht16k33_mapping_scan_command =
+    HT16K33_MAPPING_SCAN_COMMAND_NONE;
+volatile uint16_t g_ht16k33_mapping_scan_state = HT16K33_MAPPING_SCAN_IDLE;
+volatile uint16_t g_ht16k33_mapping_scan_point =
+    HT16K33_MAPPING_SCAN_POINT_INVALID;
+volatile uint16_t g_ht16k33_mapping_scan_last_point =
+    HT16K33_MAPPING_SCAN_POINT_INVALID;
+volatile uint16_t g_ht16k33_mapping_scan_ram_address =
+    HT16K33_MAPPING_SCAN_POINT_INVALID;
+volatile uint16_t g_ht16k33_mapping_scan_bit_mask = 0U;
+volatile uint32_t g_ht16k33_mapping_scan_step_ms =
+    PSU_HT16K33_MAPPING_SCAN_STEP_MS;
+volatile ec_gt g_ht16k33_mapping_scan_result = GMP_EC_NOT_READY;
+volatile uint32_t g_ht16k33_mapping_scan_start_count = 0U;
+volatile uint32_t g_ht16k33_mapping_scan_complete_count = 0U;
+volatile uint32_t g_ht16k33_mapping_scan_abort_count = 0U;
+volatile uint32_t g_ht16k33_mapping_scan_reject_count = 0U;
+volatile uint32_t g_ht16k33_mapping_scan_update_count = 0U;
+volatile uint32_t g_ht16k33_mapping_scan_restore_count = 0U;
 volatile uint16_t g_oled_pending_mask = 0U;
 volatile uint32_t g_oled_line_update_count = 0U;
 volatile uint16_t g_key_i2c_holdoff_count = 0U;

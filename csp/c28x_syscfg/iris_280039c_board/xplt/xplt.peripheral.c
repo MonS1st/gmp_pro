@@ -29,8 +29,6 @@ volatile uint16_t g_adc_iout_raw = 0U;
 volatile uint16_t g_fpga_spi_last_rx0 = 0xFFFFU;
 volatile uint16_t g_fpga_spi_last_rx1 = 0xFFFFU;
 
-static uint16_t s_fpga_led_register_shadow = 0U;
-
 volatile float g_vout_meas_v = 0.0f;
 volatile float g_iout_meas_a = 0.0f;
 volatile float g_iout_meas_ma = 0.0f;
@@ -619,105 +617,6 @@ static void fpga_spi_clear_rx_fifo(void)
     {
         (void)SPI_readDataBlockingFIFO(IRIS_SPI_FPGA_BRIDGE_BASE);
     }
-}
-
-static void fpga_spi_clear_rx_fifo_bounded(void)
-{
-    uint16_t discarded_words = 0U;
-
-    while ((SPI_getRxFIFOStatus(IRIS_SPI_FPGA_BRIDGE_BASE) !=
-            SPI_FIFO_RXEMPTY) &&
-           (discarded_words < (uint16_t)SPI_FIFO_RX16))
-    {
-        (void)SPI_readDataNonBlocking(IRIS_SPI_FPGA_BRIDGE_BASE);
-        ++discarded_words;
-    }
-
-    if (SPI_getRxFIFOStatus(IRIS_SPI_FPGA_BRIDGE_BASE) !=
-        SPI_FIFO_RXEMPTY)
-    {
-        SPI_resetRxFIFO(IRIS_SPI_FPGA_BRIDGE_BASE);
-    }
-}
-
-static void fpga_spi_abort_transaction(void)
-{
-    GPIO_writePin(IRIS_GPIO_SPI_CS, 1U);
-    SPI_resetTxFIFO(IRIS_SPI_FPGA_BRIDGE_BASE);
-    SPI_resetRxFIFO(IRIS_SPI_FPGA_BRIDGE_BASE);
-}
-
-bool SPI_try_writeReg(uint16_t addr,
-                      uint16_t data,
-                      uint32_t timeout_count)
-{
-    uint16_t cmd = (uint16_t)((addr & 0x7FU) << 8U);
-    uint32_t remaining = timeout_count;
-
-    // Discard stale full-duplex return words before starting a new frame.
-    // This helper is itself bounded by the 16-word hardware FIFO depth.
-    fpga_spi_clear_rx_fifo_bounded();
-
-    // Reserve space for both frame words without calling the blocking FIFO
-    // writer. A stalled transmitter therefore has the same finite deadline.
-    while ((SPI_getTxFIFOStatus(IRIS_SPI_FPGA_BRIDGE_BASE) >
-            SPI_FIFO_TX14) &&
-           (remaining != 0U))
-    {
-        --remaining;
-    }
-
-    if (SPI_getTxFIFOStatus(IRIS_SPI_FPGA_BRIDGE_BASE) > SPI_FIFO_TX14)
-    {
-        fpga_spi_abort_transaction();
-        return false;
-    }
-
-    GPIO_writePin(IRIS_GPIO_SPI_CS, 0U);
-    DEVICE_DELAY_US(2U);
-    SPI_writeDataNonBlocking(IRIS_SPI_FPGA_BRIDGE_BASE, cmd);
-    SPI_writeDataNonBlocking(IRIS_SPI_FPGA_BRIDGE_BASE, data);
-
-    while ((SPI_getRxFIFOStatus(IRIS_SPI_FPGA_BRIDGE_BASE) <
-            SPI_FIFO_RX2) &&
-           (remaining != 0U))
-    {
-        --remaining;
-    }
-
-    if (SPI_getRxFIFOStatus(IRIS_SPI_FPGA_BRIDGE_BASE) < SPI_FIFO_RX2)
-    {
-        fpga_spi_abort_transaction();
-        return false;
-    }
-
-    (void)SPI_readDataNonBlocking(IRIS_SPI_FPGA_BRIDGE_BASE);
-    (void)SPI_readDataNonBlocking(IRIS_SPI_FPGA_BRIDGE_BASE);
-    DEVICE_DELAY_US(2U);
-    GPIO_writePin(IRIS_GPIO_SPI_CS, 1U);
-    DEVICE_DELAY_US(2U);
-    return true;
-}
-
-bool board_fpga_led_set(uint16_t led_mask, bool active)
-{
-    if (active)
-    {
-        s_fpga_led_register_shadow |= led_mask;
-    }
-    else
-    {
-        s_fpga_led_register_shadow &= (uint16_t)(~led_mask);
-    }
-
-    return SPI_try_writeReg(PSU_FAULT_FPGA_LED_REG,
-                            s_fpga_led_register_shadow,
-                            PSU_FAULT_FPGA_SPI_TIMEOUT_COUNT);
-}
-
-uint16_t board_fpga_led_get_shadow(void)
-{
-    return s_fpga_led_register_shadow;
 }
 
 // Ïò FPGA Ð´Èë¼Ä´æÆ÷
