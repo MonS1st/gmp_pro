@@ -77,9 +77,12 @@ static ec_gt oled_write_active(const data_gt *payload, size_gt length)
     }
 
     g_oled_last_slave_address = s_oled_active_address;
+    // Preload the OLED control byte before START.  The C28x write_mem path
+    // otherwise starts with an empty TX FIFO when addr_len is zero.  Splitting
+    // the payload here does not change the bytes placed on the I2C bus.
     return gmp_hal_iic_write_mem(
-        iic_bus, s_oled_active_address, 0U, 0U,
-        payload, length, (time_gt)OLED_I2C_TIMEOUT_TICKS);
+        iic_bus, s_oled_active_address, (addr32_gt)payload[0], 1U,
+        &payload[1], length - 1U, (time_gt)OLED_I2C_TIMEOUT_TICKS);
 }
 
 static void oled_prepare_diagnostics(void)

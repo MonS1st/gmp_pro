@@ -209,9 +209,13 @@ static void power_ui_handle_oled_failure(ec_gt result)
 static ec_gt power_ui_probe_oled_address(uint16_t address)
 {
     g_oled_last_slave_address = address;
+    // Keep one byte in the C28x TX FIFO before START.  With addr_len == 0,
+    // gmp_hal_iic_write_mem() starts the transaction while the FIFO is empty.
+    // Treating the OLED control byte as the one-byte memory address preserves
+    // the exact on-wire payload: 0x00, 0xAE.
     return gmp_hal_iic_write_mem(
-        iic_bus, address, 0U, 0U,
-        s_oled_probe_payload, 2U, (time_gt)OLED_I2C_TIMEOUT_TICKS);
+        iic_bus, address, (addr32_gt)s_oled_probe_payload[0], 1U,
+        &s_oled_probe_payload[1], 1U, (time_gt)OLED_I2C_TIMEOUT_TICKS);
 }
 
 static void power_ui_prepare_oled_address_scan(void)
