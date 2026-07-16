@@ -12,13 +12,13 @@ volatile uint16_t g_vs_5v_dac_code = 0U;
 volatile uint16_t g_vs_103v_dac_code = 0U;
 volatile uint16_t g_vs_11v_dac_code = 0U;
 
-volatile uint16_t g_epwm_fault_command = 0U;
-volatile uint16_t g_epwm_fault_level = 0U;
-volatile uint32_t g_epwm_fault_assert_count = 0U;
-volatile uint32_t g_epwm_fault_clear_count = 0U;
+volatile uint16_t g_relay_cutoff_command = 0U;
+volatile uint16_t g_relay_cutoff_level = 0U;
+volatile uint32_t g_relay_cutoff_assert_count = 0U;
+volatile uint32_t g_relay_cutoff_release_count = 0U;
 
-#define POWER_FAULT_EPWM_BASE    (IRIS_EPWM4_BASE)
-#define POWER_FAULT_EPWM_PERIOD  (IRIS_EPWM4_TBPRD)
+#define POWER_RELAY_CUTOFF_EPWM_BASE    (IRIS_EPWM4_BASE)
+#define POWER_RELAY_CUTOFF_EPWM_PERIOD  (IRIS_EPWM4_TBPRD)
 
 #if !PSU_ENABLE_ANALOG_IO_TEST
 static void power_dac_force_physical_zero(void)
@@ -115,118 +115,133 @@ void power_dac_set_zero(void)
 #endif
 }
 
-void power_fault_epwm_init(void)
+void power_relay_cutoff_epwm_init(void)
 {
-    // Assert the fail-safe state before changing any time-base or AQ setting.
+    // Assert the fail-safe relay-disconnected state before changing any
+    // time-base or action-qualifier setting.
     EPWM_setActionQualifierContSWForceShadowMode(
-        POWER_FAULT_EPWM_BASE, EPWM_AQ_SW_IMMEDIATE_LOAD);
+        POWER_RELAY_CUTOFF_EPWM_BASE, EPWM_AQ_SW_IMMEDIATE_LOAD);
     EPWM_setActionQualifierContSWForceAction(
-        POWER_FAULT_EPWM_BASE, EPWM_AQ_OUTPUT_A, EPWM_AQ_SW_OUTPUT_LOW);
+        POWER_RELAY_CUTOFF_EPWM_BASE, EPWM_AQ_OUTPUT_A,
+        EPWM_AQ_SW_OUTPUT_HIGH);
     EPWM_setActionQualifierContSWForceAction(
-        POWER_FAULT_EPWM_BASE, EPWM_AQ_OUTPUT_B, EPWM_AQ_SW_OUTPUT_LOW);
+        POWER_RELAY_CUTOFF_EPWM_BASE, EPWM_AQ_OUTPUT_B,
+        EPWM_AQ_SW_OUTPUT_LOW);
 
     // Configure this channel independently of EPWM1. EPWM1 remains the ADC
-    // SOCA/sample timebase; EPWM4A is an active-high OVP/OCP fault output.
-    EPWM_setClockPrescaler(POWER_FAULT_EPWM_BASE,
+    // SOCA/sample timebase; EPWM4A is an active-high relay cutoff output.
+    EPWM_setClockPrescaler(POWER_RELAY_CUTOFF_EPWM_BASE,
                            EPWM_CLOCK_DIVIDER_1,
                            EPWM_HSCLOCK_DIVIDER_1);
-    EPWM_selectPeriodLoadEvent(POWER_FAULT_EPWM_BASE,
+    EPWM_selectPeriodLoadEvent(POWER_RELAY_CUTOFF_EPWM_BASE,
                                EPWM_SHADOW_LOAD_MODE_COUNTER_ZERO);
-    EPWM_setTimeBasePeriod(POWER_FAULT_EPWM_BASE,
-                           POWER_FAULT_EPWM_PERIOD);
-    EPWM_setTimeBaseCounter(POWER_FAULT_EPWM_BASE, 0U);
-    EPWM_setTimeBaseCounterMode(POWER_FAULT_EPWM_BASE,
+    EPWM_setTimeBasePeriod(POWER_RELAY_CUTOFF_EPWM_BASE,
+                           POWER_RELAY_CUTOFF_EPWM_PERIOD);
+    EPWM_setTimeBaseCounter(POWER_RELAY_CUTOFF_EPWM_BASE, 0U);
+    EPWM_setTimeBaseCounterMode(POWER_RELAY_CUTOFF_EPWM_BASE,
                                 EPWM_COUNTER_MODE_UP);
-    EPWM_setCountModeAfterSync(POWER_FAULT_EPWM_BASE,
+    EPWM_setCountModeAfterSync(POWER_RELAY_CUTOFF_EPWM_BASE,
                                EPWM_COUNT_MODE_UP_AFTER_SYNC);
-    EPWM_disablePhaseShiftLoad(POWER_FAULT_EPWM_BASE);
-    EPWM_setPhaseShift(POWER_FAULT_EPWM_BASE, 0U);
-    EPWM_disableOneShotSync(POWER_FAULT_EPWM_BASE);
-    EPWM_disableSyncOutPulseSource(POWER_FAULT_EPWM_BASE,
+    EPWM_disablePhaseShiftLoad(POWER_RELAY_CUTOFF_EPWM_BASE);
+    EPWM_setPhaseShift(POWER_RELAY_CUTOFF_EPWM_BASE, 0U);
+    EPWM_disableOneShotSync(POWER_RELAY_CUTOFF_EPWM_BASE);
+    EPWM_disableSyncOutPulseSource(POWER_RELAY_CUTOFF_EPWM_BASE,
                                    EPWM_SYNC_OUT_PULSE_ON_ALL);
 
-    EPWM_setCounterCompareValue(POWER_FAULT_EPWM_BASE,
+    EPWM_setCounterCompareValue(POWER_RELAY_CUTOFF_EPWM_BASE,
                                 EPWM_COUNTER_COMPARE_A, 0U);
-    EPWM_setCounterCompareShadowLoadMode(POWER_FAULT_EPWM_BASE,
+    EPWM_setCounterCompareShadowLoadMode(POWER_RELAY_CUTOFF_EPWM_BASE,
                                          EPWM_COUNTER_COMPARE_A,
                                          EPWM_COMP_LOAD_ON_CNTR_ZERO);
 
+    // Static relay levels are generated only by continuous software force,
+    // never by duty-cycle boundary events.
     EPWM_setActionQualifierAction(
-        POWER_FAULT_EPWM_BASE, EPWM_AQ_OUTPUT_A, EPWM_AQ_OUTPUT_HIGH,
+        POWER_RELAY_CUTOFF_EPWM_BASE, EPWM_AQ_OUTPUT_A,
+        EPWM_AQ_OUTPUT_NO_CHANGE,
         EPWM_AQ_OUTPUT_ON_TIMEBASE_ZERO);
     EPWM_setActionQualifierAction(
-        POWER_FAULT_EPWM_BASE, EPWM_AQ_OUTPUT_A, EPWM_AQ_OUTPUT_LOW,
+        POWER_RELAY_CUTOFF_EPWM_BASE, EPWM_AQ_OUTPUT_A,
+        EPWM_AQ_OUTPUT_NO_CHANGE,
         EPWM_AQ_OUTPUT_ON_TIMEBASE_UP_CMPA);
     EPWM_setActionQualifierAction(
-        POWER_FAULT_EPWM_BASE, EPWM_AQ_OUTPUT_A, EPWM_AQ_OUTPUT_NO_CHANGE,
+        POWER_RELAY_CUTOFF_EPWM_BASE, EPWM_AQ_OUTPUT_A,
+        EPWM_AQ_OUTPUT_NO_CHANGE,
         EPWM_AQ_OUTPUT_ON_TIMEBASE_PERIOD);
     EPWM_setActionQualifierAction(
-        POWER_FAULT_EPWM_BASE, EPWM_AQ_OUTPUT_A, EPWM_AQ_OUTPUT_NO_CHANGE,
+        POWER_RELAY_CUTOFF_EPWM_BASE, EPWM_AQ_OUTPUT_A,
+        EPWM_AQ_OUTPUT_NO_CHANGE,
         EPWM_AQ_OUTPUT_ON_TIMEBASE_DOWN_CMPA);
     EPWM_setActionQualifierAction(
-        POWER_FAULT_EPWM_BASE, EPWM_AQ_OUTPUT_A, EPWM_AQ_OUTPUT_NO_CHANGE,
+        POWER_RELAY_CUTOFF_EPWM_BASE, EPWM_AQ_OUTPUT_A,
+        EPWM_AQ_OUTPUT_NO_CHANGE,
         EPWM_AQ_OUTPUT_ON_TIMEBASE_UP_CMPB);
     EPWM_setActionQualifierAction(
-        POWER_FAULT_EPWM_BASE, EPWM_AQ_OUTPUT_A, EPWM_AQ_OUTPUT_NO_CHANGE,
+        POWER_RELAY_CUTOFF_EPWM_BASE, EPWM_AQ_OUTPUT_A,
+        EPWM_AQ_OUTPUT_NO_CHANGE,
         EPWM_AQ_OUTPUT_ON_TIMEBASE_DOWN_CMPB);
 
     // No complementary output path and no dead-band processing.
-    EPWM_setDeadBandOutputSwapMode(POWER_FAULT_EPWM_BASE,
+    EPWM_setDeadBandOutputSwapMode(POWER_RELAY_CUTOFF_EPWM_BASE,
                                    EPWM_DB_OUTPUT_A, false);
-    EPWM_setDeadBandOutputSwapMode(POWER_FAULT_EPWM_BASE,
+    EPWM_setDeadBandOutputSwapMode(POWER_RELAY_CUTOFF_EPWM_BASE,
                                    EPWM_DB_OUTPUT_B, false);
-    EPWM_setDeadBandDelayMode(POWER_FAULT_EPWM_BASE, EPWM_DB_RED, false);
-    EPWM_setDeadBandDelayMode(POWER_FAULT_EPWM_BASE, EPWM_DB_FED, false);
+    EPWM_setDeadBandDelayMode(POWER_RELAY_CUTOFF_EPWM_BASE,
+                              EPWM_DB_RED, false);
+    EPWM_setDeadBandDelayMode(POWER_RELAY_CUTOFF_EPWM_BASE,
+                              EPWM_DB_FED, false);
 
-    EPWM_disableInterrupt(POWER_FAULT_EPWM_BASE);
-    EPWM_disableADCTrigger(POWER_FAULT_EPWM_BASE, EPWM_SOC_A);
-    EPWM_disableADCTrigger(POWER_FAULT_EPWM_BASE, EPWM_SOC_B);
+    EPWM_disableInterrupt(POWER_RELAY_CUTOFF_EPWM_BASE);
+    EPWM_disableADCTrigger(POWER_RELAY_CUTOFF_EPWM_BASE, EPWM_SOC_A);
+    EPWM_disableADCTrigger(POWER_RELAY_CUTOFF_EPWM_BASE, EPWM_SOC_B);
 
-    power_fault_epwm_set(false);
+    power_relay_cutoff_epwm_set(true);
+
+    // SysConfig boots GPIO22 as a GPIO output HIGH. Switch it to EPWM4A only
+    // after EPWM4A is already continuously forced HIGH, preventing a low
+    // pulse during the GPIO-to-EPWM handoff.
+    GPIO_setPinConfig(GPIO_22_EPWM4_A);
+    GPIO_setPadConfig(22U, GPIO_PIN_TYPE_STD);
+    GPIO_setQualificationMode(22U, GPIO_QUAL_SYNC);
 }
 
-void power_fault_epwm_set(bool fault_active)
+void power_relay_cutoff_epwm_set(bool cutoff_active)
 {
-    uint16_t requested_level = fault_active ? 1U : 0U;
-    bool level_changed = (g_epwm_fault_level != requested_level);
+    uint16_t requested_level = cutoff_active ? 1U : 0U;
+    bool level_changed = (g_relay_cutoff_level != requested_level);
 
-    g_epwm_fault_command = requested_level;
+    g_relay_cutoff_command = requested_level;
 
-    if (!fault_active)
+    if (!cutoff_active)
     {
-        // Immediate continuous force makes the normal state independent of
-        // AQ event collisions at TBCTR zero or a compare boundary.
+        // LOW permits relay connection. The application safety gate is the
+        // only caller allowed to request this state.
         EPWM_setActionQualifierContSWForceAction(
-            POWER_FAULT_EPWM_BASE, EPWM_AQ_OUTPUT_A,
+            POWER_RELAY_CUTOFF_EPWM_BASE, EPWM_AQ_OUTPUT_A,
             EPWM_AQ_SW_OUTPUT_LOW);
-        EPWM_setCounterCompareValue(POWER_FAULT_EPWM_BASE,
-                                    EPWM_COUNTER_COMPARE_A, 0U);
-        g_epwm_fault_level = 0U;
+        g_relay_cutoff_level = 0U;
         if (level_changed)
         {
-            ++g_epwm_fault_clear_count;
+            ++g_relay_cutoff_release_count;
         }
         return;
     }
 
-    // Keep CMPA equal to TBPRD as the asserted-state representation, while
-    // continuous HIGH guarantees no short low pulse at the period boundary.
-    EPWM_setCounterCompareValue(POWER_FAULT_EPWM_BASE,
-                                EPWM_COUNTER_COMPARE_A,
-                                POWER_FAULT_EPWM_PERIOD);
+    // Immediate continuous HIGH disconnects the relay without waiting for a
+    // time-base event and cannot create a low pulse at a period boundary.
     EPWM_setActionQualifierContSWForceAction(
-        POWER_FAULT_EPWM_BASE, EPWM_AQ_OUTPUT_A,
+        POWER_RELAY_CUTOFF_EPWM_BASE, EPWM_AQ_OUTPUT_A,
         EPWM_AQ_SW_OUTPUT_HIGH);
-    g_epwm_fault_level = 1U;
+    g_relay_cutoff_level = 1U;
     if (level_changed)
     {
-        ++g_epwm_fault_assert_count;
+        ++g_relay_cutoff_assert_count;
     }
 }
 
-bool power_fault_epwm_get(void)
+bool power_relay_cutoff_epwm_get(void)
 {
-    return g_epwm_fault_level != 0U;
+    return g_relay_cutoff_level != 0U;
 }
 
 void power_output_hw_set(bool enable)

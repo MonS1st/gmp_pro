@@ -47,8 +47,8 @@
 
 void ctl_init()
 {
-    // Keep the active-high OVP/OCP fault output low through initialization.
-    power_fault_epwm_init();
+    // Reassert and finalize the fail-safe configuration after Board_init().
+    power_relay_cutoff_epwm_init();
     power_app_init();
 }
 

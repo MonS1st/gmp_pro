@@ -55,6 +55,11 @@
 #define PSU_VOUT_SENSOR_GAIN           (0.25f)
 #define PSU_IOUT_SENSOR_GAIN_V_PER_A   (22.0f)
 
+// Application-layer measurement calibration. Raw ADC diagnostics remain
+// unmodified; UI, mode control, and protection use the calibrated values.
+#define PSU_VM_CALIBRATION_ADD_MV      (200U)
+#define PSU_IM_CALIBRATION_SUB_MA      (0U)
+
 // DAC command conversion parameters
 #define PSU_DAC_VREF_MV                (3300UL)
 #define PSU_DAC_RESOLUTION_BITS        (12U)
@@ -63,6 +68,16 @@
 
 #define PSU_VOLTAGE_CMD_MAX_MV         (11000U)
 #define PSU_CURRENT_CMD_MAX_MA         (105U)
+#define PSU_CV_MODE_FIXED_ISET_MA      (105U)
+#define PSU_CC_MODE_FIXED_VSET_MV      (11000U)
+
+#if PSU_CV_MODE_FIXED_ISET_MA > PSU_CURRENT_CMD_MAX_MA
+#error "CV-only fixed ISET exceeds the current command limit"
+#endif
+
+#if PSU_CC_MODE_FIXED_VSET_MV > PSU_VOLTAGE_CMD_MAX_MV
+#error "CC-only fixed VSET exceeds the voltage command limit"
+#endif
 #define PSU_ENABLE_LOW_RANGE_BRINGUP_LIMITS (0)
 // Measured hardware command gain: Vout / Vset = 3611 / 1000 = 3.611.
 #define PSU_VOUT_PER_VSET_NUMERATOR    (3611UL)

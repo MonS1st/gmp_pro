@@ -42,6 +42,18 @@ volatile uint32_t g_encoder_reject_count = 0U;
 
 static uint32_t s_encoder_previous_position = 0U;
 
+static void rotary_encoder_force_unlocked_mode(void)
+{
+    if (g_voltage_adjust_locked != 0U)
+    {
+        g_encoder_ui_mode = PSU_ENCODER_MODE_CURRENT;
+    }
+    else if (g_current_adjust_locked != 0U)
+    {
+        g_encoder_ui_mode = PSU_ENCODER_MODE_VOLTAGE;
+    }
+}
+
 static bool rotary_encoder_resettable_power_fault_active(void)
 {
     return (g_power_app.fault_latched != 0U) &&
@@ -189,6 +201,17 @@ static void rotary_encoder_apply_detent(bool clockwise)
         return;
     }
 
+    if (((g_encoder_ui_mode == PSU_ENCODER_MODE_VOLTAGE) &&
+         (g_voltage_adjust_locked != 0U)) ||
+        ((g_encoder_ui_mode == PSU_ENCODER_MODE_CURRENT) &&
+         (g_current_adjust_locked != 0U)))
+    {
+        rotary_encoder_force_unlocked_mode();
+        ++g_locked_adjust_reject_count;
+        ++g_encoder_reject_count;
+        return;
+    }
+
     if (g_encoder_ui_mode == PSU_ENCODER_MODE_VOLTAGE)
     {
         rotary_encoder_update_voltage(clockwise);
@@ -319,6 +342,15 @@ static void rotary_encoder_process_button(void)
                     ++g_encoder_fault_reset_request_count;
                     g_encoder_fault_reset_pending = 1U;
                 }
+                else if ((g_voltage_adjust_locked != 0U) ||
+                         (g_current_adjust_locked != 0U))
+                {
+                    // In a fixed strategy the push button cannot select the
+                    // locked channel. Fault reset above remains higher priority.
+                    rotary_encoder_force_unlocked_mode();
+                    ++g_locked_adjust_reject_count;
+                    ++g_encoder_reject_count;
+                }
                 else
                 {
                     g_encoder_ui_mode =
@@ -397,6 +429,7 @@ gmp_task_status_t rotary_encoder_ui_task(gmp_task_t* tsk)
     }
 
     rotary_encoder_update_fault_reset_result();
+    rotary_encoder_force_unlocked_mode();
     rotary_encoder_process_position();
     rotary_encoder_process_button();
 

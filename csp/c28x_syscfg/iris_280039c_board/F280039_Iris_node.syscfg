@@ -48,6 +48,7 @@ const gpio8          = gpio.addInstance();
 const gpio9          = gpio.addInstance();
 const gpio10         = gpio.addInstance();
 const gpio11         = gpio.addInstance();
+const gpio12         = gpio.addInstance();
 const i2c            = scripting.addModule("/driverlib/i2c.js", {}, false);
 const i2c1           = i2c.addInstance();
 const other          = scripting.addModule("/driverlib/other.js", {}, false);
@@ -394,7 +395,7 @@ epwm3.epwm.$assign                                               = "EPWM3";
 
 epwm4.$name                                                      = "IRIS_EPWM4";
 epwm4.useCase                                                    = "CUSTOM";
-epwm4.useInterfacePins                                           = ["EPWM#_A"];
+epwm4.useInterfacePins                                           = [];
 epwm4.epwmTimebase_hsClockDiv                                    = "EPWM_HSCLOCK_DIVIDER_1";
 epwm4.epwmTimebase_periodLoadEvent                               = "EPWM_SHADOW_LOAD_MODE_COUNTER_ZERO";
 epwm4.epwmTimebase_counterMode                                   = "EPWM_COUNTER_MODE_UP";
@@ -405,8 +406,9 @@ epwm4.epwmCounterCompare_cmpAGld                                 = false;
 epwm4.epwmCounterCompare_cmpBGld                                 = false;
 epwm4.epwmActionQualifier_EPWM_AQ_OUTPUT_A_gld                   = false;
 epwm4.epwmActionQualifier_EPWM_AQ_OUTPUT_A_shadowMode            = false;
-epwm4.epwmActionQualifier_EPWM_AQ_OUTPUT_A_ON_TIMEBASE_ZERO      = "EPWM_AQ_OUTPUT_HIGH";
-epwm4.epwmActionQualifier_EPWM_AQ_OUTPUT_A_ON_TIMEBASE_UP_CMPA   = "EPWM_AQ_OUTPUT_LOW";
+epwm4.epwmActionQualifier_EPWM_AQ_OUTPUT_A_ON_TIMEBASE_ZERO      = "EPWM_AQ_OUTPUT_NO_CHANGE";
+epwm4.epwmActionQualifier_EPWM_AQ_OUTPUT_A_ON_TIMEBASE_UP_CMPA   = "EPWM_AQ_OUTPUT_NO_CHANGE";
+epwm4.epwmActionQualifier_EPWM_AQ_OUTPUT_A_continuousSwForceAction = "EPWM_AQ_SW_OUTPUT_HIGH";
 epwm4.epwmDeadband_enableRED                                     = false;
 epwm4.epwmDeadband_enableFED                                     = false;
 epwm4.epwmEventTrigger_enableInterrupt                           = false;
@@ -414,7 +416,6 @@ epwm4.epwmEventTrigger_EPWM_SOC_A_triggerEnable                  = false;
 epwm4.epwmTimebase_period                                        = 3000;
 epwm4.epwmCounterCompare_cmpA                                    = 0;
 epwm4.epwm.$assign                                               = "EPWM4";
-epwm4.epwm.epwm_aPin.$assign                                     = "GPIO22";
 
 epwm5.$name                                                      = "IRIS_EPWM5";
 epwm5.useCase                                                    = "CUSTOM";
@@ -556,6 +557,15 @@ gpio11.padConfig         = "STD";
 gpio11.writeInitialValue = true;
 gpio11.initialValue      = 1;
 gpio11.gpioPin.$assign   = "GPIO11";
+
+// Hold the active-high relay cutoff asserted before handing GPIO22 to
+// EPWM4A in power_relay_cutoff_epwm_init().
+gpio12.$name             = "IRIS_RELAY_CUTOFF_BOOT";
+gpio12.direction         = "GPIO_DIR_MODE_OUT";
+gpio12.padConfig         = "STD";
+gpio12.writeInitialValue = true;
+gpio12.initialValue      = 1;
+gpio12.gpioPin.$assign   = "GPIO22";
 
 i2c1.$name                  = "IRIS_IIC";
 i2c1.i2c.$assign            = "I2CA";

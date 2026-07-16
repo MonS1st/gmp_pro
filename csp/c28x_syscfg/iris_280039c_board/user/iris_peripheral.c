@@ -640,6 +640,22 @@ static bool power_ui_execute_key_action(uint16_t key_id)
     }
 
     if (((key_id == PSU_KEY_VOLTAGE_UP_ID) ||
+         (key_id == PSU_KEY_VOLTAGE_DOWN_ID)) &&
+        (g_voltage_adjust_locked != 0U))
+    {
+        ++g_locked_adjust_reject_count;
+        return false;
+    }
+
+    if (((key_id == PSU_KEY_CURRENT_UP_ID) ||
+         (key_id == PSU_KEY_CURRENT_DOWN_ID)) &&
+        (g_current_adjust_locked != 0U))
+    {
+        ++g_locked_adjust_reject_count;
+        return false;
+    }
+
+    if (((key_id == PSU_KEY_VOLTAGE_UP_ID) ||
          (key_id == PSU_KEY_VOLTAGE_DOWN_ID) ||
          (key_id == PSU_KEY_CURRENT_UP_ID) ||
          (key_id == PSU_KEY_CURRENT_DOWN_ID)) &&

@@ -546,8 +546,8 @@ static void analog_io_test_try_auto_follow(void)
 
 static void analog_io_test_process_follow_ui(void)
 {
-    uint16_t voltage_mv = power_app_get_voltage_mv();
-    uint16_t current_ma = power_app_get_current_ma();
+    uint16_t voltage_mv = g_effective_voltage_set_mv;
+    uint16_t current_ma = g_effective_current_set_ma;
     uint16_t voltage_code;
     uint16_t current_code;
 

@@ -27,6 +27,7 @@ typedef enum
 
 typedef struct
 {
+    // Effective setpoints currently applied to the DAC/control path.
     uint16_t voltage_set_mv;
     uint16_t current_set_ma;
     uint16_t voltage_meas_mv;
@@ -47,6 +48,19 @@ typedef struct
 
 extern volatile power_app_t g_power_app;
 extern volatile uint16_t g_analog_board_real_feedback_active;
+
+extern volatile uint16_t g_vm_uncalibrated_mv;
+extern volatile uint16_t g_im_uncalibrated_ma;
+extern volatile uint16_t g_vm_calibrated_mv;
+extern volatile uint16_t g_im_calibrated_ma;
+
+extern volatile uint16_t g_user_voltage_set_mv;
+extern volatile uint16_t g_user_current_set_ma;
+extern volatile uint16_t g_effective_voltage_set_mv;
+extern volatile uint16_t g_effective_current_set_ma;
+extern volatile uint16_t g_voltage_adjust_locked;
+extern volatile uint16_t g_current_adjust_locked;
+extern volatile uint32_t g_locked_adjust_reject_count;
 
 extern volatile uint16_t g_output_switch_requested;
 extern volatile uint16_t g_output_switch_active;
@@ -69,11 +83,15 @@ extern volatile uint32_t g_output_switch_precharge_count;
 extern volatile uint32_t g_output_switch_precharge_start_tick;
 
 void power_app_init(void);
-// UI and communication code should use these APIs instead of writing g_power_app directly.
+// UI and communication code should use these APIs for user-setpoint changes.
 void power_app_set_voltage_mv(uint16_t voltage_mv);
 void power_app_set_current_ma(uint16_t current_ma);
 uint16_t power_app_get_voltage_mv(void);
 uint16_t power_app_get_current_ma(void);
+// Settings restore bypasses mode locks but does not change the active strategy.
+void power_app_restore_user_setpoints(uint16_t voltage_mv,
+                                      uint16_t current_ma);
+void power_app_update_effective_setpoints(void);
 void power_app_request_output(bool enable);
 void power_app_request_logical_output(bool enable);
 void power_app_output_switch_fault_shutdown(void);

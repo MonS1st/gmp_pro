@@ -213,8 +213,10 @@ void power_settings_store_init(void)
     power_settings_read_record(&settings);
     if (power_settings_record_valid(&settings))
     {
-        power_app_set_voltage_mv(settings.voltage_set_mv);
-        power_app_set_current_ma(settings.current_set_ma);
+        // Restore both saved user values even if the selected strategy locks
+        // one of them. The active strategy derives the effective pair below.
+        power_app_restore_user_setpoints(settings.voltage_set_mv,
+                                         settings.current_set_ma);
         (void)power_control_policy_set_strategy(
             (psu_control_strategy_t)settings.control_strategy);
         g_settings_valid = 1U;
@@ -255,8 +257,9 @@ gmp_task_status_t power_settings_store_task(gmp_task_t *tsk)
 
     settings.magic = PSU_SETTINGS_MAGIC;
     settings.version = PSU_SETTINGS_VERSION;
-    settings.voltage_set_mv = g_power_app.voltage_set_mv;
-    settings.current_set_ma = g_power_app.current_set_ma;
+    // Persist the user's pair, not a CV/CC fixed effective substitute.
+    settings.voltage_set_mv = g_user_voltage_set_mv;
+    settings.current_set_ma = g_user_current_set_ma;
     settings.control_strategy = g_control_strategy;
     settings.checksum = power_settings_checksum(&settings);
 

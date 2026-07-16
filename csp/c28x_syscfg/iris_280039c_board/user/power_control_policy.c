@@ -197,6 +197,7 @@ void power_control_policy_init(void)
     g_control_policy_fault_shutdown_count = 0U;
     g_control_policy_reset_count = 0U;
     g_control_policy_reset_reject_count = 0U;
+    power_app_update_effective_setpoints();
     s_control_policy_last_voltage_set_mv = g_power_app.voltage_set_mv;
     s_control_policy_last_current_set_ma = g_power_app.current_set_ma;
 }
@@ -215,6 +216,7 @@ bool power_control_policy_set_strategy(psu_control_strategy_t strategy)
         g_control_strategy = (uint16_t)strategy;
         ++g_control_policy_strategy_change_count;
     }
+    power_app_update_effective_setpoints();
     power_control_policy_clear_mismatch();
     g_control_policy_target_active = 0U;
     return true;
