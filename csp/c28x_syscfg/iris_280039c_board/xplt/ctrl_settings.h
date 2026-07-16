@@ -113,12 +113,11 @@
 #define PSU_KEY_OUTPUT_TOGGLE_ID        (5U)
 #define PSU_KEY_FAULT_RESET_ID          (6U)
 #define PSU_KEY_CONTROL_STRATEGY_ID      (7U)
-// No authoritative physical key map exists for the three spare buttons.
-// Leave these disabled until g_last_raw_key_id is observed on real hardware;
-// then assign three distinct, otherwise unused IDs in the 1..39 range.
-#define PSU_KEY_PRESET_1_ID              (0U)
-#define PSU_KEY_PRESET_2_ID              (0U)
-#define PSU_KEY_PRESET_3_ID              (0U)
+// Preset keys: key IDs 16, 17 and 18 select M1, M2 and M3 respectively.
+// g_last_raw_key_id remains available to confirm the physical mapping.
+#define PSU_KEY_PRESET_1_ID              (16U)
+#define PSU_KEY_PRESET_2_ID              (17U)
+#define PSU_KEY_PRESET_3_ID              (18U)
 
 #define PSU_VOLTAGE_STEP_MV             (100U)
 #define PSU_CURRENT_STEP_MA             (1U)
