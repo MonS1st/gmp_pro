@@ -3,5 +3,5 @@
 .\gmp_inc
 
 2. External macro dependency paths (-I):
-E:/lib/gmp_pro
-E:/lib/gmp_pro/csp/stm32
+F:/eletronic/gmp_pro/gmp_pro
+F:/eletronic/gmp_pro/gmp_pro/csp/stm32
