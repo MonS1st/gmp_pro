@@ -79,7 +79,23 @@ GMP_STATIC_INLINE void ctl_dispatch(void)
 #endif
 
     if (g_fsbb_faults != FSBB_FAULT_NONE)
+    {
+        /*
+        * Prevent the previous control command from being reused
+        * by diagnostic or subsequent control logic.
+        */
+        v_req = float2ctrl(0.0f);
+
+        /*
+        * Disable PWM immediately instead of waiting for the
+        * slower CiA402 fault-state transition.
+        */
+        if (g_fsbb_output_enabled)
+        {
+            ctl_disable_pwm();
+        }
         return;
+    }
 
 #if (BUILD_LEVEL == 1)
     dcdc_core.mode = CTL_DCDC_MODE_OPENLOOP;
@@ -120,6 +136,16 @@ GMP_STATIC_INLINE void ctl_dispatch(void)
         /*
          * Keep test timing relative to PWM enable.
          */
+
+        if (!g_fsbb_output_enabled)
+        {
+            build4_test_counter = 0U;
+        }
+        else
+        {
+            build4_test_counter++;
+        }
+
         if (build4_test_counter < (uint32_t)(0.2f * CONTROLLER_FREQUENCY))
         {
             /* Clearly inside CV region */
@@ -144,6 +170,14 @@ GMP_STATIC_INLINE void ctl_dispatch(void)
         {
             /* Cross the CC-to-CV threshold */
             i_L_ref_cc_test = float2ctrl(0.83f / CTRL_CURRENT_BASE);
+        }
+        /*
+        * Temporary fault injection for fast-shutdown verification.
+        * Trigger 0.7 s after the Build 4 test starts.
+        */
+        if (build4_test_counter == (uint32_t)(0.7f * CONTROLLER_FREQUENCY))
+        {
+            g_fsbb_faults |= FSBB_FAULT_IL_POSITIVE_OVERCURRENT;
         }
 
         v_req = ctl_step_fsbb_build4(&fsbb_build4, &dcdc_core, i_L_ref_cv_test, i_L_ref_cc_test);

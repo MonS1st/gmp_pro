@@ -70,11 +70,12 @@ GMP_STATIC_INLINE void ctl_output_callback(void)
     simulink_tx_buffer.monitor[6] = ctrl2float(fsbb_build4.i_L_ref_cmd) * CTRL_CURRENT_BASE;
 
     /* CH8: Build 4 operating mode: 0=TEST, 1=CV, 2=CC */
-    simulink_tx_buffer.monitor[7] = (double)fsbb_build4.mode;
+    simulink_tx_buffer.monitor[7] = (double)g_fsbb_output_enabled;
 
 #else
 
     simulink_tx_buffer.monitor[4] = ctrl2float(dcdc_core.v_out_formal) * CTRL_VOLTAGE_BASE;
+
     simulink_tx_buffer.monitor[5] = ctrl2float(v_req) * CTRL_VOLTAGE_BASE;
     simulink_tx_buffer.monitor[6] = (double)cia402_sm.current_state;
     simulink_tx_buffer.monitor[7] = (double)cia402_sm.current_cmd;
