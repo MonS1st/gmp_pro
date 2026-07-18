@@ -242,6 +242,11 @@ extern "C"
 #define FSBB_OUTPUT_CURRENT_LIM (10.0f)
 
 /**
+ * @brief Maximum commanded inductor-current reference for Build Level 4.
+ */
+#define FSBB_INDUCTOR_CURRENT_REF_MAX (1.0f)
+
+/**
  * @brief Default voltage-loop command.
  */
 #define FSBB_DEFAULT_OUTPUT_VOLTAGE (24.0f)

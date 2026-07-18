@@ -102,19 +102,15 @@ GMP_STATIC_INLINE void ctl_dispatch(void)
         v_req = ctl_step_dcdc_cascade(&dcdc_core);
     }
 #elif (BUILD_LEVEL == 4)
-
     {
         /*
-         * Temporary candidate references.
-         * These will later be replaced by the CV and CC outer-loop outputs.
-         */
-        ctrl_gt i_L_ref_cv_test = float2ctrl(0.8f / CTRL_CURRENT_BASE);
+     * Temporary fixed current command.
+     * It will later be replaced by the CV/CC selector output.
+     */
+        ctrl_gt i_L_ref_test = float2ctrl(1.5f / CTRL_CURRENT_BASE);
 
-        ctrl_gt i_L_ref_cc_test = float2ctrl(1.0f / CTRL_CURRENT_BASE);
-
-        v_req = ctl_step_fsbb_build4(&fsbb_build4, &dcdc_core, i_L_ref_cv_test, i_L_ref_cc_test);
+        v_req = ctl_step_fsbb_build4(&fsbb_build4, &dcdc_core, i_L_ref_test);
     }
-
 #endif
 
     ctl_step_fsbb_modulator(&fsbb_mod, v_req, adc_v_in.control_port.value);

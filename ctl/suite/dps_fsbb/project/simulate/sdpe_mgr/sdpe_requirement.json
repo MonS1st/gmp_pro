@@ -259,6 +259,14 @@
       "description": "Output current limit."
     },
     {
+      "role": "Maximum Inductor Current Reference",
+      "macro": "FSBB_INDUCTOR_CURRENT_REF_MAX",
+      "binding": {
+        "float": "1.0"
+      },
+      "description": "Maximum commanded inductor-current reference for Build Level 4."
+    },
+    {
       "role": "Default Output Voltage",
       "macro": "FSBB_DEFAULT_OUTPUT_VOLTAGE",
       "binding": {
