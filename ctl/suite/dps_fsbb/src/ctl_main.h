@@ -105,12 +105,51 @@ GMP_STATIC_INLINE void ctl_dispatch(void)
 
     {
         /*
-         * Temporary candidate references.
-         * These will later be replaced by the CV and CC outer-loop outputs.
+         * Dynamic CV/CC switching test.
+         *
+         * Stage 1: CV = 0.8 A, CC = 1.0 A -> CV mode
+         * Stage 2: CV = 0.8 A, CC = 0.6 A -> CC mode
+         * Stage 3: CV = 0.8 A, CC = 1.0 A -> CV mode
          */
+        static uint32_t build4_test_counter = 0U;
+
         ctrl_gt i_L_ref_cv_test = float2ctrl(0.8f / CTRL_CURRENT_BASE);
 
-        ctrl_gt i_L_ref_cc_test = float2ctrl(1.0f / CTRL_CURRENT_BASE);
+        ctrl_gt i_L_ref_cc_test;
+
+        /*
+         * Keep test timing relative to PWM enable.
+         */
+        if (!g_fsbb_output_enabled)
+        {
+            build4_test_counter = 0U;
+        }
+        else
+        {
+            build4_test_counter++;
+        }
+
+        /*
+         * 0.0~0.4 s after enable: CV mode
+         */
+        if (build4_test_counter < (uint32_t)(0.4f * CONTROLLER_FREQUENCY))
+        {
+            i_L_ref_cc_test = float2ctrl(1.0f / CTRL_CURRENT_BASE);
+        }
+        /*
+         * 0.4~0.8 s after enable: CC mode
+         */
+        else if (build4_test_counter < (uint32_t)(0.8f * CONTROLLER_FREQUENCY))
+        {
+            i_L_ref_cc_test = float2ctrl(0.6f / CTRL_CURRENT_BASE);
+        }
+        /*
+         * After 0.8 s: return to CV mode
+         */
+        else
+        {
+            i_L_ref_cc_test = float2ctrl(1.0f / CTRL_CURRENT_BASE);
+        }
 
         v_req = ctl_step_fsbb_build4(&fsbb_build4, &dcdc_core, i_L_ref_cv_test, i_L_ref_cc_test);
     }

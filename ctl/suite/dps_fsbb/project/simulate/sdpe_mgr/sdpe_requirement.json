@@ -267,6 +267,14 @@
       "description": "Maximum commanded inductor-current reference for Build Level 4."
     },
     {
+      "role": "CV CC Switching Hysteresis",
+      "macro": "FSBB_CVCC_SWITCH_HYSTERESIS",
+      "binding": {
+        "float": "0.02"
+      },
+      "description": "Hysteresis band for CV and CC candidate current-reference selection in amperes."
+    },
+    {
       "role": "Default Output Voltage",
       "macro": "FSBB_DEFAULT_OUTPUT_VOLTAGE",
       "binding": {

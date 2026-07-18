@@ -4,9 +4,11 @@
 #include <xplt.peripheral.h>
 
 #ifdef __cplusplus
-extern "C" {
+extern "C"
+{
 #endif
-typedef enum _tag_dcdc_adc_index_items {
+typedef enum _tag_dcdc_adc_index_items
+{
     DCDC_ADC_ID_VIN = 0,
     DCDC_ADC_ID_VOUT = 1,
     DCDC_ADC_ID_IL = 2,
@@ -56,10 +58,28 @@ GMP_STATIC_INLINE void ctl_output_callback(void)
     simulink_tx_buffer.monitor[1] = ctrl2float(adc_v_out.control_port.value) * CTRL_VOLTAGE_BASE;
     simulink_tx_buffer.monitor[2] = ctrl2float(adc_i_L.control_port.value) * CTRL_CURRENT_BASE;
     simulink_tx_buffer.monitor[3] = ctrl2float(adc_i_load.control_port.value) * CTRL_CURRENT_BASE;
+#if defined(BUILD_LEVEL) && (BUILD_LEVEL == 4)
+
+    /* CH5: candidate inductor-current reference from CV loop */
+    simulink_tx_buffer.monitor[4] = ctrl2float(fsbb_build4.i_L_ref_cv) * CTRL_CURRENT_BASE;
+
+    /* CH6: candidate inductor-current reference from CC loop */
+    simulink_tx_buffer.monitor[5] = ctrl2float(fsbb_build4.i_L_ref_cc) * CTRL_CURRENT_BASE;
+
+    /* CH7: final selected inductor-current reference */
+    simulink_tx_buffer.monitor[6] = ctrl2float(fsbb_build4.i_L_ref_cmd) * CTRL_CURRENT_BASE;
+
+    /* CH8: Build 4 operating mode: 0=TEST, 1=CV, 2=CC */
+    simulink_tx_buffer.monitor[7] = (double)fsbb_build4.mode;
+
+#else
+
     simulink_tx_buffer.monitor[4] = ctrl2float(dcdc_core.v_out_formal) * CTRL_VOLTAGE_BASE;
     simulink_tx_buffer.monitor[5] = ctrl2float(v_req) * CTRL_VOLTAGE_BASE;
     simulink_tx_buffer.monitor[6] = (double)cia402_sm.current_state;
     simulink_tx_buffer.monitor[7] = (double)cia402_sm.current_cmd;
+
+#endif
     if (g_fsbb_sim_enable_pending)
     {
         csp_sl_enable_output();

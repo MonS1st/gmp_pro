@@ -98,7 +98,7 @@ void ctl_init(void)
     * Initialize Build Level 4 current-reference limits.
     */
     ctl_init_fsbb_build4_controller(&fsbb_build4, float2ctrl(FSBB_INDUCTOR_CURRENT_REF_MAX / CTRL_CURRENT_BASE),
-                                    float2ctrl(0.0f));
+                                    float2ctrl(0.0f), float2ctrl(FSBB_CVCC_SWITCH_HYSTERESIS / CTRL_CURRENT_BASE));
 
     v_req = float2ctrl(FSBB_OPEN_LOOP_VOLTAGE_COMMAND / CTRL_VOLTAGE_BASE);
 

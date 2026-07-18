@@ -28,6 +28,8 @@ typedef struct _tag_fsbb_build4_controller_t
     /* Allowed inductor-current reference range */
     ctrl_gt i_L_ref_max;
     ctrl_gt i_L_ref_min;
+    /* CV/CC mode-switching hysteresis */
+    ctrl_gt switch_hysteresis;
 
     /* Current CV/CC operating mode */
     fsbb_build4_mode_e mode;
@@ -46,6 +48,7 @@ GMP_STATIC_INLINE void ctl_init_fsbb_build4_controller(fsbb_build4_controller_t*
 
     obj->i_L_ref_max = i_L_ref_max;
     obj->i_L_ref_min = i_L_ref_min;
+    obj->switch_hysteresis = switch_hysteresis;
 
     obj->mode = FSBB_BUILD4_MODE_TEST;
 }
@@ -82,17 +85,52 @@ GMP_STATIC_INLINE ctrl_gt ctl_step_fsbb_cvcc_selector(fsbb_build4_controller_t* 
     obj->i_L_ref_cc = ctl_sat(i_L_ref_cc_input, obj->i_L_ref_max, obj->i_L_ref_min);
 
     /*
-     * The smaller reference is the more restrictive request.
-     */
-    if (obj->i_L_ref_cv <= obj->i_L_ref_cc)
+    * Initialize the mode according to the smaller candidate.
+    */
+    if (obj->mode == FSBB_BUILD4_MODE_TEST)
     {
-        obj->i_L_ref_cmd = obj->i_L_ref_cv;
-        obj->mode = FSBB_BUILD4_MODE_CV;
+        if (obj->i_L_ref_cv <= obj->i_L_ref_cc)
+        {
+            obj->mode = FSBB_BUILD4_MODE_CV;
+        }
+        else
+        {
+            obj->mode = FSBB_BUILD4_MODE_CC;
+        }
+    }
+    /*
+    * While operating in CV mode, switch to CC only when the
+    * CC candidate is lower by more than the hysteresis band.
+    */
+    else if (obj->mode == FSBB_BUILD4_MODE_CV)
+    {
+        if ((obj->i_L_ref_cc + obj->switch_hysteresis) < obj->i_L_ref_cv)
+        {
+            obj->mode = FSBB_BUILD4_MODE_CC;
+        }
+    }
+    /*
+    * While operating in CC mode, switch back to CV only when
+    * the CV candidate is lower by more than the hysteresis band.
+    */
+    else
+    {
+        if ((obj->i_L_ref_cv + obj->switch_hysteresis) < obj->i_L_ref_cc)
+        {
+            obj->mode = FSBB_BUILD4_MODE_CV;
+        }
+    }
+
+    /*
+    * Select the reference corresponding to the retained mode.
+    */
+    if (obj->mode == FSBB_BUILD4_MODE_CC)
+    {
+        obj->i_L_ref_cmd = obj->i_L_ref_cc;
     }
     else
     {
-        obj->i_L_ref_cmd = obj->i_L_ref_cc;
-        obj->mode = FSBB_BUILD4_MODE_CC;
+        obj->i_L_ref_cmd = obj->i_L_ref_cv;
     }
 
     return obj->i_L_ref_cmd;

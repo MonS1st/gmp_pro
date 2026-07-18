@@ -247,6 +247,11 @@ extern "C"
 #define FSBB_INDUCTOR_CURRENT_REF_MAX (1.0f)
 
 /**
+ * @brief Hysteresis band for CV and CC candidate current-reference selection in amperes.
+ */
+#define FSBB_CVCC_SWITCH_HYSTERESIS (0.02f)
+
+/**
  * @brief Default voltage-loop command.
  */
 #define FSBB_DEFAULT_OUTPUT_VOLTAGE (24.0f)
