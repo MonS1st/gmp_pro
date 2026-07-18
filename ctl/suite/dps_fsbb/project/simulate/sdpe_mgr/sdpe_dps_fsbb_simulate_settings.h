@@ -76,10 +76,10 @@ extern "C"
  */
 
 /**
- * @brief 1: open loop, 2: current loop, 3: voltage/current cascade.
- *        Options: (1), (2), (3)
+ * @brief 1: open loop, 2: current loop, 3: voltage/current cascade, 4: custom CV/CC control.
+ *        Options: (1), (2), (3), (4)
  */
-#define BUILD_LEVEL (3)
+#define BUILD_LEVEL (4)
 
 //=================================================================================================
 /**
@@ -347,8 +347,8 @@ extern "C"
 #define CTRL_SPLL_EPSILON (0.005f)
 
 // User project tail code
-#if (BUILD_LEVEL < 1) || (BUILD_LEVEL > 3)
-#error "BUILD_LEVEL must be 1, 2, or 3."
+#if (BUILD_LEVEL < 1) || (BUILD_LEVEL > 4)
+#error "BUILD_LEVEL must be 1, 2, 3, or 4."
 #endif
 
 #ifdef __cplusplus

@@ -4,7 +4,7 @@ function sim_out = run_fsbb_cosim(stop_time)
 %   stop time. RUN_FSBB_COSIM(T) overrides the stop time in seconds.
 
 root = fileparts(mfilename('fullpath'));
-model = 'MCS_STD_FSBB_MODEL';
+model = 'MCS_STD_FSBB_MODEL_2022b';
 exe = fullfile(root, 'x64', 'Debug', 'Digital_Power_Suite_FSBB_SIL_Env.exe');
 if ~isfile(exe)
     error('FSBB:SILExecutableMissing', ...

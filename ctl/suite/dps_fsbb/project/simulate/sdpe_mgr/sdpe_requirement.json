@@ -476,19 +476,20 @@
       "group": "Controller",
       "macro": "BUILD_LEVEL",
       "enabled": true,
-      "value": "(3)",
+      "value": "(4)",
       "options_preset": "",
       "options": [
         "(1)",
         "(2)",
-        "(3)"
+        "(3)",
+        "(4)"
       ],
-      "description": "1: open loop, 2: current loop, 3: voltage/current cascade."
+      "description": "1: open loop, 2: current loop, 3: voltage/current cascade, 4: custom CV/CC control."
     }
   ],
   "code_sections": {
     "after_extern_open": "/* MATLAB/Simulink SIL project settings. */",
-    "before_footer": "#if (BUILD_LEVEL < 1) || (BUILD_LEVEL > 3)\n#error \"BUILD_LEVEL must be 1, 2, or 3.\"\n#endif"
+    "before_footer": "#if (BUILD_LEVEL < 1) || (BUILD_LEVEL > 4)\n#error \"BUILD_LEVEL must be 1, 2, 3, or 4.\"\n#endif"
   },
   "requirement_groups": [
     {

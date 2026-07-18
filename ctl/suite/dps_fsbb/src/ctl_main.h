@@ -10,13 +10,14 @@
 #define SDPE_FSBB_SETTINGS_HEADER <sdpe_dps_fsbb_iris_settings.h>
 #endif
 #include SDPE_FSBB_SETTINGS_HEADER
-#include <core/pm/function_scheduler.h>
+#include "fsbb_build4_controller.h"
+#include "fsbb_inner_current_loop.h"
 #include <core/dev/pil_core.h>
-#include <ctl/framework/cia402_state_machine.h>
-#include <ctl/component/interface/adc_channel.h>
+#include <core/pm/function_scheduler.h>
 #include <ctl/component/digital_power/dcdc/dcdc_core.h>
 #include <ctl/component/digital_power/dcdc/fsbb.h>
-
+#include <ctl/component/interface/adc_channel.h>
+#include <ctl/framework/cia402_state_machine.h>
 #ifdef __cplusplus
 extern "C"
 {
@@ -24,6 +25,7 @@ extern "C"
 
 extern cia402_sm_t cia402_sm;
 extern ctl_dcdc_core_t dcdc_core;
+extern fsbb_build4_controller_t fsbb_build4;
 
 extern adc_channel_t adc_v_in;
 extern adc_channel_t adc_v_out;
@@ -85,22 +87,29 @@ GMP_STATIC_INLINE void ctl_dispatch(void)
     v_req = ctl_step_dcdc_open_loop(&dcdc_core);
 #elif (BUILD_LEVEL == 2)
     dcdc_core.mode = CTL_DCDC_MODE_CURRENTLOOP;
-    dcdc_core.i_target = ctl_sat(g_i_limit_user,
-                                 float2ctrl(FSBB_OUTPUT_CURRENT_LIM / CTRL_CURRENT_BASE),
-                                 float2ctrl(0.0f));
+    dcdc_core.i_target =
+        ctl_sat(g_i_limit_user, float2ctrl(FSBB_OUTPUT_CURRENT_LIM / CTRL_CURRENT_BASE), float2ctrl(0.0f));
     v_req = ctl_step_dcdc_current_loop(&dcdc_core);
 #elif (BUILD_LEVEL == 3)
     {
-        ctrl_gt current_limit = ctl_sat(g_i_limit_user,
-                                        float2ctrl(FSBB_OUTPUT_CURRENT_LIM / CTRL_CURRENT_BASE),
-                                        float2ctrl(0.0f));
+        ctrl_gt current_limit =
+            ctl_sat(g_i_limit_user, float2ctrl(FSBB_OUTPUT_CURRENT_LIM / CTRL_CURRENT_BASE), float2ctrl(0.0f));
         dcdc_core.mode = CTL_DCDC_MODE_VOLTAGELOOP;
-        dcdc_core.v_target = ctl_sat(g_v_out_ref_user,
-                                     float2ctrl(FSBB_OUTPUT_VOLTAGE_MAX / CTRL_VOLTAGE_BASE),
+        dcdc_core.v_target = ctl_sat(g_v_out_ref_user, float2ctrl(FSBB_OUTPUT_VOLTAGE_MAX / CTRL_VOLTAGE_BASE),
                                      float2ctrl(FSBB_OUTPUT_VOLTAGE_MIN / CTRL_VOLTAGE_BASE));
         ctl_set_pid_limit(&dcdc_core.voltage_pid, current_limit, float2ctrl(0.0f));
         ctl_set_pid_int_limit(&dcdc_core.voltage_pid, current_limit, float2ctrl(0.0f));
         v_req = ctl_step_dcdc_cascade(&dcdc_core);
+    }
+#elif (BUILD_LEVEL == 4)
+    {
+        /*
+     * Temporary fixed current command.
+     * It will later be replaced by the CV/CC selector output.
+     */
+        ctrl_gt i_L_ref_test = float2ctrl(0.5f / CTRL_CURRENT_BASE);
+
+        v_req = ctl_step_fsbb_build4(&fsbb_build4, &dcdc_core, i_L_ref_test);
     }
 #endif
 

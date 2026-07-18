@@ -353,5 +353,8 @@
     <ClInclude Include="xplt\xplt.peripheral.h">
       <Filter>implement_interface</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\fsbb_inner_current_loop.h">
+      <Filter>implement_common</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

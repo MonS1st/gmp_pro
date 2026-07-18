@@ -18,6 +18,8 @@ cia402_sm_t cia402_sm;
 
 // Control Law Core
 ctl_dcdc_core_t dcdc_core;
+// Build Level 4 Control Coordinator
+fsbb_build4_controller_t fsbb_build4;
 
 // Input channel
 adc_channel_t adc_v_in;
@@ -90,15 +92,19 @@ void ctl_init(void)
 
     // init FSBB controller core
     ctl_init_dcdc_core(&dcdc_core, &core_init);
-    ctl_set_dcdc_core_limits(&dcdc_core,
-                             float2ctrl(FSBB_OUTPUT_VOLTAGE_MAX / CTRL_VOLTAGE_BASE),
-                             float2ctrl(0.0f));
+    ctl_set_dcdc_core_limits(&dcdc_core, float2ctrl(FSBB_OUTPUT_VOLTAGE_MAX / CTRL_VOLTAGE_BASE), float2ctrl(0.0f));
+
+    /*
+    * Initialize Build Level 4 current-reference limits.
+    */
+    ctl_init_fsbb_build4_controller(&fsbb_build4, float2ctrl(FSBB_OUTPUT_CURRENT_LIM / CTRL_CURRENT_BASE),
+                                    float2ctrl(0.0f));
+
+    v_req = float2ctrl(FSBB_OPEN_LOOP_VOLTAGE_COMMAND / CTRL_VOLTAGE_BASE);
 
     // attach FSBB with ADC peripheral
     ctl_attach_dcdc_core(&dcdc_core, &adc_v_in.control_port, &adc_v_out.control_port, &adc_i_L.control_port,
                          &adc_i_load.control_port);
-
-    v_req = float2ctrl(FSBB_OPEN_LOOP_VOLTAGE_COMMAND / CTRL_VOLTAGE_BASE);
 
     //
     // init FSBB PWM modulator
@@ -226,6 +232,7 @@ fast_gt ctl_exec_adc_calibration(void)
 void clear_all_controllers(void)
 {
     ctl_clear_dcdc_core(&dcdc_core);
+    ctl_clear_fsbb_build4_controller(&fsbb_build4);
 }
 
 void ctl_enable_pwm(void)
