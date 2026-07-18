@@ -120,35 +120,30 @@ GMP_STATIC_INLINE void ctl_dispatch(void)
         /*
          * Keep test timing relative to PWM enable.
          */
-        if (!g_fsbb_output_enabled)
+        if (build4_test_counter < (uint32_t)(0.2f * CONTROLLER_FREQUENCY))
         {
-            build4_test_counter = 0U;
+            /* Clearly inside CV region */
+            i_L_ref_cc_test = float2ctrl(0.85f / CTRL_CURRENT_BASE);
         }
-        else
+        else if (build4_test_counter < (uint32_t)(0.4f * CONTROLLER_FREQUENCY))
         {
-            build4_test_counter++;
+            /* CC is slightly lower, but still inside hysteresis band */
+            i_L_ref_cc_test = float2ctrl(0.79f / CTRL_CURRENT_BASE);
         }
-
-        /*
-         * 0.0~0.4 s after enable: CV mode
-         */
-        if (build4_test_counter < (uint32_t)(0.4f * CONTROLLER_FREQUENCY))
+        else if (build4_test_counter < (uint32_t)(0.6f * CONTROLLER_FREQUENCY))
         {
-            i_L_ref_cc_test = float2ctrl(1.0f / CTRL_CURRENT_BASE);
+            /* Cross the CV-to-CC threshold */
+            i_L_ref_cc_test = float2ctrl(0.77f / CTRL_CURRENT_BASE);
         }
-        /*
-         * 0.4~0.8 s after enable: CC mode
-         */
         else if (build4_test_counter < (uint32_t)(0.8f * CONTROLLER_FREQUENCY))
         {
-            i_L_ref_cc_test = float2ctrl(0.6f / CTRL_CURRENT_BASE);
+            /* Rise inside the hysteresis band; retain CC */
+            i_L_ref_cc_test = float2ctrl(0.81f / CTRL_CURRENT_BASE);
         }
-        /*
-         * After 0.8 s: return to CV mode
-         */
         else
         {
-            i_L_ref_cc_test = float2ctrl(1.0f / CTRL_CURRENT_BASE);
+            /* Cross the CC-to-CV threshold */
+            i_L_ref_cc_test = float2ctrl(0.83f / CTRL_CURRENT_BASE);
         }
 
         v_req = ctl_step_fsbb_build4(&fsbb_build4, &dcdc_core, i_L_ref_cv_test, i_L_ref_cc_test);

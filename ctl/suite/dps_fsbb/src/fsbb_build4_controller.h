@@ -40,7 +40,7 @@ typedef struct _tag_fsbb_build4_controller_t
  * @brief Initialize Build Level 4 controller state.
  */
 GMP_STATIC_INLINE void ctl_init_fsbb_build4_controller(fsbb_build4_controller_t* obj, ctrl_gt i_L_ref_max,
-                                                       ctrl_gt i_L_ref_min)
+                                                       ctrl_gt i_L_ref_min, ctrl_gt switch_hysteresis)
 {
     obj->i_L_ref_cv = float2ctrl(0.0f);
     obj->i_L_ref_cc = float2ctrl(0.0f);
