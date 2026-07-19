@@ -36,6 +36,7 @@ volatile fast_gt flag_enable_adc_calibrator = 0;
 volatile fast_gt index_adc_calibrator = 0;
 volatile uint16_t g_fsbb_faults = FSBB_FAULT_NONE;
 volatile fast_gt g_fsbb_output_enabled = 0;
+volatile fast_gt g_fsbb_fault_reset_result = FSBB_FAULT_RESET_IDLE;
 
 // User commands
 ctrl_gt g_v_out_ref_user = float2ctrl(FSBB_DEFAULT_OUTPUT_VOLTAGE / CTRL_VOLTAGE_BASE);
@@ -94,11 +95,14 @@ void ctl_init(void)
     ctl_init_dcdc_core(&dcdc_core, &core_init);
     ctl_set_dcdc_core_limits(&dcdc_core, float2ctrl(FSBB_OUTPUT_VOLTAGE_MAX / CTRL_VOLTAGE_BASE), float2ctrl(0.0f));
 
-    /*
-    * Initialize Build Level 4 current-reference limits.
-    */
+#if (BUILD_LEVEL == 4)
+    /* Initialize Build Level 4 outer-loop current-reference limits. */
     ctl_init_fsbb_build4_controller(&fsbb_build4, float2ctrl(FSBB_INDUCTOR_CURRENT_REF_MAX / CTRL_CURRENT_BASE),
-                                    float2ctrl(0.0f), float2ctrl(FSBB_CVCC_SWITCH_HYSTERESIS / CTRL_CURRENT_BASE));
+                                    float2ctrl(0.0f), float2ctrl(FSBB_CVCC_SWITCH_HYSTERESIS / CTRL_CURRENT_BASE),
+                                    FSBB_OUTPUT_CURRENT_LOOP_KP, FSBB_OUTPUT_CURRENT_LOOP_TI, CONTROLLER_FREQUENCY);
+    ctl_set_pid_limit(&dcdc_core.voltage_pid, fsbb_build4.i_L_ref_max, fsbb_build4.i_L_ref_min);
+    ctl_set_pid_int_limit(&dcdc_core.voltage_pid, fsbb_build4.i_L_ref_max, fsbb_build4.i_L_ref_min);
+#endif
 
     v_req = float2ctrl(FSBB_OPEN_LOOP_VOLTAGE_COMMAND / CTRL_VOLTAGE_BASE);
 
@@ -178,8 +182,36 @@ gmp_task_status_t tsk_protect(gmp_task_t* tsk)
     GMP_UNUSED_VAR(tsk);
 
     if (g_fsbb_faults != FSBB_FAULT_NONE)
-        cia402_fault_request(&cia402_sm);
+    {
+        if ((cia402_sm.current_state != CIA402_SM_FAULT_REACTION) && (cia402_sm.current_state != CIA402_SM_FAULT))
+        {
+            cia402_fault_request(&cia402_sm);
+        }
+    }
     return GMP_TASK_DONE;
+}
+
+fast_gt ctl_fsbb_try_fault_reset(void)
+{
+    if ((cia402_sm.current_state != CIA402_SM_FAULT) || g_fsbb_output_enabled ||
+        (ctl_fsbb_active_faults() != FSBB_FAULT_NONE) ||
+        (cia402_sm.current_cmd != CIA402_CMD_FAULT_RESET))
+    {
+        g_fsbb_fault_reset_result = FSBB_FAULT_RESET_REJECTED;
+        return 0;
+    }
+
+    g_fsbb_faults = FSBB_FAULT_NONE;
+    v_req = float2ctrl(0.0f);
+    clear_all_controllers();
+    cia402_send_cmd(&cia402_sm, CIA402_CMD_FAULT_RESET);
+    g_fsbb_fault_reset_result = FSBB_FAULT_RESET_ACCEPTED;
+    return 1;
+}
+
+fast_gt ctl_fault_recover_routine(void)
+{
+    return ctl_fsbb_try_fault_reset();
 }
 
 //=================================================================================================

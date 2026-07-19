@@ -252,6 +252,21 @@ extern "C"
 #define FSBB_CVCC_SWITCH_HYSTERESIS (0.02f)
 
 /**
+ * @brief Conservative proportional gain for the Build Level 4 output-current outer loop.
+ */
+#define FSBB_OUTPUT_CURRENT_LOOP_KP (0.2f)
+
+/**
+ * @brief Conservative integral time constant for the Build Level 4 output-current outer loop in seconds.
+ */
+#define FSBB_OUTPUT_CURRENT_LOOP_TI (0.05f)
+
+/**
+ * @brief Set to 1 only for the staged CV/CC and fault-injection self test.
+ */
+#define FSBB_BUILD4_SELF_TEST_ENABLE (0)
+
+/**
  * @brief Default voltage-loop command.
  */
 #define FSBB_DEFAULT_OUTPUT_VOLTAGE (24.0f)

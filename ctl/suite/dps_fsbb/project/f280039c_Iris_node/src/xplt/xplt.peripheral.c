@@ -168,10 +168,16 @@ interrupt void INT_IRIS_CAN_0_ISR(void)
         {
             cia402_send_cmd(&cia402_sm, CIA402_CMD_DISABLE_VOLTAGE);
         }
-        else if ((rx_data[0] == 2) && (ctl_fsbb_active_faults() == FSBB_FAULT_NONE))
+        else if (rx_data[0] == 2)
         {
-            g_fsbb_faults = FSBB_FAULT_NONE;
-            cia402_send_cmd(&cia402_sm, CIA402_CMD_FAULT_RESET);
+            if (cia402_sm.current_state == CIA402_SM_FAULT)
+            {
+                cia402_send_cmd(&cia402_sm, CIA402_CMD_FAULT_RESET);
+            }
+            else
+            {
+                g_fsbb_fault_reset_result = FSBB_FAULT_RESET_REJECTED;
+            }
         }
     }
     // Mailbox 2: Reference Commands (V_out Setpoint & I_limit)

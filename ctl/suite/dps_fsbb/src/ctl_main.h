@@ -52,15 +52,50 @@ typedef enum _tag_fsbb_fault
     FSBB_FAULT_IOUT_OVERCURRENT = 1U << 5
 } fsbb_fault_t;
 
+typedef enum _tag_fsbb_fault_reset_result
+{
+    FSBB_FAULT_RESET_IDLE = 0,
+    FSBB_FAULT_RESET_ACCEPTED,
+    FSBB_FAULT_RESET_REJECTED
+} fsbb_fault_reset_result_t;
+
 extern volatile uint16_t g_fsbb_faults;
 extern volatile fast_gt g_fsbb_output_enabled;
+extern volatile fast_gt g_fsbb_fault_reset_result;
 
 void ctl_init(void);
 void ctl_mainloop(void);
 void ctl_enable_pwm(void);
 void ctl_disable_pwm(void);
 void clear_all_controllers(void);
+fast_gt ctl_fsbb_try_fault_reset(void);
 gmp_task_status_t tsk_protect(gmp_task_t* tsk);
+
+/** Return faults present in the latest unfiltered ADC sample set. */
+GMP_STATIC_INLINE uint16_t ctl_fsbb_active_faults(void)
+{
+    uint16_t faults = FSBB_FAULT_NONE;
+
+#if defined FSBB_ENABLE_VIN_SAMPLE
+    if (adc_v_in.control_port.value < float2ctrl(FSBB_INPUT_VOLTAGE_MIN / CTRL_VOLTAGE_BASE))
+        faults |= FSBB_FAULT_VIN_UNDERVOLTAGE;
+    if (adc_v_in.control_port.value > float2ctrl(FSBB_INPUT_VOLTAGE_MAX / CTRL_VOLTAGE_BASE))
+        faults |= FSBB_FAULT_VIN_OVERVOLTAGE;
+#endif
+    if (adc_v_out.control_port.value > float2ctrl(FSBB_OUTPUT_VOLTAGE_MAX / CTRL_VOLTAGE_BASE))
+        faults |= FSBB_FAULT_VOUT_OVERVOLTAGE;
+    if (adc_i_L.control_port.value > float2ctrl(FSBB_PROTECT_IL_MAX / CTRL_CURRENT_BASE))
+        faults |= FSBB_FAULT_IL_POSITIVE_OVERCURRENT;
+    if (adc_i_L.control_port.value < float2ctrl(FSBB_PROTECT_IL_MIN / CTRL_CURRENT_BASE))
+        faults |= FSBB_FAULT_IL_NEGATIVE_OVERCURRENT;
+#if defined FSBB_ENABLE_IOUT_SAMPLE
+    if ((adc_i_load.control_port.value > float2ctrl(FSBB_OUTPUT_CURRENT_LIM / CTRL_CURRENT_BASE)) ||
+        (adc_i_load.control_port.value < -float2ctrl(FSBB_OUTPUT_CURRENT_LIM / CTRL_CURRENT_BASE)))
+        faults |= FSBB_FAULT_IOUT_OVERCURRENT;
+#endif
+
+    return faults;
+}
 
 /** Execute one control sample after the platform input callback has run. */
 GMP_STATIC_INLINE void ctl_dispatch(void)
@@ -120,6 +155,7 @@ GMP_STATIC_INLINE void ctl_dispatch(void)
 #elif (BUILD_LEVEL == 4)
 
     {
+#if (FSBB_BUILD4_SELF_TEST_ENABLE == 1)
         /*
          * Dynamic CV/CC switching test.
          *
@@ -173,14 +209,22 @@ GMP_STATIC_INLINE void ctl_dispatch(void)
         }
         /*
         * Temporary fault injection for fast-shutdown verification.
-        * Trigger 0.7 s after the Build 4 test starts.
+         * Trigger after all five selector stages have been observed.
         */
-        if (build4_test_counter == (uint32_t)(0.7f * CONTROLLER_FREQUENCY))
+        if (build4_test_counter == (uint32_t)(1.0f * CONTROLLER_FREQUENCY))
         {
             g_fsbb_faults |= FSBB_FAULT_IL_POSITIVE_OVERCURRENT;
         }
 
-        v_req = ctl_step_fsbb_build4(&fsbb_build4, &dcdc_core, i_L_ref_cv_test, i_L_ref_cc_test);
+        v_req = ctl_step_fsbb_build4_self_test(&fsbb_build4, &dcdc_core, i_L_ref_cv_test, i_L_ref_cc_test);
+#else
+        dcdc_core.mode = CTL_DCDC_MODE_VOLTAGELOOP;
+        dcdc_core.v_target = ctl_sat(g_v_out_ref_user, float2ctrl(FSBB_OUTPUT_VOLTAGE_MAX / CTRL_VOLTAGE_BASE),
+                                     float2ctrl(FSBB_OUTPUT_VOLTAGE_MIN / CTRL_VOLTAGE_BASE));
+        dcdc_core.i_target =
+            ctl_sat(g_i_limit_user, float2ctrl(FSBB_OUTPUT_CURRENT_LIM / CTRL_CURRENT_BASE), float2ctrl(0.0f));
+        v_req = ctl_step_fsbb_build4(&fsbb_build4, &dcdc_core, dcdc_core.v_target, dcdc_core.i_target);
+#endif
     }
 
 #endif

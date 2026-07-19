@@ -206,9 +206,9 @@ FSBB_ENABLE_IOUT_SAMPLE = true;
 % PWM_MODULATOR_USING_NEGATIVE_LOGIC = 1;
 
 %% Controller
-% 1: open loop, 2: current loop, 3: voltage/current cascade.
-% Options: (1), (2), (3)
-BUILD_LEVEL = 3;
+% 1: open loop, 2: current loop, 3: voltage/current cascade, 4: custom CV/CC control.
+% Options: (1), (2), (3), (4)
+BUILD_LEVEL = 4;
 
 %% Requirement bindings
 % FSBB switching frequency.
@@ -303,6 +303,21 @@ FSBB_OUTPUT_VOLTAGE_MIN = 3.0;
 
 % Output current limit.
 FSBB_OUTPUT_CURRENT_LIM = 10.0;
+
+% Maximum commanded inductor-current reference for Build Level 4.
+FSBB_INDUCTOR_CURRENT_REF_MAX = 1.0;
+
+% Hysteresis band for CV and CC candidate current-reference selection in amperes.
+FSBB_CVCC_SWITCH_HYSTERESIS = 0.02;
+
+% Conservative proportional gain for the Build Level 4 output-current outer loop.
+FSBB_OUTPUT_CURRENT_LOOP_KP = 0.2;
+
+% Conservative integral time constant for the Build Level 4 output-current outer loop in seconds.
+FSBB_OUTPUT_CURRENT_LOOP_TI = 0.05;
+
+% Set to 1 only for the staged CV/CC and fault-injection self test.
+FSBB_BUILD4_SELF_TEST_ENABLE = 0;
 
 % Default voltage-loop command.
 FSBB_DEFAULT_OUTPUT_VOLTAGE = 24.0;
