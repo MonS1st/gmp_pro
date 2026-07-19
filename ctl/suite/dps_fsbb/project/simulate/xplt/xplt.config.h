@@ -57,5 +57,7 @@
 #define gmp_pc_simulink_tx_buffer_t dp_sil_tx_buf_t
 
 // Invoke SDPE-generated controller and plant settings.
+#ifndef SDPE_FSBB_SETTINGS_HEADER
 #define SDPE_FSBB_SETTINGS_HEADER <sdpe_dps_fsbb_simulate_settings.h>
+#endif
 #include SDPE_FSBB_SETTINGS_HEADER

@@ -431,6 +431,10 @@ ctl/suite/**/MDK-ARM/**/*.htm
 ctl/suite/**/build
 ctl/suite/**/RTE/**
 
+# DPS FSBB SIL regression raw/intermediate MAT files are reproducible.
+/ctl/suite/dps_fsbb/project/simulate/validation/build4_cvcc_load_switch_raw.mat
+/ctl/suite/dps_fsbb/project/simulate/validation/build4_cvcc_load_switch_results.mat
+
 # Disable all the STM32 CubeMX generated files, and compiled results
 ctl/training/**/Drivers
 ctl/training/**/*.crf
