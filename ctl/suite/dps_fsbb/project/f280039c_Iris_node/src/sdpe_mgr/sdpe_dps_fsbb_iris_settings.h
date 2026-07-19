@@ -1,8 +1,7 @@
 /**
  * @file sdpe_dps_fsbb_iris_settings.h
  * @brief SDPE project bindings for DPS FSBB F280039C IRIS Node.
- * @note Four-switch buck-boost converter SDPE project requirement prepared from ctl/suite/dps_fsbb/project/f280039c_Iris_node/xplt/ctrl_settings.h.
- *       The requirement introduces the GMP LVFB 150V 2-phase board as the switching stage and sensor source, and IRIS F280039C Node as the peripheral option provider.
+ * @note Four-switch buck-boost converter SDPE requirement for F280039C Iris Node. The LVFB entity remains the switching stage and Vin/IL nominal sensor source; the Vout interface uses the QuadSensor nominal model only as an explicitly uncalibrated placeholder until board measurements replace it.
  */
 
 #ifndef _PROJECT_SDPE_DPS_FSBB_IRIS_SETTINGS_H_
@@ -10,6 +9,7 @@
 
 #include <ctl/hardware_preset/half_bridge/gmp_lvfb_150_2ph_v2.h>
 #include <ctl/hardware_preset/mcu_board/iris_f280039c_node.h>
+#include <ctl/hardware_preset/voltage_sensor/quad_sensor_voltage_channel.h>
 
 #ifdef __cplusplus
 extern "C"
@@ -27,7 +27,7 @@ extern "C"
 #define SDPE_PROJECT_ID "dps_fsbb_f280039c_Iris_node"
 #define SDPE_PROJECT_SUITE "dps_fsbb"
 #define SDPE_PROJECT_VERSION "0.1.0"
-#define SDPE_PROJECT_UPDATED_AT "2026-07-14"
+#define SDPE_PROJECT_UPDATED_AT "2026-07-19"
 
 //=================================================================================================
 /**
@@ -75,10 +75,16 @@ extern "C"
  */
 
 /**
- * @brief Incremental debug build level. 1: modulation and hardware check; 2: current loop; 3: voltage loop.
- *        Options: (1), (2), (3)
+ * @brief 1: modulator, PWM, and hardware check; 2: inductor-current inner loop; 3: cascaded voltage outer loop; 4: dual voltage/output-current outer-loop CV/CC control.
+ *        Options: (1), (2), (3), (4)
  */
 #define BUILD_LEVEL (1)
+
+/**
+ * @brief Vout feedback filter type: 0 bypass, 1 existing first-order CTL IIR low-pass.
+ *        Options: (0), (1)
+ */
+#define FSBB_VOUT_FILTER_TYPE (1)
 
 //=================================================================================================
 /**
@@ -226,6 +232,11 @@ extern "C"
 #define CTRL_ADC_VOLTAGE_REF (3.3f)
 
 /**
+ * @brief F280039C ADC resolution used by the shared sensor conversion and compile-test platform.
+ */
+#define CTRL_ADC_RESOLUTION (12)
+
+/**
  * @brief Voltage per-unit base value, using the peak value of the nominal 24 Vrms system.
  */
 #define CTRL_VOLTAGE_BASE (34.0f)
@@ -246,14 +257,34 @@ extern "C"
 #define CTRL_FSBB_VIN_BIAS GMP_LVFB_VOLTAGE_BIAS_V
 
 /**
- * @brief Output voltage ADC sensing sensitivity provided by the LVFB voltage sensor path.
+ * @brief Provisional polarity sign (+1 or -1). The default is not a hardware verification and closed-loop use remains gated by FSBB_VOUT_SENSOR_CALIBRATED.
  */
-#define CTRL_FSBB_VOUT_SENSITIVITY GMP_LVFB_VOLTAGE_SENSITIVITY
+#define FSBB_VOUT_SENSOR_POLARITY (1)
 
 /**
- * @brief Output voltage ADC bias voltage provided by the LVFB voltage sensor path.
+ * @brief Nominal QuadSensor bias placeholder in volts; replace with measured calibration data before setting FSBB_VOUT_SENSOR_CALIBRATED to 1.
  */
-#define CTRL_FSBB_VOUT_BIAS GMP_LVFB_VOLTAGE_BIAS_V
+#define FSBB_VOUT_SENSOR_BIAS_V QUAD_SENSOR_VCH_BIAS_V
+
+/**
+ * @brief Nominal QuadSensor sensitivity placeholder in V/V; it is not an actual Iris hardware calibration result.
+ */
+#define FSBB_VOUT_SENSOR_SENSITIVITY QUAD_SENSOR_VCH_SENSITIVITY_V_PER_V
+
+/**
+ * @brief Set to 1 only after the physical Vout channel bias, sensitivity, and polarity have been measured.
+ */
+#define FSBB_VOUT_SENSOR_CALIBRATED (0)
+
+/**
+ * @brief Compatibility alias used by the existing adc_channel conversion path.
+ */
+#define CTRL_FSBB_VOUT_SENSITIVITY (FSBB_VOUT_SENSOR_SENSITIVITY)
+
+/**
+ * @brief Compatibility alias used by the existing adc_channel conversion path.
+ */
+#define CTRL_FSBB_VOUT_BIAS (FSBB_VOUT_SENSOR_BIAS_V)
 
 /**
  * @brief Inductor current ADC sensing sensitivity provided by the LVFB current sensor path.
@@ -266,14 +297,34 @@ extern "C"
 #define CTRL_FSBB_IL_BIAS GMP_LVFB_CURRENT_BIAS_V
 
 /**
- * @brief Load/output current ADC sensing sensitivity provided by the LVFB current sensor path.
+ * @brief Provisional polarity sign (+1 or -1). The default is not a hardware verification and closed-loop use remains gated by FSBB_IOUT_SENSOR_CALIBRATED.
  */
-#define CTRL_FSBB_IOUT_SENSITIVITY GMP_LVFB_CURRENT_SENSITIVITY
+#define FSBB_IOUT_SENSOR_POLARITY (1)
 
 /**
- * @brief Load/output current ADC bias voltage provided by the LVFB current sensor path.
+ * @brief Existing LVFB nominal current-sensor bias placeholder in volts; replace with the measured Iout channel calibration.
  */
-#define CTRL_FSBB_IOUT_BIAS GMP_LVFB_CURRENT_BIAS_V
+#define FSBB_IOUT_SENSOR_BIAS_V GMP_LVFB_CURRENT_BIAS_V
+
+/**
+ * @brief Existing LVFB nominal sensitivity placeholder in V/A; it is not an actual Iout channel calibration result.
+ */
+#define FSBB_IOUT_SENSOR_SENSITIVITY GMP_LVFB_CURRENT_SENSITIVITY
+
+/**
+ * @brief Set to 1 only after the physical Iout channel bias, sensitivity, and polarity have been measured.
+ */
+#define FSBB_IOUT_SENSOR_CALIBRATED (0)
+
+/**
+ * @brief Compatibility alias used by the existing adc_channel conversion path.
+ */
+#define CTRL_FSBB_IOUT_SENSITIVITY (FSBB_IOUT_SENSOR_SENSITIVITY)
+
+/**
+ * @brief Compatibility alias used by the existing adc_channel conversion path.
+ */
+#define CTRL_FSBB_IOUT_BIAS (FSBB_IOUT_SENSOR_BIAS_V)
 
 /**
  * @brief Minimum load resistance used by FSBB controller initialization.
@@ -336,14 +387,14 @@ extern "C"
 #define FSBB_OUTPUT_CURRENT_LIM (10.0f)
 
 /**
- * @brief Default startup output-voltage command.
+ * @brief Conservative first-hardware startup output-voltage command.
  */
-#define FSBB_DEFAULT_OUTPUT_VOLTAGE (24.0f)
+#define FSBB_DEFAULT_OUTPUT_VOLTAGE (5.0f)
 
 /**
- * @brief Default startup current command and limit.
+ * @brief Conservative first-hardware startup current command and user limit.
  */
-#define FSBB_DEFAULT_CURRENT_LIMIT (5.0f)
+#define FSBB_DEFAULT_CURRENT_LIMIT (0.2f)
 
 /**
  * @brief Equivalent output-voltage command used by BUILD_LEVEL 1.
@@ -366,9 +417,54 @@ extern "C"
 #define FSBB_CURRENT_LOOP_BANDWIDTH (800.0f)
 
 /**
- * @brief Requested voltage-loop crossover frequency.
+ * @brief Conservative 10 Hz first-hardware voltage-loop crossover; chosen well below the 150 Hz Vout feedback filter cutoff.
  */
-#define FSBB_VOLTAGE_LOOP_BANDWIDTH (40.0f)
+#define FSBB_VOLTAGE_LOOP_BANDWIDTH (10.0f)
+
+/**
+ * @brief Maximum Build 4 inductor-current command for conservative first-hardware operation.
+ */
+#define FSBB_INDUCTOR_CURRENT_REF_MAX (0.3f)
+
+/**
+ * @brief CV/CC candidate-selection hysteresis in amperes.
+ */
+#define FSBB_CVCC_SWITCH_HYSTERESIS (0.02f)
+
+/**
+ * @brief Conservative proportional gain for the Build 4 output-current outer loop.
+ */
+#define FSBB_OUTPUT_CURRENT_LOOP_KP (0.2f)
+
+/**
+ * @brief Conservative Build 4 output-current outer-loop integral time in seconds.
+ */
+#define FSBB_OUTPUT_CURRENT_LOOP_TI (0.05f)
+
+/**
+ * @brief Must remain 0 on Iris hardware; compile-time validation rejects fault-injection self test.
+ */
+#define FSBB_BUILD4_SELF_TEST_ENABLE (0)
+
+/**
+ * @brief Enable the existing dcdc_core first-order IIR only on the voltage-loop Vout feedback path.
+ */
+#define FSBB_VOUT_FILTER_ENABLE (1)
+
+/**
+ * @brief First-order IIR Vout cutoff frequency in hertz; filtering suppresses noise but cannot recover ADC resolution.
+ */
+#define FSBB_VOUT_FILTER_PARAMETER (150.0f)
+
+/**
+ * @brief Set to 1 only with BUILD_LEVEL 1 to keep PWM tripped while sampling and exporting sensor calibration data.
+ */
+#define FSBB_HARDWARE_SENSOR_CALIBRATION_MODE (0)
+
+/**
+ * @brief Consecutive valid Vin samples required before latching UV/OV faults (10 ms at 20 kHz).
+ */
+#define FSBB_VIN_PROTECTION_DEBOUNCE_SAMPLES (200)
 
 /**
  * @brief Maximum FSBB leg duty ratio.
@@ -416,9 +512,35 @@ extern "C"
 #define ENABLE_GMP_DL_PIL_SIM
 #endif
 
-/* Project-specific compile-time validation. */
-#if (BUILD_LEVEL < 1) || (BUILD_LEVEL > 3)
-#error "BUILD_LEVEL must be 1 (open loop), 2 (current loop), or 3 (voltage/current cascade)."
+/* Compatibility names for the hardware calibration interface. */
+#define FSBB_VOUT_CALIBRATION_ENABLE FSBB_VOUT_SENSOR_CALIBRATED
+#define FSBB_VOUT_CALIBRATION_BIAS_V FSBB_VOUT_SENSOR_BIAS_V
+#define FSBB_VOUT_CALIBRATION_SENSITIVITY FSBB_VOUT_SENSOR_SENSITIVITY
+
+/* Iris hardware compile-time safety validation. */
+#if (BUILD_LEVEL < 1) || (BUILD_LEVEL > 4)
+#error "BUILD_LEVEL must be 1, 2, 3, or 4."
+#endif
+#if (FSBB_VOUT_SENSOR_POLARITY != 1) && (FSBB_VOUT_SENSOR_POLARITY != -1)
+#error "FSBB_VOUT_SENSOR_POLARITY must be +1 or -1 after physical polarity verification."
+#endif
+#if (FSBB_IOUT_SENSOR_POLARITY != 1) && (FSBB_IOUT_SENSOR_POLARITY != -1)
+#error "FSBB_IOUT_SENSOR_POLARITY must be +1 or -1 after physical polarity verification."
+#endif
+#if (FSBB_VOUT_FILTER_TYPE < 0) || (FSBB_VOUT_FILTER_TYPE > 1)
+#error "FSBB_VOUT_FILTER_TYPE must be 0 (bypass) or 1 (first-order IIR)."
+#endif
+#if (FSBB_HARDWARE_SENSOR_CALIBRATION_MODE == 1) && (BUILD_LEVEL != 1)
+#error "FSBB_HARDWARE_SENSOR_CALIBRATION_MODE requires BUILD_LEVEL 1 so no closed loop can run."
+#endif
+#if (BUILD_LEVEL == 3) && (FSBB_VOUT_SENSOR_CALIBRATED != 1)
+#error "BUILD_LEVEL 3 requires calibrated Vout sensing: set FSBB_VOUT_SENSOR_CALIBRATED=1 only after measurement."
+#endif
+#if (BUILD_LEVEL == 4) && (!defined FSBB_ENABLE_IOUT_SAMPLE || (FSBB_VOUT_SENSOR_CALIBRATED != 1) || (FSBB_IOUT_SENSOR_CALIBRATED != 1))
+#error "BUILD_LEVEL 4 requires Iout sampling (FSBB_ENABLE_IOUT_SAMPLE), calibrated Vout (FSBB_VOUT_SENSOR_CALIBRATED=1), and calibrated Iout (FSBB_IOUT_SENSOR_CALIBRATED=1)."
+#endif
+#if (FSBB_BUILD4_SELF_TEST_ENABLE != 0)
+#error "FSBB_BUILD4_SELF_TEST_ENABLE must remain 0 on F280039C Iris hardware."
 #endif
 
 #ifdef __cplusplus

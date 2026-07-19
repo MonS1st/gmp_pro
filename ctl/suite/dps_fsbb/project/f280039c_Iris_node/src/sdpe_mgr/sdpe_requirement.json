@@ -10,6 +10,9 @@
     },
     {
       "entity": "gmp_lvfb_150_2ph_v2"
+    },
+    {
+      "entity": "quad_sensor_voltage_channel"
     }
   ],
   "requirements": [
@@ -70,6 +73,14 @@
       "description": "ADC voltage reference used by sensor gain and bias conversion."
     },
     {
+      "role": "ADC Resolution",
+      "macro": "CTRL_ADC_RESOLUTION",
+      "binding": {
+        "number": "12"
+      },
+      "description": "F280039C ADC resolution used by the shared sensor conversion and compile-test platform."
+    },
+    {
       "role": "Voltage PU Base",
       "macro": "CTRL_VOLTAGE_BASE",
       "binding": {
@@ -102,20 +113,52 @@
       "description": "Input voltage ADC bias voltage provided by the LVFB voltage sensor path."
     },
     {
-      "role": "Output Voltage Sensitive",
-      "macro": "CTRL_FSBB_VOUT_SENSITIVITY",
+      "role": "Output Voltage Sensor Polarity",
+      "macro": "FSBB_VOUT_SENSOR_POLARITY",
       "binding": {
-        "export": "gmp_lvfb_150_2ph_v2.voltage_sensitivity"
+        "number": "1"
       },
-      "description": "Output voltage ADC sensing sensitivity provided by the LVFB voltage sensor path."
+      "description": "Provisional polarity sign (+1 or -1). The default is not a hardware verification and closed-loop use remains gated by FSBB_VOUT_SENSOR_CALIBRATED."
     },
     {
-      "role": "Output Voltage Bias",
+      "role": "Output Voltage Sensor Bias",
+      "macro": "FSBB_VOUT_SENSOR_BIAS_V",
+      "binding": {
+        "export": "quad_sensor_voltage_channel.bias"
+      },
+      "description": "Nominal QuadSensor bias placeholder in volts; replace with measured calibration data before setting FSBB_VOUT_SENSOR_CALIBRATED to 1."
+    },
+    {
+      "role": "Output Voltage Sensor Sensitivity",
+      "macro": "FSBB_VOUT_SENSOR_SENSITIVITY",
+      "binding": {
+        "export": "quad_sensor_voltage_channel.sensitivity"
+      },
+      "description": "Nominal QuadSensor sensitivity placeholder in V/V; it is not an actual Iris hardware calibration result."
+    },
+    {
+      "role": "Output Voltage Sensor Calibrated",
+      "macro": "FSBB_VOUT_SENSOR_CALIBRATED",
+      "binding": {
+        "number": "0"
+      },
+      "description": "Set to 1 only after the physical Vout channel bias, sensitivity, and polarity have been measured."
+    },
+    {
+      "role": "Output Voltage Sensitive Compatibility",
+      "macro": "CTRL_FSBB_VOUT_SENSITIVITY",
+      "binding": {
+        "number": "FSBB_VOUT_SENSOR_SENSITIVITY"
+      },
+      "description": "Compatibility alias used by the existing adc_channel conversion path."
+    },
+    {
+      "role": "Output Voltage Bias Compatibility",
       "macro": "CTRL_FSBB_VOUT_BIAS",
       "binding": {
-        "export": "gmp_lvfb_150_2ph_v2.voltage_bias_v"
+        "number": "FSBB_VOUT_SENSOR_BIAS_V"
       },
-      "description": "Output voltage ADC bias voltage provided by the LVFB voltage sensor path."
+      "description": "Compatibility alias used by the existing adc_channel conversion path."
     },
     {
       "role": "Inductor Current Sensitive",
@@ -134,20 +177,52 @@
       "description": "Inductor current ADC bias voltage provided by the LVFB current sensor path."
     },
     {
-      "role": "Output Current Sensitive",
-      "macro": "CTRL_FSBB_IOUT_SENSITIVITY",
+      "role": "Output Current Sensor Polarity",
+      "macro": "FSBB_IOUT_SENSOR_POLARITY",
       "binding": {
-        "export": "gmp_lvfb_150_2ph_v2.current_sensitivity"
+        "number": "1"
       },
-      "description": "Load/output current ADC sensing sensitivity provided by the LVFB current sensor path."
+      "description": "Provisional polarity sign (+1 or -1). The default is not a hardware verification and closed-loop use remains gated by FSBB_IOUT_SENSOR_CALIBRATED."
     },
     {
-      "role": "Output Current Bias",
-      "macro": "CTRL_FSBB_IOUT_BIAS",
+      "role": "Output Current Sensor Bias",
+      "macro": "FSBB_IOUT_SENSOR_BIAS_V",
       "binding": {
         "export": "gmp_lvfb_150_2ph_v2.current_bias_v"
       },
-      "description": "Load/output current ADC bias voltage provided by the LVFB current sensor path."
+      "description": "Existing LVFB nominal current-sensor bias placeholder in volts; replace with the measured Iout channel calibration."
+    },
+    {
+      "role": "Output Current Sensor Sensitivity",
+      "macro": "FSBB_IOUT_SENSOR_SENSITIVITY",
+      "binding": {
+        "export": "gmp_lvfb_150_2ph_v2.current_sensitivity"
+      },
+      "description": "Existing LVFB nominal sensitivity placeholder in V/A; it is not an actual Iout channel calibration result."
+    },
+    {
+      "role": "Output Current Sensor Calibrated",
+      "macro": "FSBB_IOUT_SENSOR_CALIBRATED",
+      "binding": {
+        "number": "0"
+      },
+      "description": "Set to 1 only after the physical Iout channel bias, sensitivity, and polarity have been measured."
+    },
+    {
+      "role": "Output Current Sensitive Compatibility",
+      "macro": "CTRL_FSBB_IOUT_SENSITIVITY",
+      "binding": {
+        "number": "FSBB_IOUT_SENSOR_SENSITIVITY"
+      },
+      "description": "Compatibility alias used by the existing adc_channel conversion path."
+    },
+    {
+      "role": "Output Current Bias Compatibility",
+      "macro": "CTRL_FSBB_IOUT_BIAS",
+      "binding": {
+        "number": "FSBB_IOUT_SENSOR_BIAS_V"
+      },
+      "description": "Compatibility alias used by the existing adc_channel conversion path."
     },
     {
       "role": "Min Resistance Load",
@@ -249,17 +324,17 @@
       "role": "Default Output Voltage",
       "macro": "FSBB_DEFAULT_OUTPUT_VOLTAGE",
       "binding": {
-        "float": "24.0"
+        "float": "5.0"
       },
-      "description": "Default startup output-voltage command."
+      "description": "Conservative first-hardware startup output-voltage command."
     },
     {
       "role": "Default Current Limit",
       "macro": "FSBB_DEFAULT_CURRENT_LIMIT",
       "binding": {
-        "float": "5.0"
+        "float": "0.2"
       },
-      "description": "Default startup current command and limit."
+      "description": "Conservative first-hardware startup current command and user limit."
     },
     {
       "role": "Open Loop Voltage Command",
@@ -297,9 +372,81 @@
       "role": "Voltage Loop Bandwidth",
       "macro": "FSBB_VOLTAGE_LOOP_BANDWIDTH",
       "binding": {
-        "float": "40.0"
+        "float": "10.0"
       },
-      "description": "Requested voltage-loop crossover frequency."
+      "description": "Conservative 10 Hz first-hardware voltage-loop crossover; chosen well below the 150 Hz Vout feedback filter cutoff."
+    },
+    {
+      "role": "Maximum Inductor Current Reference",
+      "macro": "FSBB_INDUCTOR_CURRENT_REF_MAX",
+      "binding": {
+        "float": "0.3"
+      },
+      "description": "Maximum Build 4 inductor-current command for conservative first-hardware operation."
+    },
+    {
+      "role": "CV CC Switching Hysteresis",
+      "macro": "FSBB_CVCC_SWITCH_HYSTERESIS",
+      "binding": {
+        "float": "0.02"
+      },
+      "description": "CV/CC candidate-selection hysteresis in amperes."
+    },
+    {
+      "role": "Output Current Outer-loop Kp",
+      "macro": "FSBB_OUTPUT_CURRENT_LOOP_KP",
+      "binding": {
+        "float": "0.2"
+      },
+      "description": "Conservative proportional gain for the Build 4 output-current outer loop."
+    },
+    {
+      "role": "Output Current Outer-loop Ti",
+      "macro": "FSBB_OUTPUT_CURRENT_LOOP_TI",
+      "binding": {
+        "float": "0.05"
+      },
+      "description": "Conservative Build 4 output-current outer-loop integral time in seconds."
+    },
+    {
+      "role": "Build 4 Self Test Enable",
+      "macro": "FSBB_BUILD4_SELF_TEST_ENABLE",
+      "binding": {
+        "number": "0"
+      },
+      "description": "Must remain 0 on Iris hardware; compile-time validation rejects fault-injection self test."
+    },
+    {
+      "role": "Vout Filter Enable",
+      "macro": "FSBB_VOUT_FILTER_ENABLE",
+      "binding": {
+        "number": "1"
+      },
+      "description": "Enable the existing dcdc_core first-order IIR only on the voltage-loop Vout feedback path."
+    },
+    {
+      "role": "Vout Filter Parameter",
+      "macro": "FSBB_VOUT_FILTER_PARAMETER",
+      "binding": {
+        "float": "150.0"
+      },
+      "description": "First-order IIR Vout cutoff frequency in hertz; filtering suppresses noise but cannot recover ADC resolution."
+    },
+    {
+      "role": "Hardware Sensor Calibration Mode",
+      "macro": "FSBB_HARDWARE_SENSOR_CALIBRATION_MODE",
+      "binding": {
+        "number": "0"
+      },
+      "description": "Set to 1 only with BUILD_LEVEL 1 to keep PWM tripped while sampling and exporting sensor calibration data."
+    },
+    {
+      "role": "Vin Protection Debounce Samples",
+      "macro": "FSBB_VIN_PROTECTION_DEBOUNCE_SAMPLES",
+      "binding": {
+        "number": "200"
+      },
+      "description": "Consecutive valid Vin samples required before latching UV/OV faults (10 ms at 20 kHz)."
     },
     {
       "role": "Maximum Duty",
@@ -420,9 +567,22 @@
       "options": [
         "(1)",
         "(2)",
-        "(3)"
+        "(3)",
+        "(4)"
       ],
-      "description": "Incremental debug build level. 1: modulation and hardware check; 2: current loop; 3: voltage loop."
+      "description": "1: modulator, PWM, and hardware check; 2: inductor-current inner loop; 3: cascaded voltage outer loop; 4: dual voltage/output-current outer-loop CV/CC control."
+    },
+    {
+      "group": "Controller Options",
+      "macro": "FSBB_VOUT_FILTER_TYPE",
+      "enabled": true,
+      "value": "(1)",
+      "options_preset": "",
+      "options": [
+        "(0)",
+        "(1)"
+      ],
+      "description": "Vout feedback filter type: 0 bypass, 1 existing first-order CTL IIR low-pass."
     },
     {
       "group": "Board GPIO",
@@ -567,10 +727,10 @@
   ],
   "code_sections": {
     "after_extern_open": "/* Project-specific includes can be added here if the migrated project needs extra headers. */",
-    "before_footer": "/* Backward compatibility for the historical misspelled PIL switch. */\n#if defined ENBALE_GMP_DL_PIL_SIM && !defined ENABLE_GMP_DL_PIL_SIM\n#define ENABLE_GMP_DL_PIL_SIM\n#endif\n\n/* Project-specific compile-time validation. */\n#if (BUILD_LEVEL < 1) || (BUILD_LEVEL > 3)\n#error \"BUILD_LEVEL must be 1 (open loop), 2 (current loop), or 3 (voltage/current cascade).\"\n#endif"
+    "before_footer": "/* Backward compatibility for the historical misspelled PIL switch. */\n#if defined ENBALE_GMP_DL_PIL_SIM && !defined ENABLE_GMP_DL_PIL_SIM\n#define ENABLE_GMP_DL_PIL_SIM\n#endif\n\n/* Compatibility names for the hardware calibration interface. */\n#define FSBB_VOUT_CALIBRATION_ENABLE FSBB_VOUT_SENSOR_CALIBRATED\n#define FSBB_VOUT_CALIBRATION_BIAS_V FSBB_VOUT_SENSOR_BIAS_V\n#define FSBB_VOUT_CALIBRATION_SENSITIVITY FSBB_VOUT_SENSOR_SENSITIVITY\n\n/* Iris hardware compile-time safety validation. */\n#if (BUILD_LEVEL < 1) || (BUILD_LEVEL > 4)\n#error \"BUILD_LEVEL must be 1, 2, 3, or 4.\"\n#endif\n#if (FSBB_VOUT_SENSOR_POLARITY != 1) && (FSBB_VOUT_SENSOR_POLARITY != -1)\n#error \"FSBB_VOUT_SENSOR_POLARITY must be +1 or -1 after physical polarity verification.\"\n#endif\n#if (FSBB_IOUT_SENSOR_POLARITY != 1) && (FSBB_IOUT_SENSOR_POLARITY != -1)\n#error \"FSBB_IOUT_SENSOR_POLARITY must be +1 or -1 after physical polarity verification.\"\n#endif\n#if (FSBB_VOUT_FILTER_TYPE < 0) || (FSBB_VOUT_FILTER_TYPE > 1)\n#error \"FSBB_VOUT_FILTER_TYPE must be 0 (bypass) or 1 (first-order IIR).\"\n#endif\n#if (FSBB_HARDWARE_SENSOR_CALIBRATION_MODE == 1) && (BUILD_LEVEL != 1)\n#error \"FSBB_HARDWARE_SENSOR_CALIBRATION_MODE requires BUILD_LEVEL 1 so no closed loop can run.\"\n#endif\n#if (BUILD_LEVEL == 3) && (FSBB_VOUT_SENSOR_CALIBRATED != 1)\n#error \"BUILD_LEVEL 3 requires calibrated Vout sensing: set FSBB_VOUT_SENSOR_CALIBRATED=1 only after measurement.\"\n#endif\n#if (BUILD_LEVEL == 4) && (!defined FSBB_ENABLE_IOUT_SAMPLE || (FSBB_VOUT_SENSOR_CALIBRATED != 1) || (FSBB_IOUT_SENSOR_CALIBRATED != 1))\n#error \"BUILD_LEVEL 4 requires Iout sampling (FSBB_ENABLE_IOUT_SAMPLE), calibrated Vout (FSBB_VOUT_SENSOR_CALIBRATED=1), and calibrated Iout (FSBB_IOUT_SENSOR_CALIBRATED=1).\"\n#endif\n#if (FSBB_BUILD4_SELF_TEST_ENABLE != 0)\n#error \"FSBB_BUILD4_SELF_TEST_ENABLE must remain 0 on F280039C Iris hardware.\"\n#endif"
   },
-  "description": "Four-switch buck-boost converter SDPE project requirement prepared from ctl/suite/dps_fsbb/project/f280039c_Iris_node/xplt/ctrl_settings.h.\nThe requirement introduces the GMP LVFB 150V 2-phase board as the switching stage and sensor source, and IRIS F280039C Node as the peripheral option provider.",
-  "updated_at": "2026-07-14",
+  "description": "Four-switch buck-boost converter SDPE requirement for F280039C Iris Node. The LVFB entity remains the switching stage and Vin/IL nominal sensor source; the Vout interface uses the QuadSensor nominal model only as an explicitly uncalibrated placeholder until board measurements replace it.",
+  "updated_at": "2026-07-19",
   "requirement_groups": [
     {
       "name": "Peripheral Parameters",
@@ -581,7 +741,8 @@
         "PWM Deadband Width",
         "CPU Main Frequency",
         "System Divition",
-        "ADC reference Voltage"
+        "ADC reference Voltage",
+        "ADC Resolution"
       ]
     },
     {
@@ -612,15 +773,23 @@
     {
       "name": "Output Voltage Sensor",
       "requirements": [
-        "Output Voltage Sensitive",
-        "Output Voltage Bias"
+        "Output Voltage Sensor Polarity",
+        "Output Voltage Sensor Bias",
+        "Output Voltage Sensor Sensitivity",
+        "Output Voltage Sensor Calibrated",
+        "Output Voltage Sensitive Compatibility",
+        "Output Voltage Bias Compatibility"
       ]
     },
     {
       "name": "Output Current Sensor",
       "requirements": [
-        "Output Current Sensitive",
-        "Output Current Bias"
+        "Output Current Sensor Polarity",
+        "Output Current Sensor Bias",
+        "Output Current Sensor Sensitivity",
+        "Output Current Sensor Calibrated",
+        "Output Current Sensitive Compatibility",
+        "Output Current Bias Compatibility"
       ]
     },
     {
@@ -653,6 +822,15 @@
         "Open Loop Voltage Command",
         "Current Loop Bandwidth",
         "Voltage Loop Bandwidth",
+        "Maximum Inductor Current Reference",
+        "CV CC Switching Hysteresis",
+        "Output Current Outer-loop Kp",
+        "Output Current Outer-loop Ti",
+        "Build 4 Self Test Enable",
+        "Vout Filter Enable",
+        "Vout Filter Parameter",
+        "Hardware Sensor Calibration Mode",
+        "Vin Protection Debounce Samples",
         "Low Transition Ratio",
         "High Transition Ratio",
         "adc_calibration_timeout",
