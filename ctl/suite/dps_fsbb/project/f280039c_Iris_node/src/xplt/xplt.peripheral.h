@@ -37,6 +37,34 @@ extern adc_channel_t adc_v_out;
 extern adc_channel_t adc_i_L;
 extern adc_channel_t adc_i_load;
 
+typedef enum _tag_fsbb_sensor_monitor_index_e
+{
+    FSBB_SENSOR_MONITOR_VIN = 0,
+    FSBB_SENSOR_MONITOR_VOUT,
+    FSBB_SENSOR_MONITOR_IL,
+    FSBB_SENSOR_MONITOR_IOUT,
+    FSBB_SENSOR_MONITOR_COUNT
+} fsbb_sensor_monitor_index_e;
+
+/**
+ * @brief CCS/watch and CAN calibration data for the four Iris ADC channels.
+ * @details Bias, sensitivity, polarity, and reconstructed values remain
+ * provisional until the corresponding SDPE calibrated flag is set after
+ * physical measurement.
+ */
+typedef struct _tag_fsbb_sensor_calibration_monitor_t
+{
+    uint16_t raw_code[FSBB_SENSOR_MONITOR_COUNT];
+    float adc_pin_voltage_v[FSBB_SENSOR_MONITOR_COUNT];
+    float debiased_voltage_v[FSBB_SENSOR_MONITOR_COUNT];
+    float bias_v[FSBB_SENSOR_MONITOR_COUNT];
+    float sensitivity[FSBB_SENSOR_MONITOR_COUNT];
+    float physical_value[FSBB_SENSOR_MONITOR_COUNT];
+    float vout_filtered_v;
+} fsbb_sensor_calibration_monitor_t;
+
+extern volatile fsbb_sensor_calibration_monitor_t g_fsbb_sensor_monitor;
+
 // dlog DSA objects
 //extern basic_trigger_t trigger;
 

@@ -28,6 +28,22 @@
 // GPIO port
 extern gpio_halt user_led;
 
+volatile fsbb_sensor_calibration_monitor_t g_fsbb_sensor_monitor = {0};
+
+static void configure_fsbb_trip_zone(uint32_t base)
+{
+    /*
+     * The LVFB power-stage preset identifies UCC21520DWR drivers. TI's
+     * input/output truth table holds both outputs low when INA/INB are low;
+     * therefore force both ePWM outputs low for a one-shot trip. The separate
+     * board-level PWM_ENABLE signal is also driven to its established disable
+     * level by every shutdown path.
+     */
+    EPWM_setTripZoneAction(base, EPWM_TZ_ACTION_EVENT_TZA, EPWM_TZ_ACTION_LOW);
+    EPWM_setTripZoneAction(base, EPWM_TZ_ACTION_EVENT_TZB, EPWM_TZ_ACTION_LOW);
+    EPWM_forceTripZoneEvent(base, EPWM_TZ_FORCE_EVENT_OST);
+}
+
 //=================================================================================================
 // Peripheral Setup Function
 
@@ -42,6 +58,12 @@ void setup_peripheral(void)
     asm(" RPT #255 || NOP");
 
     user_led = SYSTEM_LED;
+
+    /* Start with both bridge legs tripped and the gate-driver interface off. */
+    configure_fsbb_trip_zone(PHASE_BUCK_BASE);
+    configure_fsbb_trip_zone(PHASE_BOOST_BASE);
+    GPIO_WritePin(PWM_ENABLE_PORT, 0);
+    g_fsbb_output_enabled = 0;
 
     // ---------------------------------------------------------
     // 1. Initialize Input Voltage ADC Channel (V_in)
@@ -61,7 +83,8 @@ void setup_peripheral(void)
     ctl_init_adc_channel(
         &adc_v_out,
         // ADC gain calculation
-        ctl_gain_calc_generic(CTRL_ADC_VOLTAGE_REF, CTRL_FSBB_VOUT_SENSITIVITY, CTRL_VOLTAGE_BASE),
+        ctl_gain_calc_generic(CTRL_ADC_VOLTAGE_REF, CTRL_FSBB_VOUT_SENSITIVITY, CTRL_VOLTAGE_BASE) *
+            FSBB_VOUT_SENSOR_POLARITY,
         // ADC bias calculation
         ctl_bias_calc_via_Vref_Vbias(CTRL_ADC_VOLTAGE_REF, CTRL_FSBB_VOUT_BIAS),
         // ADC resolution, IQN
@@ -85,7 +108,8 @@ void setup_peripheral(void)
     ctl_init_adc_channel(
         &adc_i_load,
         // ADC gain calculation
-        ctl_gain_calc_generic(CTRL_ADC_VOLTAGE_REF, CTRL_FSBB_IOUT_SENSITIVITY, CTRL_CURRENT_BASE),
+        ctl_gain_calc_generic(CTRL_ADC_VOLTAGE_REF, CTRL_FSBB_IOUT_SENSITIVITY, CTRL_CURRENT_BASE) *
+            FSBB_IOUT_SENSOR_POLARITY,
         // ADC bias calculation
         ctl_bias_calc_via_Vref_Vbias(CTRL_ADC_VOLTAGE_REF, CTRL_FSBB_IOUT_BIAS),
         // ADC resolution, IQN
@@ -186,9 +210,11 @@ interrupt void INT_IRIS_CAN_0_ISR(void)
         CAN_readMessage(IRIS_CAN_BASE, 2, (uint16_t*)recv_content);
         CAN_clearInterruptStatus(IRIS_CAN_BASE, 2);
 
-        // Map received CAN payload to user setpoints (Converted to PU)
-        g_v_out_ref_user = float2ctrl((float)recv_content[0].i32 / CAN_SCALE_FACTOR);
-        g_i_limit_user   = float2ctrl((float)recv_content[1].i32 / CAN_SCALE_FACTOR);
+        // Map physical V/A commands into the controller per-unit bases.
+        g_v_out_ref_user =
+            float2ctrl(((float)recv_content[0].i32 / CAN_SCALE_FACTOR) / CTRL_VOLTAGE_BASE);
+        g_i_limit_user =
+            float2ctrl(((float)recv_content[1].i32 / CAN_SCALE_FACTOR) / CTRL_CURRENT_BASE);
     }
 
     // Clear the global interrupt flag
@@ -208,25 +234,83 @@ void send_monitor_data(void)
 {
     can_data_t tran_content[2];
 
+#if (FSBB_HARDWARE_SENSOR_CALIBRATION_MODE == 1)
+    static uint16_t calibration_parameter_page = 0U;
+    float calibration_parameter;
+
+    /* 0x201/0x202: exact ADC result codes. */
+    tran_content[0].i32 = (int32_t)g_fsbb_sensor_monitor.raw_code[FSBB_SENSOR_MONITOR_VIN];
+    tran_content[1].i32 = (int32_t)g_fsbb_sensor_monitor.raw_code[FSBB_SENSOR_MONITOR_VOUT];
+    CAN_sendMessage(IRIS_CAN_BASE, 4, 8, (uint16_t*)tran_content);
+    tran_content[0].i32 = (int32_t)g_fsbb_sensor_monitor.raw_code[FSBB_SENSOR_MONITOR_IL];
+    tran_content[1].i32 = (int32_t)g_fsbb_sensor_monitor.raw_code[FSBB_SENSOR_MONITOR_IOUT];
+    CAN_sendMessage(IRIS_CAN_BASE, 5, 8, (uint16_t*)tran_content);
+
+    /* 0x203/0x204: ADC pin voltages in microvolts. */
+    tran_content[0].i32 = (int32_t)(g_fsbb_sensor_monitor.adc_pin_voltage_v[FSBB_SENSOR_MONITOR_VIN] * 1.0e6f);
+    tran_content[1].i32 = (int32_t)(g_fsbb_sensor_monitor.adc_pin_voltage_v[FSBB_SENSOR_MONITOR_VOUT] * 1.0e6f);
+    CAN_sendMessage(IRIS_CAN_BASE, 6, 8, (uint16_t*)tran_content);
+    tran_content[0].i32 = (int32_t)(g_fsbb_sensor_monitor.adc_pin_voltage_v[FSBB_SENSOR_MONITOR_IL] * 1.0e6f);
+    tran_content[1].i32 = (int32_t)(g_fsbb_sensor_monitor.adc_pin_voltage_v[FSBB_SENSOR_MONITOR_IOUT] * 1.0e6f);
+    CAN_sendMessage(IRIS_CAN_BASE, 7, 8, (uint16_t*)tran_content);
+
+    /* 0x205/0x206: reconstructed physical values scaled by 10000. */
+    tran_content[0].i32 = (int32_t)(g_fsbb_sensor_monitor.physical_value[FSBB_SENSOR_MONITOR_VIN] * CAN_SCALE_FACTOR);
+    tran_content[1].i32 = (int32_t)(g_fsbb_sensor_monitor.physical_value[FSBB_SENSOR_MONITOR_VOUT] * CAN_SCALE_FACTOR);
+    CAN_sendMessage(IRIS_CAN_BASE, 8, 8, (uint16_t*)tran_content);
+    tran_content[0].i32 = (int32_t)(g_fsbb_sensor_monitor.physical_value[FSBB_SENSOR_MONITOR_IL] * CAN_SCALE_FACTOR);
+    tran_content[1].i32 = (int32_t)(g_fsbb_sensor_monitor.physical_value[FSBB_SENSOR_MONITOR_IOUT] * CAN_SCALE_FACTOR);
+    CAN_sendMessage(IRIS_CAN_BASE, 9, 8, (uint16_t*)tran_content);
+
+    /*
+     * 0x207 cycles through bias pages 0..3 and sensitivity pages 4..7.
+     * The parameter is scaled by 1e6; every page is refreshed within 40 ms.
+     */
+    if (calibration_parameter_page < FSBB_SENSOR_MONITOR_COUNT)
+        calibration_parameter = g_fsbb_sensor_monitor.bias_v[calibration_parameter_page];
+    else
+        calibration_parameter =
+            g_fsbb_sensor_monitor.sensitivity[calibration_parameter_page - FSBB_SENSOR_MONITOR_COUNT];
+    tran_content[0].i32 = (int32_t)calibration_parameter_page;
+    tran_content[1].i32 = (int32_t)(calibration_parameter * 1.0e6f);
+    CAN_sendMessage(IRIS_CAN_BASE, 10, 8, (uint16_t*)tran_content);
+    calibration_parameter_page = (calibration_parameter_page + 1U) % (2U * FSBB_SENSOR_MONITOR_COUNT);
+#else
     // 0x201: Monitor Input & Output Voltage (PU)
-    tran_content[0].i32 = (int32_t)(adc_v_in.control_port.value * CAN_SCALE_FACTOR);
-    tran_content[1].i32 = (int32_t)(adc_v_out.control_port.value * CAN_SCALE_FACTOR);
+    tran_content[0].i32 = (int32_t)(ctrl2float(adc_v_in.control_port.value) * CAN_SCALE_FACTOR);
+    tran_content[1].i32 = (int32_t)(ctrl2float(adc_v_out.control_port.value) * CAN_SCALE_FACTOR);
     CAN_sendMessage(IRIS_CAN_BASE, 4, 8, (uint16_t*)tran_content);
 
     // 0x202: Monitor Inductor Current & Load Current (PU)
-    tran_content[0].i32 = (int32_t)(adc_i_L.control_port.value * CAN_SCALE_FACTOR);
-    tran_content[1].i32 = (int32_t)(adc_i_load.control_port.value * CAN_SCALE_FACTOR);
+    tran_content[0].i32 = (int32_t)(ctrl2float(adc_i_L.control_port.value) * CAN_SCALE_FACTOR);
+    tran_content[1].i32 = (int32_t)(ctrl2float(adc_i_load.control_port.value) * CAN_SCALE_FACTOR);
     CAN_sendMessage(IRIS_CAN_BASE, 5, 8, (uint16_t*)tran_content);
 
     // 0x203: Monitor Voltage Reference (Ramped) & Final Equivalent PWM Voltage (PU)
-    tran_content[0].i32 = (int32_t)(dcdc_core.v_target * CAN_SCALE_FACTOR);
-    tran_content[1].i32 = (int32_t)(dcdc_core.v_out_formal * CAN_SCALE_FACTOR);
+    tran_content[0].i32 = (int32_t)(ctrl2float(dcdc_core.v_target) * CAN_SCALE_FACTOR);
+    tran_content[1].i32 = (int32_t)(ctrl2float(dcdc_core.v_out_formal) * CAN_SCALE_FACTOR);
     CAN_sendMessage(IRIS_CAN_BASE, 6, 8, (uint16_t*)tran_content);
 
     // 0x204: Monitor State Machine Status Word & Active Errors
     tran_content[0].i32 = (int32_t)(cia402_sm.state_word.all);
     tran_content[1].i32 = (int32_t)g_fsbb_faults;
     CAN_sendMessage(IRIS_CAN_BASE, 7, 8, (uint16_t*)tran_content);
+
+    // 0x205: Build 4 CV/CC candidate inductor-current references (PU)
+    tran_content[0].i32 = (int32_t)(ctrl2float(fsbb_build4.i_L_ref_cv) * CAN_SCALE_FACTOR);
+    tran_content[1].i32 = (int32_t)(ctrl2float(fsbb_build4.i_L_ref_cc) * CAN_SCALE_FACTOR);
+    CAN_sendMessage(IRIS_CAN_BASE, 8, 8, (uint16_t*)tran_content);
+
+    // 0x206: selected inductor-current reference (PU) and CV/CC state
+    tran_content[0].i32 = (int32_t)(ctrl2float(fsbb_build4.i_L_ref_cmd) * CAN_SCALE_FACTOR);
+    tran_content[1].i32 = (int32_t)dcdc_core.is_current_dominant;
+    CAN_sendMessage(IRIS_CAN_BASE, 9, 8, (uint16_t*)tran_content);
+
+    // 0x207: latched fault code and software PWM-enable state
+    tran_content[0].i32 = (int32_t)g_fsbb_faults;
+    tran_content[1].i32 = (int32_t)g_fsbb_output_enabled;
+    CAN_sendMessage(IRIS_CAN_BASE, 10, 8, (uint16_t*)tran_content);
+#endif
 }
 
 #if BOARD_SELECTION == GMP_IRIS

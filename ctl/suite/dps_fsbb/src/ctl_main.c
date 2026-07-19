@@ -95,6 +95,23 @@ void ctl_init(void)
     ctl_init_dcdc_core(&dcdc_core, &core_init);
     ctl_set_dcdc_core_limits(&dcdc_core, float2ctrl(FSBB_OUTPUT_VOLTAGE_MAX / CTRL_VOLTAGE_BASE), float2ctrl(0.0f));
 
+#if defined FSBB_VOUT_FILTER_ENABLE
+#if (FSBB_VOUT_FILTER_ENABLE == 1) && (FSBB_VOUT_FILTER_TYPE == 1)
+    /*
+     * Reuse the dcdc_core Vout feedback filter so filtering is applied only
+     * to the voltage outer loop. Fast protection continues to read the
+     * unfiltered adc_v_out.control_port value.
+     */
+    ctl_init_filter_iir1_lpf(&dcdc_core.filter_v_out, CONTROLLER_FREQUENCY, FSBB_VOUT_FILTER_PARAMETER);
+#else
+    /* Exact bypass: y[n] = x[n]. */
+    dcdc_core.filter_v_out.b0 = float2ctrl(1.0f);
+    dcdc_core.filter_v_out.b1 = float2ctrl(0.0f);
+    dcdc_core.filter_v_out.a1 = float2ctrl(0.0f);
+    ctl_clear_filter_iir1(&dcdc_core.filter_v_out);
+#endif
+#endif
+
 #if (BUILD_LEVEL == 4)
     /* Initialize Build Level 4 outer-loop current-reference limits. */
     ctl_init_fsbb_build4_controller(&fsbb_build4, float2ctrl(FSBB_INDUCTOR_CURRENT_REF_MAX / CTRL_CURRENT_BASE),
@@ -269,9 +286,28 @@ void clear_all_controllers(void)
 
 void ctl_enable_pwm(void)
 {
+#if defined FSBB_HARDWARE_SENSOR_CALIBRATION_MODE && (FSBB_HARDWARE_SENSOR_CALIBRATION_MODE == 1)
+    /* Acquisition-only mode must never energize the gate driver. */
+    v_req = float2ctrl(0.0f);
+    ctl_fast_disable_output();
+    g_fsbb_output_enabled = 0;
+    return;
+#endif
+
     if (g_fsbb_faults == FSBB_FAULT_NONE)
     {
         ctl_fast_enable_output();
+#if defined FSBB_VOUT_FILTER_ENABLE
+        /*
+         * ctl_fast_enable_output() clears all controller state. Prime the
+         * voltage-feedback filter from the latest ADC sample so a residual
+         * output voltage cannot look like zero during the first closed-loop
+         * sample after enable.
+         */
+        dcdc_core.filter_v_out.out = adc_v_out.control_port.value;
+        dcdc_core.filter_v_out.x1 = adc_v_out.control_port.value;
+        dcdc_core.filter_v_out.y1 = adc_v_out.control_port.value;
+#endif
         /* ctl_fast_enable_output() clears all ramps and controllers. Replace
            the pre-enable compare values in the same outgoing SIL frame so
            the power stage starts from the configured zero-command duty. */

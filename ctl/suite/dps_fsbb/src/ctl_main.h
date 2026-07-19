@@ -82,13 +82,16 @@ GMP_STATIC_INLINE uint16_t ctl_fsbb_active_faults(void)
     if (adc_v_in.control_port.value > float2ctrl(FSBB_INPUT_VOLTAGE_MAX / CTRL_VOLTAGE_BASE))
         faults |= FSBB_FAULT_VIN_OVERVOLTAGE;
 #endif
+#if !defined FSBB_VOUT_SENSOR_CALIBRATED || (FSBB_VOUT_SENSOR_CALIBRATED == 1)
     if (adc_v_out.control_port.value > float2ctrl(FSBB_OUTPUT_VOLTAGE_MAX / CTRL_VOLTAGE_BASE))
         faults |= FSBB_FAULT_VOUT_OVERVOLTAGE;
+#endif
     if (adc_i_L.control_port.value > float2ctrl(FSBB_PROTECT_IL_MAX / CTRL_CURRENT_BASE))
         faults |= FSBB_FAULT_IL_POSITIVE_OVERCURRENT;
     if (adc_i_L.control_port.value < float2ctrl(FSBB_PROTECT_IL_MIN / CTRL_CURRENT_BASE))
         faults |= FSBB_FAULT_IL_NEGATIVE_OVERCURRENT;
-#if defined FSBB_ENABLE_IOUT_SAMPLE
+#if defined FSBB_ENABLE_IOUT_SAMPLE && \
+    (!defined FSBB_IOUT_SENSOR_CALIBRATED || (FSBB_IOUT_SENSOR_CALIBRATED == 1))
     if ((adc_i_load.control_port.value > float2ctrl(FSBB_OUTPUT_CURRENT_LIM / CTRL_CURRENT_BASE)) ||
         (adc_i_load.control_port.value < -float2ctrl(FSBB_OUTPUT_CURRENT_LIM / CTRL_CURRENT_BASE)))
         faults |= FSBB_FAULT_IOUT_OVERCURRENT;
@@ -100,6 +103,17 @@ GMP_STATIC_INLINE uint16_t ctl_fsbb_active_faults(void)
 /** Execute one control sample after the platform input callback has run. */
 GMP_STATIC_INLINE void ctl_dispatch(void)
 {
+#if defined FSBB_HARDWARE_SENSOR_CALIBRATION_MODE && (FSBB_HARDWARE_SENSOR_CALIBRATION_MODE == 1)
+    /*
+     * Hardware calibration mode is acquisition-only.  Keep every command at
+     * zero and reassert the hardware shutdown on every control interrupt.
+     */
+    v_req = float2ctrl(0.0f);
+    dcdc_core.v_out_formal = float2ctrl(0.0f);
+    ctl_disable_pwm();
+    return;
+#endif
+
 #if defined SPECIFY_ENABLE_ADC_CALIBRATE
     if (flag_enable_adc_calibrator)
     {
@@ -125,10 +139,9 @@ GMP_STATIC_INLINE void ctl_dispatch(void)
         * Disable PWM immediately instead of waiting for the
         * slower CiA402 fault-state transition.
         */
-        if (g_fsbb_output_enabled)
-        {
-            ctl_disable_pwm();
-        }
+        dcdc_core.v_out_formal = float2ctrl(0.0f);
+        clear_all_controllers();
+        ctl_disable_pwm();
         return;
     }
 
