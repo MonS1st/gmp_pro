@@ -302,7 +302,7 @@
       "role": "Default Output Voltage",
       "macro": "FSBB_DEFAULT_OUTPUT_VOLTAGE",
       "binding": {
-        "float": "24.0"
+        "float": "12.0"
       },
       "description": "Default voltage-loop command."
     },
@@ -310,7 +310,7 @@
       "role": "Default Current Limit",
       "macro": "FSBB_DEFAULT_CURRENT_LIMIT",
       "binding": {
-        "float": "5.0"
+        "float": "0.8"
       },
       "description": "Default current limit."
     },

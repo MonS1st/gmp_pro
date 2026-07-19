@@ -269,12 +269,12 @@ extern "C"
 /**
  * @brief Default voltage-loop command.
  */
-#define FSBB_DEFAULT_OUTPUT_VOLTAGE (24.0f)
+#define FSBB_DEFAULT_OUTPUT_VOLTAGE (12.0f)
 
 /**
  * @brief Default current limit.
  */
-#define FSBB_DEFAULT_CURRENT_LIMIT (5.0f)
+#define FSBB_DEFAULT_CURRENT_LIMIT (0.8f)
 
 /**
  * @brief Open-loop equivalent voltage command.

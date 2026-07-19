@@ -1,0 +1,17 @@
+DPS FSBB Build 4 CV-CC-CV load switch
+stage1 [0.74, 0.79] s: Vout=11.842397 V, Iout=0.589316 A, CH8=0, mode_fraction=1.000000
+stage2 [1.35, 1.55] s: Vout=7.734648 V, Iout=0.771914 A, CH8=1, mode_fraction=1.000000
+stage3 [2.20, 2.45] s: Vout=11.977689 V, Iout=0.596191 A, CH8=0, mode_fraction=1.000000
+max |CH7-min(CH5,CH6)| = 0.000000000 A
+max |IL| = 0.854004 A
+IL >= 0.98 A fraction = 0.000000000
+load command stages = [0.000000 1.000000 0.000000]
+stage1 = 1
+stage2 = 1
+stage3 = 1
+command_is_min = 1
+no_fault = 1
+pwm_enabled = 1
+current_bounded = 1
+load_sequence = 1
+OVERALL = PASS
