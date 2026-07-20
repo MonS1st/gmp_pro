@@ -35,6 +35,7 @@ adc_bias_calibrator_t adc_calibrator;
 volatile fast_gt flag_enable_adc_calibrator = 0;
 volatile fast_gt index_adc_calibrator = 0;
 volatile uint16_t g_fsbb_faults = FSBB_FAULT_NONE;
+volatile uint16_t g_fsbb_hw_arm = 0U;
 volatile fast_gt g_fsbb_output_enabled = 0;
 volatile fast_gt g_fsbb_fault_reset_result = FSBB_FAULT_RESET_IDLE;
 
@@ -51,6 +52,7 @@ void ctl_init(void)
     //
     // stop here and wait for user start the motor controller
     //
+    g_fsbb_hw_arm = 0U;
     ctl_fast_disable_output();
 
     //
@@ -173,6 +175,12 @@ void ctl_mainloop(void)
     return;
 }
 
+fast_gt ctl_fsbb_output_permitted(void)
+{
+    return (g_fsbb_hw_arm == 1U) && (g_fsbb_faults == FSBB_FAULT_NONE) &&
+           (flag_enable_adc_calibrator == 0) && (cia402_sm.current_state == CIA402_SM_OPERATION_ENABLED);
+}
+
 void gmp_pil_sim_step(const gmp_sim_rx_buf_t* rx, gmp_sim_tx_buf_t* tx)
 {
 #if defined ENABLE_GMP_DL_PIL_SIM
@@ -200,6 +208,9 @@ gmp_task_status_t tsk_protect(gmp_task_t* tsk)
 
     if (g_fsbb_faults != FSBB_FAULT_NONE)
     {
+        /* A fault always consumes the manual arm; reset cannot restore it. */
+        g_fsbb_hw_arm = 0U;
+        ctl_disable_pwm();
         if ((cia402_sm.current_state != CIA402_SM_FAULT_REACTION) && (cia402_sm.current_state != CIA402_SM_FAULT))
         {
             cia402_fault_request(&cia402_sm);
@@ -218,6 +229,7 @@ fast_gt ctl_fsbb_try_fault_reset(void)
         return 0;
     }
 
+    g_fsbb_hw_arm = 0U;
     g_fsbb_faults = FSBB_FAULT_NONE;
     v_req = float2ctrl(0.0f);
     clear_all_controllers();
@@ -289,12 +301,13 @@ void ctl_enable_pwm(void)
 #if defined FSBB_HARDWARE_SENSOR_CALIBRATION_MODE && (FSBB_HARDWARE_SENSOR_CALIBRATION_MODE == 1)
     /* Acquisition-only mode must never energize the gate driver. */
     v_req = float2ctrl(0.0f);
+    g_fsbb_hw_arm = 0U;
     ctl_fast_disable_output();
     g_fsbb_output_enabled = 0;
     return;
 #endif
 
-    if (g_fsbb_faults == FSBB_FAULT_NONE)
+    if (ctl_fsbb_output_permitted())
     {
         ctl_fast_enable_output();
 #if defined FSBB_VOUT_FILTER_ENABLE
@@ -313,6 +326,11 @@ void ctl_enable_pwm(void)
            the power stage starts from the configured zero-command duty. */
         ctl_step_fsbb_modulator(&fsbb_mod, float2ctrl(0.0f), adc_v_in.control_port.value);
         g_fsbb_output_enabled = 1;
+    }
+    else
+    {
+        ctl_fast_disable_output();
+        g_fsbb_output_enabled = 0;
     }
 }
 

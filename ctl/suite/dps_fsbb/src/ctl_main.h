@@ -60,6 +60,13 @@ typedef enum _tag_fsbb_fault_reset_result
 } fsbb_fault_reset_result_t;
 
 extern volatile uint16_t g_fsbb_faults;
+/**
+ * @brief Manual hardware-output interlock, writable only by an explicit
+ *        debugger/operator action during hardware bring-up.
+ * @details The embedded image always initializes this value to zero. A fault
+ *          clears it and fault reset never restores it.
+ */
+extern volatile uint16_t g_fsbb_hw_arm;
 extern volatile fast_gt g_fsbb_output_enabled;
 extern volatile fast_gt g_fsbb_fault_reset_result;
 
@@ -69,6 +76,7 @@ void ctl_enable_pwm(void);
 void ctl_disable_pwm(void);
 void clear_all_controllers(void);
 fast_gt ctl_fsbb_try_fault_reset(void);
+fast_gt ctl_fsbb_output_permitted(void);
 gmp_task_status_t tsk_protect(gmp_task_t* tsk);
 
 /** Return faults present in the latest unfiltered ADC sample set. */
@@ -82,7 +90,8 @@ GMP_STATIC_INLINE uint16_t ctl_fsbb_active_faults(void)
     if (adc_v_in.control_port.value > float2ctrl(FSBB_INPUT_VOLTAGE_MAX / CTRL_VOLTAGE_BASE))
         faults |= FSBB_FAULT_VIN_OVERVOLTAGE;
 #endif
-#if !defined FSBB_VOUT_SENSOR_CALIBRATED || (FSBB_VOUT_SENSOR_CALIBRATED == 1)
+#if !defined FSBB_VOUT_SENSOR_CALIBRATED || (FSBB_VOUT_SENSOR_CALIBRATED == 1) ||                             \
+    (defined FSBB_BUILD4_NOMINAL_SENSOR_BRINGUP && (FSBB_BUILD4_NOMINAL_SENSOR_BRINGUP == 1))
     if (adc_v_out.control_port.value > float2ctrl(FSBB_OUTPUT_VOLTAGE_MAX / CTRL_VOLTAGE_BASE))
         faults |= FSBB_FAULT_VOUT_OVERVOLTAGE;
 #endif
@@ -90,8 +99,9 @@ GMP_STATIC_INLINE uint16_t ctl_fsbb_active_faults(void)
         faults |= FSBB_FAULT_IL_POSITIVE_OVERCURRENT;
     if (adc_i_L.control_port.value < float2ctrl(FSBB_PROTECT_IL_MIN / CTRL_CURRENT_BASE))
         faults |= FSBB_FAULT_IL_NEGATIVE_OVERCURRENT;
-#if defined FSBB_ENABLE_IOUT_SAMPLE && \
-    (!defined FSBB_IOUT_SENSOR_CALIBRATED || (FSBB_IOUT_SENSOR_CALIBRATED == 1))
+#if defined FSBB_ENABLE_IOUT_SAMPLE &&                                                                    \
+    (!defined FSBB_IOUT_SENSOR_CALIBRATED || (FSBB_IOUT_SENSOR_CALIBRATED == 1) ||                       \
+     (defined FSBB_BUILD4_NOMINAL_SENSOR_BRINGUP && (FSBB_BUILD4_NOMINAL_SENSOR_BRINGUP == 1)))
     if ((adc_i_load.control_port.value > float2ctrl(FSBB_OUTPUT_CURRENT_LIM / CTRL_CURRENT_BASE)) ||
         (adc_i_load.control_port.value < -float2ctrl(FSBB_OUTPUT_CURRENT_LIM / CTRL_CURRENT_BASE)))
         faults |= FSBB_FAULT_IOUT_OVERCURRENT;
@@ -110,9 +120,21 @@ GMP_STATIC_INLINE void ctl_dispatch(void)
      */
     v_req = float2ctrl(0.0f);
     dcdc_core.v_out_formal = float2ctrl(0.0f);
+    g_fsbb_hw_arm = 0U;
     ctl_disable_pwm();
     return;
 #endif
+
+    /*
+     * Keep sampling and controller observation active while the hardware is
+     * disarmed, but continuously enforce the physical-output interlock.
+     * When an operator changes g_fsbb_hw_arm to 1 in CCS, ctl_enable_pwm()
+     * can only pass after ADC calibration and CiA402 Operation Enabled.
+     */
+    if (!ctl_fsbb_output_permitted())
+        ctl_disable_pwm();
+    else if (!g_fsbb_output_enabled)
+        ctl_enable_pwm();
 
 #if defined SPECIFY_ENABLE_ADC_CALIBRATE
     if (flag_enable_adc_calibrator)
@@ -140,6 +162,7 @@ GMP_STATIC_INLINE void ctl_dispatch(void)
         * slower CiA402 fault-state transition.
         */
         dcdc_core.v_out_formal = float2ctrl(0.0f);
+        g_fsbb_hw_arm = 0U;
         clear_all_controllers();
         ctl_disable_pwm();
         return;
@@ -241,6 +264,17 @@ GMP_STATIC_INLINE void ctl_dispatch(void)
     }
 
 #endif
+
+    /* Catch faults raised by controller diagnostics in this same sample. */
+    if (g_fsbb_faults != FSBB_FAULT_NONE)
+    {
+        g_fsbb_hw_arm = 0U;
+        v_req = float2ctrl(0.0f);
+        dcdc_core.v_out_formal = float2ctrl(0.0f);
+        clear_all_controllers();
+        ctl_disable_pwm();
+        return;
+    }
 
     ctl_step_fsbb_modulator(&fsbb_mod, v_req, adc_v_in.control_port.value);
 }

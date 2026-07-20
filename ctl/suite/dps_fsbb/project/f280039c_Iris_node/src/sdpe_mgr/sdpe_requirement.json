@@ -118,7 +118,7 @@
       "binding": {
         "number": "1"
       },
-      "description": "Provisional polarity sign (+1 or -1). The default is not a hardware verification and closed-loop use remains gated by FSBB_VOUT_SENSOR_CALIBRATED."
+      "description": "Provisional polarity sign (+1 or -1). This is not a hardware verification; uncalibrated use is allowed only by the explicit FSBB_BUILD4_NOMINAL_SENSOR_BRINGUP exception."
     },
     {
       "role": "Output Voltage Sensor Bias",
@@ -182,7 +182,7 @@
       "binding": {
         "number": "1"
       },
-      "description": "Provisional polarity sign (+1 or -1). The default is not a hardware verification and closed-loop use remains gated by FSBB_IOUT_SENSOR_CALIBRATED."
+      "description": "Provisional polarity sign (+1 or -1). This is not a hardware verification; uncalibrated use is allowed only by the explicit FSBB_BUILD4_NOMINAL_SENSOR_BRINGUP exception."
     },
     {
       "role": "Output Current Sensor Bias",
@@ -292,7 +292,7 @@
       "role": "Nominal Input Voltage",
       "macro": "FSBB_INPUT_VOLTAGE_NOMINAL",
       "binding": {
-        "float": "24.0"
+        "float": "12.0"
       },
       "description": "Nominal input voltage used when input-voltage sampling is disabled."
     },
@@ -415,6 +415,14 @@
         "number": "0"
       },
       "description": "Must remain 0 on Iris hardware; compile-time validation rejects fault-injection self test."
+    },
+    {
+      "role": "Build 4 Nominal Sensor Bringup",
+      "macro": "FSBB_BUILD4_NOMINAL_SENSOR_BRINGUP",
+      "binding": {
+        "number": "1"
+      },
+      "description": "Explicit first-low-voltage hardware bring-up exception. Allows Build 4 to use the uncalibrated QuadSensor Vout and LVFB Iout nominal coefficients; this is not formal sensor calibration."
     },
     {
       "role": "Vout Filter Enable",
@@ -545,7 +553,7 @@
     {
       "group": "Optional Sampling Channels",
       "macro": "FSBB_ENABLE_IOUT_SAMPLE",
-      "enabled": false,
+      "enabled": true,
       "value": "",
       "description": "Enable output/load current sampling path."
     },
@@ -562,7 +570,7 @@
       "group": "Controller Options",
       "macro": "BUILD_LEVEL",
       "enabled": true,
-      "value": "(1)",
+      "value": "(4)",
       "options_preset": "",
       "options": [
         "(1)",
@@ -727,7 +735,7 @@
   ],
   "code_sections": {
     "after_extern_open": "/* Project-specific includes can be added here if the migrated project needs extra headers. */",
-    "before_footer": "/* Backward compatibility for the historical misspelled PIL switch. */\n#if defined ENBALE_GMP_DL_PIL_SIM && !defined ENABLE_GMP_DL_PIL_SIM\n#define ENABLE_GMP_DL_PIL_SIM\n#endif\n\n/* Compatibility names for the hardware calibration interface. */\n#define FSBB_VOUT_CALIBRATION_ENABLE FSBB_VOUT_SENSOR_CALIBRATED\n#define FSBB_VOUT_CALIBRATION_BIAS_V FSBB_VOUT_SENSOR_BIAS_V\n#define FSBB_VOUT_CALIBRATION_SENSITIVITY FSBB_VOUT_SENSOR_SENSITIVITY\n\n/* Iris hardware compile-time safety validation. */\n#if (BUILD_LEVEL < 1) || (BUILD_LEVEL > 4)\n#error \"BUILD_LEVEL must be 1, 2, 3, or 4.\"\n#endif\n#if (FSBB_VOUT_SENSOR_POLARITY != 1) && (FSBB_VOUT_SENSOR_POLARITY != -1)\n#error \"FSBB_VOUT_SENSOR_POLARITY must be +1 or -1 after physical polarity verification.\"\n#endif\n#if (FSBB_IOUT_SENSOR_POLARITY != 1) && (FSBB_IOUT_SENSOR_POLARITY != -1)\n#error \"FSBB_IOUT_SENSOR_POLARITY must be +1 or -1 after physical polarity verification.\"\n#endif\n#if (FSBB_VOUT_FILTER_TYPE < 0) || (FSBB_VOUT_FILTER_TYPE > 1)\n#error \"FSBB_VOUT_FILTER_TYPE must be 0 (bypass) or 1 (first-order IIR).\"\n#endif\n#if (FSBB_HARDWARE_SENSOR_CALIBRATION_MODE == 1) && (BUILD_LEVEL != 1)\n#error \"FSBB_HARDWARE_SENSOR_CALIBRATION_MODE requires BUILD_LEVEL 1 so no closed loop can run.\"\n#endif\n#if (BUILD_LEVEL == 3) && (FSBB_VOUT_SENSOR_CALIBRATED != 1)\n#error \"BUILD_LEVEL 3 requires calibrated Vout sensing: set FSBB_VOUT_SENSOR_CALIBRATED=1 only after measurement.\"\n#endif\n#if (BUILD_LEVEL == 4) && (!defined FSBB_ENABLE_IOUT_SAMPLE || (FSBB_VOUT_SENSOR_CALIBRATED != 1) || (FSBB_IOUT_SENSOR_CALIBRATED != 1))\n#error \"BUILD_LEVEL 4 requires Iout sampling (FSBB_ENABLE_IOUT_SAMPLE), calibrated Vout (FSBB_VOUT_SENSOR_CALIBRATED=1), and calibrated Iout (FSBB_IOUT_SENSOR_CALIBRATED=1).\"\n#endif\n#if (FSBB_BUILD4_SELF_TEST_ENABLE != 0)\n#error \"FSBB_BUILD4_SELF_TEST_ENABLE must remain 0 on F280039C Iris hardware.\"\n#endif"
+    "before_footer": "/* Backward compatibility for the historical misspelled PIL switch. */\n#if defined ENBALE_GMP_DL_PIL_SIM && !defined ENABLE_GMP_DL_PIL_SIM\n#define ENABLE_GMP_DL_PIL_SIM\n#endif\n\n/* Compatibility names for the hardware calibration interface. */\n#define FSBB_VOUT_CALIBRATION_ENABLE FSBB_VOUT_SENSOR_CALIBRATED\n#define FSBB_VOUT_CALIBRATION_BIAS_V FSBB_VOUT_SENSOR_BIAS_V\n#define FSBB_VOUT_CALIBRATION_SENSITIVITY FSBB_VOUT_SENSOR_SENSITIVITY\n\n/* Iris hardware compile-time safety validation. */\n#if (BUILD_LEVEL < 1) || (BUILD_LEVEL > 4)\n#error \"BUILD_LEVEL must be 1, 2, 3, or 4.\"\n#endif\n#if (FSBB_VOUT_SENSOR_POLARITY != 1) && (FSBB_VOUT_SENSOR_POLARITY != -1)\n#error \"FSBB_VOUT_SENSOR_POLARITY must be +1 or -1 after physical polarity verification.\"\n#endif\n#if (FSBB_IOUT_SENSOR_POLARITY != 1) && (FSBB_IOUT_SENSOR_POLARITY != -1)\n#error \"FSBB_IOUT_SENSOR_POLARITY must be +1 or -1 after physical polarity verification.\"\n#endif\n#if (FSBB_VOUT_FILTER_TYPE < 0) || (FSBB_VOUT_FILTER_TYPE > 1)\n#error \"FSBB_VOUT_FILTER_TYPE must be 0 (bypass) or 1 (first-order IIR).\"\n#endif\n#if (FSBB_BUILD4_NOMINAL_SENSOR_BRINGUP != 0) && (FSBB_BUILD4_NOMINAL_SENSOR_BRINGUP != 1)\n#error \"FSBB_BUILD4_NOMINAL_SENSOR_BRINGUP must be 0 or 1.\"\n#endif\n#if (FSBB_BUILD4_NOMINAL_SENSOR_BRINGUP == 1) && (BUILD_LEVEL != 4)\n#error \"FSBB_BUILD4_NOMINAL_SENSOR_BRINGUP is only allowed with BUILD_LEVEL 4.\"\n#endif\n#if (FSBB_BUILD4_NOMINAL_SENSOR_BRINGUP == 1) && ((FSBB_VOUT_SENSOR_CALIBRATED != 0) || (FSBB_IOUT_SENSOR_CALIBRATED != 0))\n#error \"Disable FSBB_BUILD4_NOMINAL_SENSOR_BRINGUP before declaring formal Vout/Iout calibration.\"\n#endif\n#if (FSBB_BUILD4_NOMINAL_SENSOR_BRINGUP == 1)\n#warning \"FSBB: Build 4 nominal sensor bring-up uses uncalibrated hardware-preset Vout/Iout coefficients; NOT FORMAL CALIBRATION.\"\n#endif\n#if (FSBB_HARDWARE_SENSOR_CALIBRATION_MODE == 1) && (BUILD_LEVEL != 1)\n#error \"FSBB_HARDWARE_SENSOR_CALIBRATION_MODE requires BUILD_LEVEL 1 so no closed loop can run.\"\n#endif\n#if (BUILD_LEVEL == 3) && (FSBB_VOUT_SENSOR_CALIBRATED != 1)\n#error \"BUILD_LEVEL 3 requires calibrated Vout sensing: set FSBB_VOUT_SENSOR_CALIBRATED=1 only after measurement.\"\n#endif\n#if (BUILD_LEVEL == 4) && !defined FSBB_ENABLE_IOUT_SAMPLE\n#error \"BUILD_LEVEL 4 requires output-current sampling (FSBB_ENABLE_IOUT_SAMPLE).\"\n#endif\n#if (BUILD_LEVEL == 4) && (FSBB_BUILD4_NOMINAL_SENSOR_BRINGUP == 0) && ((FSBB_VOUT_SENSOR_CALIBRATED != 1) || (FSBB_IOUT_SENSOR_CALIBRATED != 1))\n#error \"Formal BUILD_LEVEL 4 requires FSBB_VOUT_SENSOR_CALIBRATED=1 and FSBB_IOUT_SENSOR_CALIBRATED=1 after physical measurement.\"\n#endif\n#if (FSBB_BUILD4_SELF_TEST_ENABLE != 0)\n#error \"FSBB_BUILD4_SELF_TEST_ENABLE must remain 0 on F280039C Iris hardware.\"\n#endif"
   },
   "description": "Four-switch buck-boost converter SDPE requirement for F280039C Iris Node. The LVFB entity remains the switching stage and Vin/IL nominal sensor source; the Vout interface uses the QuadSensor nominal model only as an explicitly uncalibrated placeholder until board measurements replace it.",
   "updated_at": "2026-07-19",
@@ -827,6 +835,7 @@
         "Output Current Outer-loop Kp",
         "Output Current Outer-loop Ti",
         "Build 4 Self Test Enable",
+        "Build 4 Nominal Sensor Bringup",
         "Vout Filter Enable",
         "Vout Filter Parameter",
         "Hardware Sensor Calibration Mode",

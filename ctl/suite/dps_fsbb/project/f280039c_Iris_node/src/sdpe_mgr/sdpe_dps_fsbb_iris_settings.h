@@ -62,7 +62,7 @@ extern "C"
 /**
  * @brief Enable output/load current sampling path.
  */
-// #define FSBB_ENABLE_IOUT_SAMPLE
+#define FSBB_ENABLE_IOUT_SAMPLE
 
 /**
  * @brief Enable input voltage sampling path.
@@ -78,7 +78,7 @@ extern "C"
  * @brief 1: modulator, PWM, and hardware check; 2: inductor-current inner loop; 3: cascaded voltage outer loop; 4: dual voltage/output-current outer-loop CV/CC control.
  *        Options: (1), (2), (3), (4)
  */
-#define BUILD_LEVEL (1)
+#define BUILD_LEVEL (4)
 
 /**
  * @brief Vout feedback filter type: 0 bypass, 1 existing first-order CTL IIR low-pass.
@@ -257,7 +257,7 @@ extern "C"
 #define CTRL_FSBB_VIN_BIAS GMP_LVFB_VOLTAGE_BIAS_V
 
 /**
- * @brief Provisional polarity sign (+1 or -1). The default is not a hardware verification and closed-loop use remains gated by FSBB_VOUT_SENSOR_CALIBRATED.
+ * @brief Provisional polarity sign (+1 or -1). This is not a hardware verification; uncalibrated use is allowed only by the explicit FSBB_BUILD4_NOMINAL_SENSOR_BRINGUP exception.
  */
 #define FSBB_VOUT_SENSOR_POLARITY (1)
 
@@ -297,7 +297,7 @@ extern "C"
 #define CTRL_FSBB_IL_BIAS GMP_LVFB_CURRENT_BIAS_V
 
 /**
- * @brief Provisional polarity sign (+1 or -1). The default is not a hardware verification and closed-loop use remains gated by FSBB_IOUT_SENSOR_CALIBRATED.
+ * @brief Provisional polarity sign (+1 or -1). This is not a hardware verification; uncalibrated use is allowed only by the explicit FSBB_BUILD4_NOMINAL_SENSOR_BRINGUP exception.
  */
 #define FSBB_IOUT_SENSOR_POLARITY (1)
 
@@ -369,7 +369,7 @@ extern "C"
 /**
  * @brief Nominal input voltage used when input-voltage sampling is disabled.
  */
-#define FSBB_INPUT_VOLTAGE_NOMINAL (24.0f)
+#define FSBB_INPUT_VOLTAGE_NOMINAL (12.0f)
 
 /**
  * @brief Maximum allowed FSBB output voltage command.
@@ -445,6 +445,11 @@ extern "C"
  * @brief Must remain 0 on Iris hardware; compile-time validation rejects fault-injection self test.
  */
 #define FSBB_BUILD4_SELF_TEST_ENABLE (0)
+
+/**
+ * @brief Explicit first-low-voltage hardware bring-up exception. Allows Build 4 to use the uncalibrated QuadSensor Vout and LVFB Iout nominal coefficients; this is not formal sensor calibration.
+ */
+#define FSBB_BUILD4_NOMINAL_SENSOR_BRINGUP (1)
 
 /**
  * @brief Enable the existing dcdc_core first-order IIR only on the voltage-loop Vout feedback path.
@@ -530,14 +535,29 @@ extern "C"
 #if (FSBB_VOUT_FILTER_TYPE < 0) || (FSBB_VOUT_FILTER_TYPE > 1)
 #error "FSBB_VOUT_FILTER_TYPE must be 0 (bypass) or 1 (first-order IIR)."
 #endif
+#if (FSBB_BUILD4_NOMINAL_SENSOR_BRINGUP != 0) && (FSBB_BUILD4_NOMINAL_SENSOR_BRINGUP != 1)
+#error "FSBB_BUILD4_NOMINAL_SENSOR_BRINGUP must be 0 or 1."
+#endif
+#if (FSBB_BUILD4_NOMINAL_SENSOR_BRINGUP == 1) && (BUILD_LEVEL != 4)
+#error "FSBB_BUILD4_NOMINAL_SENSOR_BRINGUP is only allowed with BUILD_LEVEL 4."
+#endif
+#if (FSBB_BUILD4_NOMINAL_SENSOR_BRINGUP == 1) && ((FSBB_VOUT_SENSOR_CALIBRATED != 0) || (FSBB_IOUT_SENSOR_CALIBRATED != 0))
+#error "Disable FSBB_BUILD4_NOMINAL_SENSOR_BRINGUP before declaring formal Vout/Iout calibration."
+#endif
+#if (FSBB_BUILD4_NOMINAL_SENSOR_BRINGUP == 1)
+#warning "FSBB: Build 4 nominal sensor bring-up uses uncalibrated hardware-preset Vout/Iout coefficients; NOT FORMAL CALIBRATION."
+#endif
 #if (FSBB_HARDWARE_SENSOR_CALIBRATION_MODE == 1) && (BUILD_LEVEL != 1)
 #error "FSBB_HARDWARE_SENSOR_CALIBRATION_MODE requires BUILD_LEVEL 1 so no closed loop can run."
 #endif
 #if (BUILD_LEVEL == 3) && (FSBB_VOUT_SENSOR_CALIBRATED != 1)
 #error "BUILD_LEVEL 3 requires calibrated Vout sensing: set FSBB_VOUT_SENSOR_CALIBRATED=1 only after measurement."
 #endif
-#if (BUILD_LEVEL == 4) && (!defined FSBB_ENABLE_IOUT_SAMPLE || (FSBB_VOUT_SENSOR_CALIBRATED != 1) || (FSBB_IOUT_SENSOR_CALIBRATED != 1))
-#error "BUILD_LEVEL 4 requires Iout sampling (FSBB_ENABLE_IOUT_SAMPLE), calibrated Vout (FSBB_VOUT_SENSOR_CALIBRATED=1), and calibrated Iout (FSBB_IOUT_SENSOR_CALIBRATED=1)."
+#if (BUILD_LEVEL == 4) && !defined FSBB_ENABLE_IOUT_SAMPLE
+#error "BUILD_LEVEL 4 requires output-current sampling (FSBB_ENABLE_IOUT_SAMPLE)."
+#endif
+#if (BUILD_LEVEL == 4) && (FSBB_BUILD4_NOMINAL_SENSOR_BRINGUP == 0) && ((FSBB_VOUT_SENSOR_CALIBRATED != 1) || (FSBB_IOUT_SENSOR_CALIBRATED != 1))
+#error "Formal BUILD_LEVEL 4 requires FSBB_VOUT_SENSOR_CALIBRATED=1 and FSBB_IOUT_SENSOR_CALIBRATED=1 after physical measurement."
 #endif
 #if (FSBB_BUILD4_SELF_TEST_ENABLE != 0)
 #error "FSBB_BUILD4_SELF_TEST_ENABLE must remain 0 on F280039C Iris hardware."

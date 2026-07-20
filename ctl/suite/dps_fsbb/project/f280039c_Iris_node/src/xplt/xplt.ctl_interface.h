@@ -112,6 +112,8 @@ GMP_STATIC_INLINE void ctl_input_callback(void)
         }
 #endif
         g_fsbb_faults |= active_faults;
+        if (g_fsbb_faults != FSBB_FAULT_NONE)
+            g_fsbb_hw_arm = 0U;
     }
 #endif
 }
@@ -125,17 +127,19 @@ GMP_STATIC_INLINE uint16_t ctl_fsbb_dac_value(ctrl_gt value)
 GMP_STATIC_INLINE void ctl_output_callback(void)
 {
 #if !defined ENABLE_GMP_DL_PIL_SIM
+    g_fsbb_sensor_monitor.vout_filtered_v = ctrl2float(dcdc_core.filter_v_out.out) * CTRL_VOLTAGE_BASE;
 #if (FSBB_HARDWARE_SENSOR_CALIBRATION_MODE == 1)
     EPWM_forceTripZoneEvent(PHASE_BUCK_BASE, EPWM_TZ_FORCE_EVENT_OST);
     EPWM_forceTripZoneEvent(PHASE_BOOST_BASE, EPWM_TZ_FORCE_EVENT_OST);
     GPIO_WritePin(PWM_ENABLE_PORT, 0);
     g_fsbb_output_enabled = 0;
-    g_fsbb_sensor_monitor.vout_filtered_v = ctrl2float(dcdc_core.filter_v_out.out) * CTRL_VOLTAGE_BASE;
     return;
 #endif
 
-    if (g_fsbb_faults != FSBB_FAULT_NONE)
+    if (!ctl_fsbb_output_permitted())
     {
+        if (g_fsbb_faults != FSBB_FAULT_NONE)
+            g_fsbb_hw_arm = 0U;
         EPWM_forceTripZoneEvent(PHASE_BUCK_BASE, EPWM_TZ_FORCE_EVENT_OST);
         EPWM_forceTripZoneEvent(PHASE_BOOST_BASE, EPWM_TZ_FORCE_EVENT_OST);
         GPIO_WritePin(PWM_ENABLE_PORT, 0);
@@ -145,7 +149,6 @@ GMP_STATIC_INLINE void ctl_output_callback(void)
 
     EPWM_setCounterCompareValue(PHASE_BUCK_BASE, EPWM_COUNTER_COMPARE_A, ctl_get_fsbb_buck_cmp(&fsbb_mod));
     EPWM_setCounterCompareValue(PHASE_BOOST_BASE, EPWM_COUNTER_COMPARE_A, ctl_get_fsbb_boost_cmp(&fsbb_mod));
-    g_fsbb_sensor_monitor.vout_filtered_v = ctrl2float(dcdc_core.filter_v_out.out) * CTRL_VOLTAGE_BASE;
 
 #if BUILD_LEVEL >= 1
     DAC_setShadowValue(IRIS_DACA_BASE, ctl_fsbb_dac_value(adc_v_out.control_port.value));
@@ -163,6 +166,14 @@ GMP_STATIC_INLINE void ctl_fast_enable_output(void)
     g_fsbb_output_enabled = 0;
     return;
 #endif
+    if (!ctl_fsbb_output_permitted())
+    {
+        EPWM_forceTripZoneEvent(PHASE_BUCK_BASE, EPWM_TZ_FORCE_EVENT_OST);
+        EPWM_forceTripZoneEvent(PHASE_BOOST_BASE, EPWM_TZ_FORCE_EVENT_OST);
+        GPIO_WritePin(PWM_ENABLE_PORT, 0);
+        g_fsbb_output_enabled = 0;
+        return;
+    }
     EPWM_clearTripZoneFlag(PHASE_BUCK_BASE, EPWM_TZ_FLAG_OST);
     EPWM_clearTripZoneFlag(PHASE_BOOST_BASE, EPWM_TZ_FLAG_OST);
     clear_all_controllers();
@@ -176,6 +187,7 @@ GMP_STATIC_INLINE void ctl_fast_disable_output(void)
     EPWM_forceTripZoneEvent(PHASE_BOOST_BASE, EPWM_TZ_FORCE_EVENT_OST);
     GPIO_WritePin(PWM_ENABLE_PORT, 0);
     GPIO_WritePin(CONTROLLER_LED, 1);
+    g_fsbb_output_enabled = 0;
 }
 
 typedef enum _tag_dcdc_adc_index_items

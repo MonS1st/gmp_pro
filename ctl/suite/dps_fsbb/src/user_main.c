@@ -228,6 +228,9 @@ GMP_NO_OPT_PREFIX void init(void) GMP_NO_OPT_SUFFIX
 #if defined SPECIFY_PC_ENVIRONMENT
     // The SIL target has no external CiA402 master. Use the normal sequenced
     // transitions and request operation immediately after initialization.
+    // Auto-arm is strictly limited to the PC/SIL process; embedded hardware
+    // always boots with g_fsbb_hw_arm=0 and requires an explicit CCS action.
+    g_fsbb_hw_arm = 1U;
     cia402_sm.flag_enable_control_word = 0;
     cia402_sm.current_cmd = CIA402_CMD_ENABLE_OPERATION;
 #endif

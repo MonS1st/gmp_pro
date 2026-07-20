@@ -44,8 +44,8 @@ typedef struct _tag_fsbb_build4_controller_t
  */
 GMP_STATIC_INLINE void ctl_init_fsbb_build4_controller(fsbb_build4_controller_t* obj, ctrl_gt i_L_ref_max,
                                                        ctrl_gt i_L_ref_min, ctrl_gt switch_hysteresis,
-                                                       parameter_gt output_current_kp,
-                                                       parameter_gt output_current_ti, parameter_gt fs)
+                                                       parameter_gt output_current_kp, parameter_gt output_current_ti,
+                                                       parameter_gt fs)
 {
     ctl_init_pid_Tmode(&obj->output_current_pid, output_current_kp, output_current_ti, 0.0f, fs);
     ctl_set_pid_limit(&obj->output_current_pid, i_L_ref_max, i_L_ref_min);
@@ -178,8 +178,7 @@ GMP_STATIC_INLINE ctrl_gt ctl_step_fsbb_build4(fsbb_build4_controller_t* obj, ct
 
     core->v_ramp_ref = ctl_step_slope_limiter(&core->ramp_v, voltage_target);
     i_L_ref_cv = ctl_step_pid_ser(&core->voltage_pid, core->v_ramp_ref - core->filter_v_out.out);
-    i_L_ref_cc =
-        ctl_step_pid_ser(&obj->output_current_pid, output_current_limit - core->filter_i_load.out);
+    i_L_ref_cc = ctl_step_pid_ser(&obj->output_current_pid, output_current_limit - core->filter_i_load.out);
 
     ctl_step_fsbb_cvcc_selector(obj, i_L_ref_cv, i_L_ref_cc);
 

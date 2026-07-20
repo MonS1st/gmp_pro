@@ -63,6 +63,7 @@ void setup_peripheral(void)
     configure_fsbb_trip_zone(PHASE_BUCK_BASE);
     configure_fsbb_trip_zone(PHASE_BOOST_BASE);
     GPIO_WritePin(PWM_ENABLE_PORT, 0);
+    g_fsbb_hw_arm = 0U;
     g_fsbb_output_enabled = 0;
 
     // ---------------------------------------------------------
