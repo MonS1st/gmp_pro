@@ -1,0 +1,25 @@
+{
+    "sync_mode": "all",
+    "selected_modules": [
+        {
+            "root": "core",
+            "module": "std"
+        },
+        {
+            "root": "core",
+            "module": "pm|function_scheduler"
+        },
+        {
+            "root": "core",
+            "module": "dev|_internal"
+        },
+        {
+            "root": "core",
+            "module": "dev|can"
+        },
+        {
+            "root": "csp",
+            "module": "rp_pico"
+        }
+    ]
+}
