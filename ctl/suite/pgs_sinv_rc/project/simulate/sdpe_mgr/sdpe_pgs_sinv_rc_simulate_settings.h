@@ -104,9 +104,9 @@ extern "C"
 #define SINV_2023A_VOLTAGE_LOOP_KP (0.05f)
 
 /**
- * @brief Fundamental quasi-resonant gain; with the measured 12 Ohm load it gives approximately 150 PU loop gain at 50 Hz before current-loop dynamics.
+ * @brief Fundamental quasi-resonant gain; with the measured 12 Ohm load it gives approximately 175 PU loop gain at 50 Hz before current-loop dynamics.
  */
-#define SINV_2023A_VOLTAGE_LOOP_KR (30.0f)
+#define SINV_2023A_VOLTAGE_LOOP_KR (35.0f)
 
 /**
  * @brief Narrow QPR resonant half-bandwidth around the fixed 50 Hz standalone reference.

@@ -115,9 +115,9 @@
       "role": "2023a_voltage_loop_kr",
       "macro": "SINV_2023A_VOLTAGE_LOOP_KR",
       "binding": {
-        "float": "30.0"
+        "float": "35.0"
       },
-      "description": "Fundamental quasi-resonant gain; with the measured 12 Ohm load it gives approximately 150 PU loop gain at 50 Hz before current-loop dynamics."
+      "description": "Fundamental quasi-resonant gain; with the measured 12 Ohm load it gives approximately 175 PU loop gain at 50 Hz before current-loop dynamics."
     },
     {
       "role": "2023a_voltage_loop_wi",

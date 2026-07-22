@@ -53,8 +53,8 @@ SINV_2023A_SOFTSTART_TIME_S = 0.50;
 % Conservative PU voltage-error to PU peak-current proportional gain; with the 12 Ohm load its low-frequency proportional loop gain is approximately 0.25, leaving the 50 Hz QPR term to remove fundamental error.
 SINV_2023A_VOLTAGE_LOOP_KP = 0.05;
 
-% Fundamental quasi-resonant gain; with the measured 12 Ohm load it gives approximately 150 PU loop gain at 50 Hz before current-loop dynamics.
-SINV_2023A_VOLTAGE_LOOP_KR = 30.0;
+% Fundamental quasi-resonant gain; with the measured 12 Ohm load it gives approximately 175 PU loop gain at 50 Hz before current-loop dynamics.
+SINV_2023A_VOLTAGE_LOOP_KR = 35.0;
 
 % Narrow QPR resonant half-bandwidth around the fixed 50 Hz standalone reference.
 SINV_2023A_VOLTAGE_LOOP_WI_HZ = 0.20;
