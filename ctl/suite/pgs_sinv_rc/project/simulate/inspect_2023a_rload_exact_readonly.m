@@ -8,7 +8,7 @@ if isempty(script_path)
 end
 
 root = fileparts(script_path);
-mdl = 'PGS_STD_SINV_MODEL_RLOAD_2022b';
+mdl = 'PGS_2023A_SINGLE_INV_RLOAD_2022b';
 model_file = fullfile(root, [mdl '.slx']);
 
 if ~isfile(model_file)
