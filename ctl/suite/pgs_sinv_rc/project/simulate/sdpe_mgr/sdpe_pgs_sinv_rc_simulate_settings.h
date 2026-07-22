@@ -24,7 +24,7 @@ extern "C"
 #define PGS_SINV_RC_SIM_SDPE_PROJECT_ID "pgs_sinv_rc_simulate"
 #define PGS_SINV_RC_SIM_SDPE_PROJECT_SUITE "pgs_sinv_rc"
 #define PGS_SINV_RC_SIM_SDPE_PROJECT_VERSION "1.0.0"
-#define PGS_SINV_RC_SIM_SDPE_PROJECT_UPDATED_AT "2026-07-15"
+#define PGS_SINV_RC_SIM_SDPE_PROJECT_UPDATED_AT "2026-07-22"
 
 //=================================================================================================
 /**
@@ -52,15 +52,76 @@ extern "C"
  */
 
 /**
- * @brief 1 open-loop R load; 2 current-loop R load; 3 grid current loop; 4 grid power loop; 5 DC-bus rectifier loop.
+ * @brief 1 open-loop R load; 2 current-loop R load with an explicit project application mode; 3 grid current loop; 4 grid power loop; 5 DC-bus rectifier loop.
  *        Options: (1), (2), (3), (4), (5)
  */
-#define BUILD_LEVEL (5)
+#define BUILD_LEVEL (2)
+
+//=================================================================================================
+/**
+ * @brief Application Mode.
+ */
+
+/**
+ * @brief BUILD_LEVEL 2 application selector: 0 standard fixed-current BL2; 1 2023A standalone RL-terminal voltage loop.
+ *        Options: (0), (1)
+ */
+#define SINV_APP_MODE (1)
 
 //=================================================================================================
 /**
  * @brief Requirement bindings.
  */
+
+/**
+ * @brief Application-mode constant selecting the unchanged standard BUILD_LEVEL 2 fixed-current reference.
+ */
+#define SINV_APP_MODE_STANDARD_BL2 (0)
+
+/**
+ * @brief Application-mode constant selecting the 2023A standalone RL-terminal voltage loop inside BUILD_LEVEL 2.
+ */
+#define SINV_APP_MODE_2023A_SINGLE (1)
+
+/**
+ * @brief 2023A standalone-mode physical RL-terminal RMS voltage command.
+ */
+#define SINV_2023A_UO_REF_RMS_V (24.0f)
+
+/**
+ * @brief 2023A standalone-mode internal phase-accumulator frequency; the PLL does not set this frequency.
+ */
+#define SINV_2023A_OUTPUT_FREQ_HZ (50.0f)
+
+/**
+ * @brief Time for the standalone voltage-reference peak to ramp linearly from zero to its rated value.
+ */
+#define SINV_2023A_SOFTSTART_TIME_S (0.50f)
+
+/**
+ * @brief Conservative PU voltage-error to PU peak-current proportional gain; with the 12 Ohm load its low-frequency proportional loop gain is approximately 0.25, leaving the 50 Hz QPR term to remove fundamental error.
+ */
+#define SINV_2023A_VOLTAGE_LOOP_KP (0.05f)
+
+/**
+ * @brief Fundamental quasi-resonant gain; with the measured 12 Ohm load it gives approximately 150 PU loop gain at 50 Hz before current-loop dynamics.
+ */
+#define SINV_2023A_VOLTAGE_LOOP_KR (30.0f)
+
+/**
+ * @brief Narrow QPR resonant half-bandwidth around the fixed 50 Hz standalone reference.
+ */
+#define SINV_2023A_VOLTAGE_LOOP_WI_HZ (0.20f)
+
+/**
+ * @brief Absolute peak IL-reference safety limit in PU; 0.28 PU is 3.96 A peak while the rated case requires approximately 2.84 A peak.
+ */
+#define SINV_2023A_CURRENT_REF_LIMIT_PEAK_PU (0.28f)
+
+/**
+ * @brief Symmetric QPR output clamp in PU peak current; the effective limit is the smaller of this value and the current-reference safety limit.
+ */
+#define SINV_2023A_VOLTAGE_LOOP_OUTPUT_LIMIT_PU (0.28f)
 
 /**
  * @brief SIL controller and PWM update frequency.

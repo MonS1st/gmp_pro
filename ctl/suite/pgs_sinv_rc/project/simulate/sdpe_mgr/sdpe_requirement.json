@@ -5,7 +5,7 @@
   "description": "Windows SIL platform, plant and sensing settings for all SINV commissioning models.",
   "suite": "pgs_sinv_rc",
   "version": "1.0.0",
-  "updated_at": "2026-07-15",
+  "updated_at": "2026-07-22",
   "output_header": "sdpe_pgs_sinv_rc_simulate_settings.h",
   "hardware": [],
   "code_sections": {
@@ -40,7 +40,7 @@
       "group": "Commissioning",
       "macro": "BUILD_LEVEL",
       "enabled": true,
-      "value": "(5)",
+      "value": "(2)",
       "options": [
         "(1)",
         "(2)",
@@ -48,10 +48,101 @@
         "(4)",
         "(5)"
       ],
-      "description": "1 open-loop R load; 2 current-loop R load; 3 grid current loop; 4 grid power loop; 5 DC-bus rectifier loop."
+      "description": "1 open-loop R load; 2 current-loop R load with an explicit project application mode; 3 grid current loop; 4 grid power loop; 5 DC-bus rectifier loop."
+    },
+    {
+      "group": "Application Mode",
+      "macro": "SINV_APP_MODE",
+      "enabled": true,
+      "value": "(1)",
+      "options": [
+        "(0)",
+        "(1)"
+      ],
+      "description": "BUILD_LEVEL 2 application selector: 0 standard fixed-current BL2; 1 2023A standalone RL-terminal voltage loop."
     }
   ],
   "requirements": [
+    {
+      "role": "app_mode_standard_bl2",
+      "macro": "SINV_APP_MODE_STANDARD_BL2",
+      "binding": {
+        "number": "0"
+      },
+      "description": "Application-mode constant selecting the unchanged standard BUILD_LEVEL 2 fixed-current reference."
+    },
+    {
+      "role": "app_mode_2023a_single",
+      "macro": "SINV_APP_MODE_2023A_SINGLE",
+      "binding": {
+        "number": "1"
+      },
+      "description": "Application-mode constant selecting the 2023A standalone RL-terminal voltage loop inside BUILD_LEVEL 2."
+    },
+    {
+      "role": "2023a_uo_ref_rms",
+      "macro": "SINV_2023A_UO_REF_RMS_V",
+      "binding": {
+        "float": "24.0"
+      },
+      "description": "2023A standalone-mode physical RL-terminal RMS voltage command."
+    },
+    {
+      "role": "2023a_output_frequency",
+      "macro": "SINV_2023A_OUTPUT_FREQ_HZ",
+      "binding": {
+        "float": "50.0"
+      },
+      "description": "2023A standalone-mode internal phase-accumulator frequency; the PLL does not set this frequency."
+    },
+    {
+      "role": "2023a_soft_start",
+      "macro": "SINV_2023A_SOFTSTART_TIME_S",
+      "binding": {
+        "float": "0.50"
+      },
+      "description": "Time for the standalone voltage-reference peak to ramp linearly from zero to its rated value."
+    },
+    {
+      "role": "2023a_voltage_loop_kp",
+      "macro": "SINV_2023A_VOLTAGE_LOOP_KP",
+      "binding": {
+        "float": "0.05"
+      },
+      "description": "Conservative PU voltage-error to PU peak-current proportional gain; with the 12 Ohm load its low-frequency proportional loop gain is approximately 0.25, leaving the 50 Hz QPR term to remove fundamental error."
+    },
+    {
+      "role": "2023a_voltage_loop_kr",
+      "macro": "SINV_2023A_VOLTAGE_LOOP_KR",
+      "binding": {
+        "float": "30.0"
+      },
+      "description": "Fundamental quasi-resonant gain; with the measured 12 Ohm load it gives approximately 150 PU loop gain at 50 Hz before current-loop dynamics."
+    },
+    {
+      "role": "2023a_voltage_loop_wi",
+      "macro": "SINV_2023A_VOLTAGE_LOOP_WI_HZ",
+      "binding": {
+        "float": "0.20"
+      },
+      "description": "Narrow QPR resonant half-bandwidth around the fixed 50 Hz standalone reference."
+    },
+    {
+      "role": "2023a_current_ref_limit_peak_pu",
+      "macro": "SINV_2023A_CURRENT_REF_LIMIT_PEAK_PU",
+      "binding": {
+        "float": "0.28"
+      },
+      "description": "Absolute peak IL-reference safety limit in PU; 0.28 PU is 3.96 A peak while the rated case requires approximately 2.84 A peak."
+    },
+    {
+      "role": "2023a_voltage_loop_output_limit",
+      "macro": "SINV_2023A_VOLTAGE_LOOP_OUTPUT_LIMIT_PU",
+      "binding": {
+        "float": "0.28"
+      },
+      "description": "Symmetric QPR output clamp in PU peak current; the effective limit is the smaller of this value and the current-reference safety limit."
+    },
     {
       "role": "controller_frequency",
       "macro": "CONTROLLER_FREQUENCY",
@@ -318,6 +409,21 @@
     }
   ],
   "requirement_groups": [
+    {
+      "name": "2023A Standalone Voltage Mode",
+      "requirements": [
+        "app_mode_standard_bl2",
+        "app_mode_2023a_single",
+        "2023a_uo_ref_rms",
+        "2023a_output_frequency",
+        "2023a_soft_start",
+        "2023a_voltage_loop_kp",
+        "2023a_voltage_loop_kr",
+        "2023a_voltage_loop_wi",
+        "2023a_current_ref_limit_peak_pu",
+        "2023a_voltage_loop_output_limit"
+      ]
+    },
     {
       "name": "Peripheral Parameters",
       "requirements": [

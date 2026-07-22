@@ -22,6 +22,10 @@ ctl_sinv_rc_core_t rc_core;
 ctl_sinv_outer_loop_t outer_loop;
 ctl_ramp_generator_t rg;
 
+#ifdef SINV_2023A_SINGLE_MODE_ACTIVE
+ctl_2023a_voltage_loop_t voltage_loop_2023a;
+#endif
+
 // FDRC controller static memory
 #define FDRC_ARRAY_SIZE ((int)(CONTROLLER_FREQUENCY / CTRL_FDRC_MIN_FREQ) + 10)
 static ctrl_gt fdrc_buffer[FDRC_ARRAY_SIZE];
@@ -98,8 +102,28 @@ void ctl_init(void)
         SINV_DC_BUS_LOOP_KP, SINV_DC_BUS_LOOP_KI, SINV_OUTER_LOOP_FREQUENCY_HZ,
         CONTROLLER_FREQUENCY, SINV_OUTER_LOOP_POWER_LIMIT_PU);
 
-    // freerun angle reference generator, 50Hz, [0, 1] range for pu angle
+    // Free-running angle reference generator, [0, 1] range for PU angle.
+#ifdef SINV_2023A_SINGLE_MODE_ACTIVE
+    ctl_init_ramp_generator_via_freq(&rg, CONTROLLER_FREQUENCY,
+        SINV_2023A_OUTPUT_FREQ_HZ, 1, 0);
+
+    /*
+     * 2023A voltage loop uses PU voltage error and produces PU peak IL
+     * reference. Its broadband gain is deliberately kept below the
+     * validated 600 Hz current-loop bandwidth. QPR center frequency is
+     * fixed by the standalone oscillator, not by the PLL.
+     */
+    ctl_init_2023a_voltage_loop(&voltage_loop_2023a,
+        SINV_2023A_UO_REF_RMS_V, CTRL_VOLTAGE_BASE,
+        SINV_2023A_OUTPUT_FREQ_HZ, SINV_2023A_SOFTSTART_TIME_S,
+        SINV_2023A_VOLTAGE_LOOP_KP, SINV_2023A_VOLTAGE_LOOP_KR,
+        SINV_2023A_VOLTAGE_LOOP_WI_HZ,
+        SINV_2023A_CURRENT_REF_LIMIT_PEAK_PU,
+        SINV_2023A_VOLTAGE_LOOP_OUTPUT_LIMIT_PU,
+        CONTROLLER_FREQUENCY);
+#else
     ctl_init_ramp_generator_via_freq(&rg, CONTROLLER_FREQUENCY, CTRL_GRID_FREQUENCY, 1, 0);
+#endif
 
     //
     // init H PWM modulator
@@ -337,6 +361,10 @@ void clear_all_controllers(void)
     ctl_clear_sinv_ref_gen(&ref_gen);
     ctl_clear_sinv_outer_loop(&outer_loop);
     ctl_clear_single_phase_H_modulation(&hpwm);
+#ifdef SINV_2023A_SINGLE_MODE_ACTIVE
+    ctl_clear_2023a_voltage_loop(&voltage_loop_2023a);
+    rg.current = rg.minimum;
+#endif
 }
 
 void ctl_enable_pwm(void)

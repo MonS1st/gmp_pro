@@ -31,6 +31,41 @@
 #include <ctl/component/interface/hpwm_modulator.h>
 #include <ctl/component/intrinsic/discrete/signal_generator.h>
 
+/* The simulation project must select its BL2 application explicitly. Other
+   targets retain their historical BL2 behavior unless they add APP_MODE. */
+#if BUILD_LEVEL == 2
+#if defined(SPECIFY_PC_ENVIRONMENT) && !defined(SINV_APP_MODE)
+#error SINV_BL2_simulation_requires_explicit_SINV_APP_MODE
+#endif
+#if defined(SINV_APP_MODE)
+#if !defined(SINV_APP_MODE_STANDARD_BL2) || \
+    !defined(SINV_APP_MODE_2023A_SINGLE)
+#error SINV_APP_MODE_constants_are_missing
+#endif
+#if (SINV_APP_MODE != SINV_APP_MODE_STANDARD_BL2) && \
+    (SINV_APP_MODE != SINV_APP_MODE_2023A_SINGLE)
+#error SINV_APP_MODE_is_invalid
+#endif
+#endif
+#endif
+
+#if BUILD_LEVEL == 2 && defined(SINV_APP_MODE) && \
+    defined(SINV_APP_MODE_2023A_SINGLE) && \
+    (SINV_APP_MODE == SINV_APP_MODE_2023A_SINGLE)
+#define SINV_2023A_SINGLE_MODE_ACTIVE
+#if !defined(SINV_2023A_UO_REF_RMS_V) || \
+    !defined(SINV_2023A_OUTPUT_FREQ_HZ) || \
+    !defined(SINV_2023A_SOFTSTART_TIME_S) || \
+    !defined(SINV_2023A_VOLTAGE_LOOP_KP) || \
+    !defined(SINV_2023A_VOLTAGE_LOOP_KR) || \
+    !defined(SINV_2023A_VOLTAGE_LOOP_WI_HZ) || \
+    !defined(SINV_2023A_CURRENT_REF_LIMIT_PEAK_PU) || \
+    !defined(SINV_2023A_VOLTAGE_LOOP_OUTPUT_LIMIT_PU)
+#error SINV_2023A_voltage_loop_parameters_are_missing
+#endif
+#include "ctl_2023a_voltage_loop.h"
+#endif
+
 #ifdef __cplusplus
 extern "C"
 {
@@ -49,6 +84,10 @@ extern ctl_sinv_ref_gen_t ref_gen;
 extern ctl_sinv_rc_core_t rc_core;
 extern ctl_sinv_outer_loop_t outer_loop;
 extern ctl_ramp_generator_t rg;
+
+#ifdef SINV_2023A_SINGLE_MODE_ACTIVE
+extern ctl_2023a_voltage_loop_t voltage_loop_2023a;
+#endif
 
 // Input channel
 extern adc_channel_t adc_v_grid;
@@ -126,8 +165,14 @@ GMP_STATIC_INLINE void ctl_dispatch(void)
 #if BUILD_LEVEL == 1
             ctl_clear_sinv_ref_gen(&ref_gen);
 #elif BUILD_LEVEL == 2
+#ifdef SINV_2023A_SINGLE_MODE_ACTIVE
+            ref_gen.i_ref_inst = ctl_step_2023a_voltage_loop(
+                &voltage_loop_2023a, phasor.dat[phasor_sin],
+                adc_v_grid.control_port.value);
+#else
             ref_gen.i_ref_inst = ctl_mul(float2ctrl(SINV_LEVEL2_CURRENT_REF_PEAK_PU),
                                          phasor.dat[phasor_sin]);
+#endif
 #elif BUILD_LEVEL == 3
             ctl_step_sinv_ref_gen_pq(&ref_gen, g_p_ref_user, g_q_ref_user, ctl_abs(pll.v_mag), &pll.phasor);
 #elif BUILD_LEVEL == 4
@@ -145,6 +190,10 @@ GMP_STATIC_INLINE void ctl_dispatch(void)
         {
             ctl_clear_sinv_ref_gen(&ref_gen);
             ctl_clear_sinv_outer_loop(&outer_loop);
+#ifdef SINV_2023A_SINGLE_MODE_ACTIVE
+            ctl_clear_2023a_voltage_loop(&voltage_loop_2023a);
+            rg.current = rg.minimum;
+#endif
         }
 
         // 4. Inner Current Controller (RC Core)
@@ -154,7 +203,10 @@ GMP_STATIC_INLINE void ctl_dispatch(void)
         rc_core.flag_enable_ctrl = cia402_sm.state_word.bits.operation_enabled;
 #endif
 
-#if BUILD_LEVEL >= 3
+#ifdef SINV_2023A_SINGLE_MODE_ACTIVE
+        // Standalone FDRC follows the commanded oscillator, never the PLL.
+        rc_core.fundamental_freq = SINV_2023A_OUTPUT_FREQ_HZ;
+#elif BUILD_LEVEL >= 3
         // PLL frequency is per-unit; FDRC requires the actual fundamental in Hz.
         rc_core.fundamental_freq = CTRL_GRID_FREQUENCY * ctrl2float(pll.frequency);
 #else

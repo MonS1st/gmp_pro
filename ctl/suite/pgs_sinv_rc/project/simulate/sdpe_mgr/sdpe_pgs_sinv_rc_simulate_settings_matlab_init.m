@@ -12,7 +12,7 @@ PGS_SINV_RC_SIM_SDPE_PROJECT_SUITE = 'pgs_sinv_rc';
 
 PGS_SINV_RC_SIM_SDPE_PROJECT_VERSION = '1.0.0';
 
-PGS_SINV_RC_SIM_SDPE_PROJECT_UPDATED_AT = '2026-07-15';
+PGS_SINV_RC_SIM_SDPE_PROJECT_UPDATED_AT = '2026-07-22';
 
 %% SIL Runtime
 % Automatically request CiA402 ENABLE_OPERATION in the simulation executable.
@@ -25,11 +25,46 @@ SINV_SIM_AUTO_ENABLE = true;
 % ENABLE_GMP_DL_PIL_SIM = true;
 
 %% Commissioning
-% 1 open-loop R load; 2 current-loop R load; 3 grid current loop; 4 grid power loop; 5 DC-bus rectifier loop.
+% 1 open-loop R load; 2 current-loop R load with an explicit project application mode; 3 grid current loop; 4 grid power loop; 5 DC-bus rectifier loop.
 % Options: (1), (2), (3), (4), (5)
-BUILD_LEVEL = 5;
+BUILD_LEVEL = 2;
+
+%% Application Mode
+% BUILD_LEVEL 2 application selector: 0 standard fixed-current BL2; 1 2023A standalone RL-terminal voltage loop.
+% Options: (0), (1)
+SINV_APP_MODE = 1;
 
 %% Requirement bindings
+% Application-mode constant selecting the unchanged standard BUILD_LEVEL 2 fixed-current reference.
+SINV_APP_MODE_STANDARD_BL2 = 0;
+
+% Application-mode constant selecting the 2023A standalone RL-terminal voltage loop inside BUILD_LEVEL 2.
+SINV_APP_MODE_2023A_SINGLE = 1;
+
+% 2023A standalone-mode physical RL-terminal RMS voltage command.
+SINV_2023A_UO_REF_RMS_V = 24.0;
+
+% 2023A standalone-mode internal phase-accumulator frequency; the PLL does not set this frequency.
+SINV_2023A_OUTPUT_FREQ_HZ = 50.0;
+
+% Time for the standalone voltage-reference peak to ramp linearly from zero to its rated value.
+SINV_2023A_SOFTSTART_TIME_S = 0.50;
+
+% Conservative PU voltage-error to PU peak-current proportional gain; with the 12 Ohm load its low-frequency proportional loop gain is approximately 0.25, leaving the 50 Hz QPR term to remove fundamental error.
+SINV_2023A_VOLTAGE_LOOP_KP = 0.05;
+
+% Fundamental quasi-resonant gain; with the measured 12 Ohm load it gives approximately 150 PU loop gain at 50 Hz before current-loop dynamics.
+SINV_2023A_VOLTAGE_LOOP_KR = 30.0;
+
+% Narrow QPR resonant half-bandwidth around the fixed 50 Hz standalone reference.
+SINV_2023A_VOLTAGE_LOOP_WI_HZ = 0.20;
+
+% Absolute peak IL-reference safety limit in PU; 0.28 PU is 3.96 A peak while the rated case requires approximately 2.84 A peak.
+SINV_2023A_CURRENT_REF_LIMIT_PEAK_PU = 0.28;
+
+% Symmetric QPR output clamp in PU peak current; the effective limit is the smaller of this value and the current-reference safety limit.
+SINV_2023A_VOLTAGE_LOOP_OUTPUT_LIMIT_PU = 0.28;
+
 % SIL controller and PWM update frequency.
 CONTROLLER_FREQUENCY = 20e3;
 
