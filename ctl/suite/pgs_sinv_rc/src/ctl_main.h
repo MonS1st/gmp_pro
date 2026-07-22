@@ -60,8 +60,13 @@
     !defined(SINV_2023A_VOLTAGE_LOOP_KR) || \
     !defined(SINV_2023A_VOLTAGE_LOOP_WI_HZ) || \
     !defined(SINV_2023A_CURRENT_REF_LIMIT_PEAK_PU) || \
-    !defined(SINV_2023A_VOLTAGE_LOOP_OUTPUT_LIMIT_PU)
+    !defined(SINV_2023A_VOLTAGE_LOOP_OUTPUT_LIMIT_PU) || \
+    !defined(SINV_2023A_ENABLE_DEADTIME_COMP)
 #error SINV_2023A_voltage_loop_parameters_are_missing
+#endif
+#if (SINV_2023A_ENABLE_DEADTIME_COMP != 0) && \
+    (SINV_2023A_ENABLE_DEADTIME_COMP != 1)
+#error SINV_2023A_ENABLE_DEADTIME_COMP_must_be_0_or_1
 #endif
 #include "ctl_2023a_voltage_loop.h"
 #endif

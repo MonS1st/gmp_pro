@@ -60,6 +60,17 @@
         "(1)"
       ],
       "description": "BUILD_LEVEL 2 application selector: 0 standard fixed-current BL2; 1 2023A standalone RL-terminal voltage loop."
+    },
+    {
+      "group": "Application Mode",
+      "macro": "SINV_2023A_ENABLE_DEADTIME_COMP",
+      "enabled": true,
+      "value": "(1)",
+      "options": [
+        "(0)",
+        "(1)"
+      ],
+      "description": "Enable the existing single-phase H-bridge dead-time compensation for the 2023A standalone inverter mode."
     }
   ],
   "requirements": [

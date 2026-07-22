@@ -34,6 +34,10 @@ BUILD_LEVEL = 2;
 % Options: (0), (1)
 SINV_APP_MODE = 1;
 
+% Enable the existing single-phase H-bridge dead-time compensation for the 2023A standalone inverter mode.
+% Options: (0), (1)
+SINV_2023A_ENABLE_DEADTIME_COMP = 1;
+
 %% Requirement bindings
 % Application-mode constant selecting the unchanged standard BUILD_LEVEL 2 fixed-current reference.
 SINV_APP_MODE_STANDARD_BL2 = 0;

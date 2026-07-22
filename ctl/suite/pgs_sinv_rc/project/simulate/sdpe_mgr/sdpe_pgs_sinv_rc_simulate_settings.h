@@ -68,6 +68,12 @@ extern "C"
  */
 #define SINV_APP_MODE (1)
 
+/**
+ * @brief Enable the existing single-phase H-bridge dead-time compensation for the 2023A standalone inverter mode.
+ *        Options: (0), (1)
+ */
+#define SINV_2023A_ENABLE_DEADTIME_COMP (1)
+
 //=================================================================================================
 /**
  * @brief Requirement bindings.

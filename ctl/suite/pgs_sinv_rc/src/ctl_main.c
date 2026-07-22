@@ -130,7 +130,12 @@ void ctl_init(void)
     //
     ctl_init_single_phase_H_modulation(&hpwm, CTRL_PWM_CMP_MAX + 1, CTRL_PWM_DEADBAND_CMP,
                                        float2ctrl(CTRL_CURRENT_DB_PU));
-    //hpwm.flag_enable_dbcomp = 1; // 开启死区补偿
+#ifdef SINV_2023A_SINGLE_MODE_ACTIVE
+    hpwm.flag_enable_dbcomp =
+        (fast_gt)SINV_2023A_ENABLE_DEADTIME_COMP;
+#else
+    hpwm.flag_enable_dbcomp = 0;
+#endif
 
     //
     // init and config CiA402 standard state machine
