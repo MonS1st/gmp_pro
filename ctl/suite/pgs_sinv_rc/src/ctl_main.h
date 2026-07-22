@@ -61,12 +61,24 @@
     !defined(SINV_2023A_VOLTAGE_LOOP_WI_HZ) || \
     !defined(SINV_2023A_CURRENT_REF_LIMIT_PEAK_PU) || \
     !defined(SINV_2023A_VOLTAGE_LOOP_OUTPUT_LIMIT_PU) || \
-    !defined(SINV_2023A_ENABLE_DEADTIME_COMP)
+    !defined(SINV_2023A_ENABLE_DEADTIME_COMP) || \
+    !defined(SINV_2023A_ENABLE_LOAD_CURRENT_FF) || \
+    !defined(SINV_2023A_LOAD_CURRENT_FF_GAIN) || \
+    !defined(SINV_2023A_ENABLE_CAP_CURRENT_FF) || \
+    !defined(SINV_2023A_CAP_CURRENT_FF_GAIN)
 #error SINV_2023A_voltage_loop_parameters_are_missing
 #endif
 #if (SINV_2023A_ENABLE_DEADTIME_COMP != 0) && \
     (SINV_2023A_ENABLE_DEADTIME_COMP != 1)
 #error SINV_2023A_ENABLE_DEADTIME_COMP_must_be_0_or_1
+#endif
+#if (SINV_2023A_ENABLE_LOAD_CURRENT_FF != 0) && \
+    (SINV_2023A_ENABLE_LOAD_CURRENT_FF != 1)
+#error SINV_2023A_ENABLE_LOAD_CURRENT_FF_must_be_0_or_1
+#endif
+#if (SINV_2023A_ENABLE_CAP_CURRENT_FF != 0) && \
+    (SINV_2023A_ENABLE_CAP_CURRENT_FF != 1)
+#error SINV_2023A_ENABLE_CAP_CURRENT_FF_must_be_0_or_1
 #endif
 #include "ctl_2023a_voltage_loop.h"
 #endif
@@ -98,6 +110,9 @@ extern ctl_2023a_voltage_loop_t voltage_loop_2023a;
 extern adc_channel_t adc_v_grid;
 extern adc_channel_t adc_i_ac;
 extern adc_channel_t adc_v_bus;
+#ifdef SINV_2023A_SINGLE_MODE_ACTIVE
+extern adc_channel_t adc_i_load;
+#endif
 
 // Output channel
 extern single_phase_H_modulation_t hpwm;
@@ -172,8 +187,10 @@ GMP_STATIC_INLINE void ctl_dispatch(void)
 #elif BUILD_LEVEL == 2
 #ifdef SINV_2023A_SINGLE_MODE_ACTIVE
             ref_gen.i_ref_inst = ctl_step_2023a_voltage_loop(
-                &voltage_loop_2023a, phasor.dat[phasor_sin],
-                adc_v_grid.control_port.value);
+                &voltage_loop_2023a,
+                phasor.dat[phasor_sin], phasor.dat[phasor_cos],
+                adc_v_grid.control_port.value,
+                adc_i_load.control_port.value);
 #else
             ref_gen.i_ref_inst = ctl_mul(float2ctrl(SINV_LEVEL2_CURRENT_REF_PEAK_PU),
                                          phasor.dat[phasor_sin]);

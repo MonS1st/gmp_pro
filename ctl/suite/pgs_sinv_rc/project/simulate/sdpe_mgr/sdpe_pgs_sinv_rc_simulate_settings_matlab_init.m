@@ -38,6 +38,14 @@ SINV_APP_MODE = 1;
 % Options: (0), (1)
 SINV_2023A_ENABLE_DEADTIME_COMP = 1;
 
+% Enable measured load-current feedforward in the 2023A standalone voltage loop.
+% Options: (0), (1)
+SINV_2023A_ENABLE_LOAD_CURRENT_FF = 1;
+
+% Enable analytical filter-capacitor current feedforward in the 2023A standalone voltage loop.
+% Options: (0), (1)
+SINV_2023A_ENABLE_CAP_CURRENT_FF = 1;
+
 %% Requirement bindings
 % Application-mode constant selecting the unchanged standard BUILD_LEVEL 2 fixed-current reference.
 SINV_APP_MODE_STANDARD_BL2 = 0;
@@ -68,6 +76,12 @@ SINV_2023A_CURRENT_REF_LIMIT_PEAK_PU = 0.28;
 
 % Symmetric QPR output clamp in PU peak current; the effective limit is the smaller of this value and the current-reference safety limit.
 SINV_2023A_VOLTAGE_LOOP_OUTPUT_LIMIT_PU = 0.28;
+
+% Gain applied to measured load-current peak PU before adding it to the 2023A inductor-current reference.
+SINV_2023A_LOAD_CURRENT_FF_GAIN = 1.0;
+
+% Gain applied to the analytical capacitor-current feedforward term in the 2023A inductor-current reference.
+SINV_2023A_CAP_CURRENT_FF_GAIN = 1.0;
 
 % SIL controller and PWM update frequency.
 CONTROLLER_FREQUENCY = 20e3;

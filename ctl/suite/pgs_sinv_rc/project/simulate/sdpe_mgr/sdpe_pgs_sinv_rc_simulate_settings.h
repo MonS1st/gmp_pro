@@ -74,6 +74,18 @@ extern "C"
  */
 #define SINV_2023A_ENABLE_DEADTIME_COMP (1)
 
+/**
+ * @brief Enable measured load-current feedforward in the 2023A standalone voltage loop.
+ *        Options: (0), (1)
+ */
+#define SINV_2023A_ENABLE_LOAD_CURRENT_FF (1)
+
+/**
+ * @brief Enable analytical filter-capacitor current feedforward in the 2023A standalone voltage loop.
+ *        Options: (0), (1)
+ */
+#define SINV_2023A_ENABLE_CAP_CURRENT_FF (1)
+
 //=================================================================================================
 /**
  * @brief Requirement bindings.
@@ -128,6 +140,16 @@ extern "C"
  * @brief Symmetric QPR output clamp in PU peak current; the effective limit is the smaller of this value and the current-reference safety limit.
  */
 #define SINV_2023A_VOLTAGE_LOOP_OUTPUT_LIMIT_PU (0.28f)
+
+/**
+ * @brief Gain applied to measured load-current peak PU before adding it to the 2023A inductor-current reference.
+ */
+#define SINV_2023A_LOAD_CURRENT_FF_GAIN (1.0f)
+
+/**
+ * @brief Gain applied to the analytical capacitor-current feedforward term in the 2023A inductor-current reference.
+ */
+#define SINV_2023A_CAP_CURRENT_FF_GAIN (1.0f)
 
 /**
  * @brief SIL controller and PWM update frequency.

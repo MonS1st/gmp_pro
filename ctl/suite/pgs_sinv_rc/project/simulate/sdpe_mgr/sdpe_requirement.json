@@ -71,6 +71,28 @@
         "(1)"
       ],
       "description": "Enable the existing single-phase H-bridge dead-time compensation for the 2023A standalone inverter mode."
+    },
+    {
+      "group": "Application Mode",
+      "macro": "SINV_2023A_ENABLE_LOAD_CURRENT_FF",
+      "enabled": true,
+      "value": "(1)",
+      "options": [
+        "(0)",
+        "(1)"
+      ],
+      "description": "Enable measured load-current feedforward in the 2023A standalone voltage loop."
+    },
+    {
+      "group": "Application Mode",
+      "macro": "SINV_2023A_ENABLE_CAP_CURRENT_FF",
+      "enabled": true,
+      "value": "(1)",
+      "options": [
+        "(0)",
+        "(1)"
+      ],
+      "description": "Enable analytical filter-capacitor current feedforward in the 2023A standalone voltage loop."
     }
   ],
   "requirements": [
@@ -153,6 +175,22 @@
         "float": "0.28"
       },
       "description": "Symmetric QPR output clamp in PU peak current; the effective limit is the smaller of this value and the current-reference safety limit."
+    },
+    {
+      "role": "2023a_load_current_ff_gain",
+      "macro": "SINV_2023A_LOAD_CURRENT_FF_GAIN",
+      "binding": {
+        "float": "1.0"
+      },
+      "description": "Gain applied to measured load-current peak PU before adding it to the 2023A inductor-current reference."
+    },
+    {
+      "role": "2023a_cap_current_ff_gain",
+      "macro": "SINV_2023A_CAP_CURRENT_FF_GAIN",
+      "binding": {
+        "float": "1.0"
+      },
+      "description": "Gain applied to the analytical capacitor-current feedforward term in the 2023A inductor-current reference."
     },
     {
       "role": "controller_frequency",
@@ -432,7 +470,9 @@
         "2023a_voltage_loop_kr",
         "2023a_voltage_loop_wi",
         "2023a_current_ref_limit_peak_pu",
-        "2023a_voltage_loop_output_limit"
+        "2023a_voltage_loop_output_limit",
+        "2023a_load_current_ff_gain",
+        "2023a_cap_current_ff_gain"
       ]
     },
     {
