@@ -144,7 +144,7 @@ extern "C"
 /**
  * @brief Gain applied to measured load-current peak PU before adding it to the 2023A inductor-current reference.
  */
-#define SINV_2023A_LOAD_CURRENT_FF_GAIN (1.0f)
+#define SINV_2023A_LOAD_CURRENT_FF_GAIN (1.02f)
 
 /**
  * @brief Gain applied to the analytical capacitor-current feedforward term in the 2023A inductor-current reference.

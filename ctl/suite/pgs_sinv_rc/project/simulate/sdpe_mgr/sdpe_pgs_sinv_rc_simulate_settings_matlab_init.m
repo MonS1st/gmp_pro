@@ -78,7 +78,7 @@ SINV_2023A_CURRENT_REF_LIMIT_PEAK_PU = 0.28;
 SINV_2023A_VOLTAGE_LOOP_OUTPUT_LIMIT_PU = 0.28;
 
 % Gain applied to measured load-current peak PU before adding it to the 2023A inductor-current reference.
-SINV_2023A_LOAD_CURRENT_FF_GAIN = 1.0;
+SINV_2023A_LOAD_CURRENT_FF_GAIN = 1.02;
 
 % Gain applied to the analytical capacitor-current feedforward term in the 2023A inductor-current reference.
 SINV_2023A_CAP_CURRENT_FF_GAIN = 1.0;

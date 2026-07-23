@@ -1,0 +1,985 @@
+Model: PGS_STD_SINV_MODEL_RLOAD_2022b
+Model file: F:\eletronic\gmp_pro\gmp_pro\ctl\suite\pgs_sinv_rc\project\simulate\PGS_STD_SINV_MODEL_RLOAD_2022b.slx
+Generated: 2026-07-22 12:29:26
+
+
+==================================================
+SEARCH TERM: IL
+==================================================
+
+Blocks found: 12
+
+BLOCK: PGS_STD_SINV_MODEL_RLOAD_2022b/GMP Stanrdard Digital Power Controller Panel (SIL) Pro Edition
+  Parent: PGS_STD_SINV_MODEL_RLOAD_2022b
+  BlockType: SubSystem
+  MaskType: GMP SIL Core for single Motor Controller (full edition)
+  ReferenceBlock: gmp_sil_core_pack/GMP Stanrdard Digital Power Controller Panel (SIL) Pro Edition
+  Connectivity entry 1:
+    Port type: 1
+    Source: PGS_STD_SINV_MODEL_RLOAD_2022b/From6
+  Connectivity entry 2:
+    Port type: 2
+    Source: PGS_STD_SINV_MODEL_RLOAD_2022b/From19
+  Connectivity entry 3:
+    Port type: 3
+    Source: PGS_STD_SINV_MODEL_RLOAD_2022b/From20
+  Connectivity entry 4:
+    Port type: 4
+    Source: PGS_STD_SINV_MODEL_RLOAD_2022b/From10
+  Connectivity entry 5:
+    Port type: 1
+    Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Goto9
+  Connectivity entry 6:
+    Port type: 2
+    Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Goto17
+  Connectivity entry 7:
+    Port type: 3
+    Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Goto18
+  Connectivity entry 8:
+    Port type: 4
+    Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Goto19
+
+BLOCK: PGS_STD_SINV_MODEL_RLOAD_2022b/GMP Stanrdard Digital Power Controller Panel (SIL) Pro Edition/GMP SIL Core With trigger
+  Parent: PGS_STD_SINV_MODEL_RLOAD_2022b/GMP Stanrdard Digital Power Controller Panel (SIL) Pro Edition
+  BlockType: SubSystem
+  MaskType: <empty>
+  ReferenceBlock: gmp_sil_core_pack/GMP Stanrdard Digital Power Controller Panel (SIL) Pro Edition/GMP SIL Core With trigger
+  Connectivity entry 1:
+    Port type: 1
+    Source: PGS_STD_SINV_MODEL_RLOAD_2022b/GMP Stanrdard Digital Power Controller Panel (SIL) Pro Edition/Simulation Time
+  Connectivity entry 2:
+    Port type: 2
+    Source: PGS_STD_SINV_MODEL_RLOAD_2022b/GMP Stanrdard Digital Power Controller Panel (SIL) Pro Edition/GMP Mux For ADC
+  Connectivity entry 3:
+    Port type: 3
+    Source: PGS_STD_SINV_MODEL_RLOAD_2022b/GMP Stanrdard Digital Power Controller Panel (SIL) Pro Edition/GMP Mux For Panel
+  Connectivity entry 4:
+    Port type: 4
+    Source: PGS_STD_SINV_MODEL_RLOAD_2022b/GMP Stanrdard Digital Power Controller Panel (SIL) Pro Edition/GMP Mux For Digital
+  Connectivity entry 5:
+    Port type: trigger
+    Source: PGS_STD_SINV_MODEL_RLOAD_2022b/GMP Stanrdard Digital Power Controller Panel (SIL) Pro Edition/Trigger
+  Connectivity entry 6:
+    Port type: 1
+    Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/GMP Stanrdard Digital Power Controller Panel (SIL) Pro Edition/Enable
+  Connectivity entry 7:
+    Port type: 2
+    Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/GMP Stanrdard Digital Power Controller Panel (SIL) Pro Edition/Demux
+  Connectivity entry 8:
+    Port type: 3
+    Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/GMP Stanrdard Digital Power Controller Panel (SIL) Pro Edition/Demux1
+  Connectivity entry 9:
+    Port type: 4
+    Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/GMP Stanrdard Digital Power Controller Panel (SIL) Pro Edition/Demux2
+
+BLOCK: PGS_STD_SINV_MODEL_RLOAD_2022b/GMP Stanrdard Digital Power Controller Panel (SIL) Pro Edition/GMP SIL Core With trigger/GMP SIL Core Module
+  Parent: PGS_STD_SINV_MODEL_RLOAD_2022b/GMP Stanrdard Digital Power Controller Panel (SIL) Pro Edition/GMP SIL Core With trigger
+  BlockType: S-Function
+  MaskType: GMP CTL SIL Core
+  ReferenceBlock: gmp_sil_core_pack/GMP SIL Core Module
+  Connectivity entry 1:
+    Port type: 1
+    Source: PGS_STD_SINV_MODEL_RLOAD_2022b/GMP Stanrdard Digital Power Controller Panel (SIL) Pro Edition/GMP SIL Core With trigger/time
+  Connectivity entry 2:
+    Port type: 2
+    Source: PGS_STD_SINV_MODEL_RLOAD_2022b/GMP Stanrdard Digital Power Controller Panel (SIL) Pro Edition/GMP SIL Core With trigger/24 channel ADC
+  Connectivity entry 3:
+    Port type: 3
+    Source: PGS_STD_SINV_MODEL_RLOAD_2022b/GMP Stanrdard Digital Power Controller Panel (SIL) Pro Edition/GMP SIL Core With trigger/16 channel panel
+  Connectivity entry 4:
+    Port type: 4
+    Source: PGS_STD_SINV_MODEL_RLOAD_2022b/GMP Stanrdard Digital Power Controller Panel (SIL) Pro Edition/GMP SIL Core With trigger/8 channel digital
+  Connectivity entry 5:
+    Port type: 1
+    Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/GMP Stanrdard Digital Power Controller Panel (SIL) Pro Edition/GMP SIL Core With trigger/Enable
+  Connectivity entry 6:
+    Port type: 2
+    Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/GMP Stanrdard Digital Power Controller Panel (SIL) Pro Edition/GMP SIL Core With trigger/8-ph PWM output
+  Connectivity entry 7:
+    Port type: 3
+    Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/GMP Stanrdard Digital Power Controller Panel (SIL) Pro Edition/GMP SIL Core With trigger/8-ph DAC output
+  Connectivity entry 8:
+    Port type: 4
+    Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/GMP Stanrdard Digital Power Controller Panel (SIL) Pro Edition/GMP SIL Core With trigger/16 channel Monitor
+
+BLOCK: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)
+  Parent: PGS_STD_SINV_MODEL_RLOAD_2022b
+  BlockType: SubSystem
+  MaskType: Standard Single Phase DC/AC inverter / rectifier
+  ReferenceBlock: <empty>
+  Connectivity entry 1:
+    Port type: 1
+    Source: PGS_STD_SINV_MODEL_RLOAD_2022b/From
+  Connectivity entry 2:
+    Port type: 2
+    Source: PGS_STD_SINV_MODEL_RLOAD_2022b/Mux2
+  Connectivity entry 3:
+    Port type: 1
+    Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Goto5
+  Connectivity entry 4:
+    Port type: 2
+    Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Goto
+  Connectivity entry 5:
+    Port type: LConn1
+    Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Load1
+  Connectivity entry 6:
+    Port type: LConn2
+    Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Voltage Source1
+  Connectivity entry 7:
+    Port type: RConn1
+    Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Load
+  Connectivity entry 8:
+    Port type: RConn2
+    Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Load
+
+BLOCK: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/AC bus Voltage Measurement Module/Second-Order
+Filter
+  Parent: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/AC bus Voltage Measurement Module
+  BlockType: SubSystem
+  MaskType: Second-Order Filter
+  ReferenceBlock: spsSecondOrderFilterLib/Second-Order
+Filter
+  Connectivity entry 1:
+    Port type: 1
+    Source: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/AC bus Voltage Measurement Module/Voltage Measurement
+  Connectivity entry 2:
+    Port type: 1
+    Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/AC bus Voltage Measurement Module/Switch
+    Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/AC bus Voltage Measurement Module/Mux1
+
+BLOCK: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/Capactor Current Measurement Module/Second-Order
+Filter
+  Parent: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/Capactor Current Measurement Module
+  BlockType: SubSystem
+  MaskType: Second-Order Filter
+  ReferenceBlock: spsSecondOrderFilterLib/Second-Order
+Filter
+  Connectivity entry 1:
+    Port type: 1
+    Source: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/Capactor Current Measurement Module/Voltage Measurement
+  Connectivity entry 2:
+    Port type: 1
+    Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/Capactor Current Measurement Module/Mux1
+    Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/Capactor Current Measurement Module/Switch
+
+BLOCK: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/Capactor Current Measurement Module1/Second-Order
+Filter
+  Parent: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/Capactor Current Measurement Module1
+  BlockType: SubSystem
+  MaskType: Second-Order Filter
+  ReferenceBlock: spsSecondOrderFilterLib/Second-Order
+Filter
+  Connectivity entry 1:
+    Port type: 1
+    Source: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/Capactor Current Measurement Module1/Voltage Measurement
+  Connectivity entry 2:
+    Port type: 1
+    Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/Capactor Current Measurement Module1/Switch
+    Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/Capactor Current Measurement Module1/Mux1
+
+BLOCK: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/DC Bus Current Measurement Module/Second-Order
+Filter
+  Parent: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/DC Bus Current Measurement Module
+  BlockType: SubSystem
+  MaskType: Second-Order Filter
+  ReferenceBlock: spsSecondOrderFilterLib/Second-Order
+Filter
+  Connectivity entry 1:
+    Port type: 1
+    Source: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/DC Bus Current Measurement Module/Voltage Measurement
+  Connectivity entry 2:
+    Port type: 1
+    Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/DC Bus Current Measurement Module/Mux1
+    Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/DC Bus Current Measurement Module/Switch
+
+BLOCK: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/DC bus Voltage Measurement Module/Second-Order
+Filter
+  Parent: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/DC bus Voltage Measurement Module
+  BlockType: SubSystem
+  MaskType: Second-Order Filter
+  ReferenceBlock: spsSecondOrderFilterLib/Second-Order
+Filter
+  Connectivity entry 1:
+    Port type: 1
+    Source: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/DC bus Voltage Measurement Module/Voltage Measurement
+  Connectivity entry 2:
+    Port type: 1
+    Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/DC bus Voltage Measurement Module/Switch
+    Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/DC bus Voltage Measurement Module/Mux1
+
+BLOCK: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/SINV_Filter_C
+  Parent: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)
+  BlockType: PMComponent
+  MaskType: Series RLC Branch
+  ReferenceBlock: spsSeriesRLCBranchLib/Series RLC Branch
+  Connectivity entry 1:
+    Port type: LConn1
+    Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/AC_BUS_L
+    Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/SINV_Filter_C_EPR
+    Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/SINV_Filter_L
+    Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/AC bus Voltage Measurement Module
+  Connectivity entry 2:
+    Port type: RConn1
+    Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/Capactor Current Measurement Module
+    Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/SINV_Current_Sensor
+    Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/SINV_Filter_C_EPR
+
+BLOCK: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/SINV_Filter_C_EPR
+  Parent: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)
+  BlockType: PMComponent
+  MaskType: Series RLC Branch
+  ReferenceBlock: spsSeriesRLCBranchLib/Series RLC Branch
+  Connectivity entry 1:
+    Port type: LConn1
+    Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/AC_BUS_L
+    Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/SINV_Filter_L
+    Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/AC bus Voltage Measurement Module
+    Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/SINV_Filter_C
+  Connectivity entry 2:
+    Port type: RConn1
+    Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/Capactor Current Measurement Module
+    Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/SINV_Current_Sensor
+    Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/SINV_Filter_C
+
+BLOCK: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/SINV_Filter_L
+  Parent: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)
+  BlockType: PMComponent
+  MaskType: Series RLC Branch
+  ReferenceBlock: spsSeriesRLCBranchLib/Series RLC Branch
+  Connectivity entry 1:
+    Port type: LConn1
+    Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/Ideal Inductor Current Measurement Module（ADC - Current）
+  Connectivity entry 2:
+    Port type: RConn1
+    Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/AC_BUS_L
+    Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/SINV_Filter_C_EPR
+    Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/AC bus Voltage Measurement Module
+    Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/SINV_Filter_C
+
+Signal lines found: 0
+
+Goto blocks found: 0
+
+From blocks found: 0
+
+==================================================
+SEARCH TERM: VC
+==================================================
+
+Blocks found: 0
+
+Signal lines found: 0
+
+Goto blocks found: 0
+
+From blocks found: 0
+
+==================================================
+SEARCH TERM: IG
+==================================================
+
+Blocks found: 20
+
+BLOCK: PGS_STD_SINV_MODEL_RLOAD_2022b/GMP Stanrdard Digital Power Controller Panel (SIL) Pro Edition
+  Parent: PGS_STD_SINV_MODEL_RLOAD_2022b
+  BlockType: SubSystem
+  MaskType: GMP SIL Core for single Motor Controller (full edition)
+  ReferenceBlock: gmp_sil_core_pack/GMP Stanrdard Digital Power Controller Panel (SIL) Pro Edition
+  Connectivity entry 1:
+    Port type: 1
+    Source: PGS_STD_SINV_MODEL_RLOAD_2022b/From6
+  Connectivity entry 2:
+    Port type: 2
+    Source: PGS_STD_SINV_MODEL_RLOAD_2022b/From19
+  Connectivity entry 3:
+    Port type: 3
+    Source: PGS_STD_SINV_MODEL_RLOAD_2022b/From20
+  Connectivity entry 4:
+    Port type: 4
+    Source: PGS_STD_SINV_MODEL_RLOAD_2022b/From10
+  Connectivity entry 5:
+    Port type: 1
+    Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Goto9
+  Connectivity entry 6:
+    Port type: 2
+    Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Goto17
+  Connectivity entry 7:
+    Port type: 3
+    Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Goto18
+  Connectivity entry 8:
+    Port type: 4
+    Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Goto19
+
+BLOCK: PGS_STD_SINV_MODEL_RLOAD_2022b/GMP Stanrdard Digital Power Controller Panel (SIL) Pro Edition/8 ch Digital
+  Parent: PGS_STD_SINV_MODEL_RLOAD_2022b/GMP Stanrdard Digital Power Controller Panel (SIL) Pro Edition
+  BlockType: Inport
+  MaskType: <empty>
+  ReferenceBlock: gmp_sil_core_pack/GMP Stanrdard Digital Power Controller Panel (SIL) Pro Edition/8 ch Digital
+  Connectivity entry 1:
+    Port type: 1
+    Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/GMP Stanrdard Digital Power Controller Panel (SIL) Pro Edition/GMP Mux For Digital
+
+BLOCK: PGS_STD_SINV_MODEL_RLOAD_2022b/GMP Stanrdard Digital Power Controller Panel (SIL) Pro Edition/Trigger
+  Parent: PGS_STD_SINV_MODEL_RLOAD_2022b/GMP Stanrdard Digital Power Controller Panel (SIL) Pro Edition
+  BlockType: Inport
+  MaskType: <empty>
+  ReferenceBlock: gmp_sil_core_pack/GMP Stanrdard Digital Power Controller Panel (SIL) Pro Edition/Trigger
+  Connectivity entry 1:
+    Port type: 1
+    Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/GMP Stanrdard Digital Power Controller Panel (SIL) Pro Edition/GMP SIL Core With trigger
+
+BLOCK: PGS_STD_SINV_MODEL_RLOAD_2022b/GMP Stanrdard Digital Power Controller Panel (SIL) Pro Edition/GMP Mux For Digital
+  Parent: PGS_STD_SINV_MODEL_RLOAD_2022b/GMP Stanrdard Digital Power Controller Panel (SIL) Pro Edition
+  BlockType: SubSystem
+  MaskType: <empty>
+  ReferenceBlock: gmp_sil_core_pack/GMP Stanrdard Digital Power Controller Panel (SIL) Pro Edition/GMP Mux For Digital
+  Connectivity entry 1:
+    Port type: 1
+    Source: PGS_STD_SINV_MODEL_RLOAD_2022b/GMP Stanrdard Digital Power Controller Panel (SIL) Pro Edition/8 ch Digital
+  Connectivity entry 2:
+    Port type: 1
+    Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/GMP Stanrdard Digital Power Controller Panel (SIL) Pro Edition/GMP SIL Core With trigger
+
+BLOCK: PGS_STD_SINV_MODEL_RLOAD_2022b/GMP Stanrdard Digital Power Controller Panel (SIL) Pro Edition/GMP SIL Core With trigger
+  Parent: PGS_STD_SINV_MODEL_RLOAD_2022b/GMP Stanrdard Digital Power Controller Panel (SIL) Pro Edition
+  BlockType: SubSystem
+  MaskType: <empty>
+  ReferenceBlock: gmp_sil_core_pack/GMP Stanrdard Digital Power Controller Panel (SIL) Pro Edition/GMP SIL Core With trigger
+  Connectivity entry 1:
+    Port type: 1
+    Source: PGS_STD_SINV_MODEL_RLOAD_2022b/GMP Stanrdard Digital Power Controller Panel (SIL) Pro Edition/Simulation Time
+  Connectivity entry 2:
+    Port type: 2
+    Source: PGS_STD_SINV_MODEL_RLOAD_2022b/GMP Stanrdard Digital Power Controller Panel (SIL) Pro Edition/GMP Mux For ADC
+  Connectivity entry 3:
+    Port type: 3
+    Source: PGS_STD_SINV_MODEL_RLOAD_2022b/GMP Stanrdard Digital Power Controller Panel (SIL) Pro Edition/GMP Mux For Panel
+  Connectivity entry 4:
+    Port type: 4
+    Source: PGS_STD_SINV_MODEL_RLOAD_2022b/GMP Stanrdard Digital Power Controller Panel (SIL) Pro Edition/GMP Mux For Digital
+  Connectivity entry 5:
+    Port type: trigger
+    Source: PGS_STD_SINV_MODEL_RLOAD_2022b/GMP Stanrdard Digital Power Controller Panel (SIL) Pro Edition/Trigger
+  Connectivity entry 6:
+    Port type: 1
+    Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/GMP Stanrdard Digital Power Controller Panel (SIL) Pro Edition/Enable
+  Connectivity entry 7:
+    Port type: 2
+    Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/GMP Stanrdard Digital Power Controller Panel (SIL) Pro Edition/Demux
+  Connectivity entry 8:
+    Port type: 3
+    Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/GMP Stanrdard Digital Power Controller Panel (SIL) Pro Edition/Demux1
+  Connectivity entry 9:
+    Port type: 4
+    Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/GMP Stanrdard Digital Power Controller Panel (SIL) Pro Edition/Demux2
+
+BLOCK: PGS_STD_SINV_MODEL_RLOAD_2022b/GMP Stanrdard Digital Power Controller Panel (SIL) Pro Edition/GMP SIL Core With trigger/8 channel digital
+  Parent: PGS_STD_SINV_MODEL_RLOAD_2022b/GMP Stanrdard Digital Power Controller Panel (SIL) Pro Edition/GMP SIL Core With trigger
+  BlockType: Inport
+  MaskType: <empty>
+  ReferenceBlock: gmp_sil_core_pack/GMP Stanrdard Digital Power Controller Panel (SIL) Pro Edition/GMP SIL Core With trigger/8 channel digital
+  Connectivity entry 1:
+    Port type: 1
+    Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/GMP Stanrdard Digital Power Controller Panel (SIL) Pro Edition/GMP SIL Core With trigger/GMP SIL Core Module
+
+BLOCK: PGS_STD_SINV_MODEL_RLOAD_2022b/GMP Stanrdard Digital Power Controller Panel (SIL) Pro Edition/GMP SIL Core With trigger/Trigger
+  Parent: PGS_STD_SINV_MODEL_RLOAD_2022b/GMP Stanrdard Digital Power Controller Panel (SIL) Pro Edition/GMP SIL Core With trigger
+  BlockType: TriggerPort
+  MaskType: <empty>
+  ReferenceBlock: gmp_sil_core_pack/GMP Stanrdard Digital Power Controller Panel (SIL) Pro Edition/GMP SIL Core With trigger/Trigger
+
+BLOCK: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/AC bus Voltage Measurement Module/Sample Trigger
+  Parent: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/AC bus Voltage Measurement Module
+  BlockType: Inport
+  MaskType: <empty>
+  ReferenceBlock: <empty>
+  Connectivity entry 1:
+    Port type: 1
+    Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/AC bus Voltage Measurement Module/Sample
+
+BLOCK: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/Capactor Current Measurement Module/Sample Trigger
+  Parent: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/Capactor Current Measurement Module
+  BlockType: Inport
+  MaskType: <empty>
+  ReferenceBlock: <empty>
+  Connectivity entry 1:
+    Port type: 1
+    Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/Capactor Current Measurement Module/Sample
+
+BLOCK: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/Capactor Current Measurement Module1/Sample Trigger
+  Parent: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/Capactor Current Measurement Module1
+  BlockType: Inport
+  MaskType: <empty>
+  ReferenceBlock: <empty>
+  Connectivity entry 1:
+    Port type: 1
+    Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/Capactor Current Measurement Module1/Sample
+
+BLOCK: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/DC Bus Current Measurement Module/Sample Trigger
+  Parent: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/DC Bus Current Measurement Module
+  BlockType: Inport
+  MaskType: <empty>
+  ReferenceBlock: <empty>
+  Connectivity entry 1:
+    Port type: 1
+    Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/DC Bus Current Measurement Module/Sample
+
+BLOCK: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/DC bus Voltage Measurement Module/Sample Trigger
+  Parent: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/DC bus Voltage Measurement Module
+  BlockType: Inport
+  MaskType: <empty>
+  ReferenceBlock: <empty>
+  Connectivity entry 1:
+    Port type: 1
+    Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/DC bus Voltage Measurement Module/Sample
+
+BLOCK: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/DC//AC Half Bridge1/Triangle PWM modulation (with deadband)/Hit Crossing：ADC Sample Trigger Signal
+  Parent: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/DC//AC Half Bridge1/Triangle PWM modulation (with deadband)
+  BlockType: HitCross
+  MaskType: <empty>
+  ReferenceBlock: gmp_peripheral_utilities/Single Phase Half Bridge (Duty Model)/Triangle PWM modulation (with deadband)/Hit Crossing：ADC Sample Trigger Signal
+  Connectivity entry 1:
+    Port type: 1
+    Source: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/DC//AC Half Bridge1/Triangle PWM modulation (with deadband)/Mod
+  Connectivity entry 2:
+    Port type: 1
+    Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/DC//AC Half Bridge1/Triangle PWM modulation (with deadband)/Sample Trigger Output
+
+BLOCK: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/DC//AC Half Bridge1/Triangle PWM modulation (with deadband)/Sample Trigger Output
+  Parent: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/DC//AC Half Bridge1/Triangle PWM modulation (with deadband)
+  BlockType: Outport
+  MaskType: <empty>
+  ReferenceBlock: gmp_peripheral_utilities/Single Phase Half Bridge (Duty Model)/Triangle PWM modulation (with deadband)/Sample Trigger Output
+  Connectivity entry 1:
+    Port type: 1
+    Source: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/DC//AC Half Bridge1/Triangle PWM modulation (with deadband)/Hit Crossing：ADC Sample Trigger Signal
+
+BLOCK: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/DC//AC Half Bridge1/Sample Trigger Output
+  Parent: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/DC//AC Half Bridge1
+  BlockType: Outport
+  MaskType: <empty>
+  ReferenceBlock: gmp_peripheral_utilities/Single Phase Half Bridge (Duty Model)/Sample Trigger Output
+  Connectivity entry 1:
+    Port type: 1
+    Source: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/DC//AC Half Bridge1/Triangle PWM modulation (with deadband)
+
+BLOCK: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/DC//AC Half Bridge2/Triangle PWM modulation (with deadband)/Hit Crossing：ADC Sample Trigger Signal
+  Parent: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/DC//AC Half Bridge2/Triangle PWM modulation (with deadband)
+  BlockType: HitCross
+  MaskType: <empty>
+  ReferenceBlock: gmp_peripheral_utilities/Single Phase Half Bridge (Duty Model)/Triangle PWM modulation (with deadband)/Hit Crossing：ADC Sample Trigger Signal
+  Connectivity entry 1:
+    Port type: 1
+    Source: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/DC//AC Half Bridge2/Triangle PWM modulation (with deadband)/Mod
+  Connectivity entry 2:
+    Port type: 1
+    Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/DC//AC Half Bridge2/Triangle PWM modulation (with deadband)/Sample Trigger Output
+
+BLOCK: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/DC//AC Half Bridge2/Triangle PWM modulation (with deadband)/Sample Trigger Output
+  Parent: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/DC//AC Half Bridge2/Triangle PWM modulation (with deadband)
+  BlockType: Outport
+  MaskType: <empty>
+  ReferenceBlock: gmp_peripheral_utilities/Single Phase Half Bridge (Duty Model)/Triangle PWM modulation (with deadband)/Sample Trigger Output
+  Connectivity entry 1:
+    Port type: 1
+    Source: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/DC//AC Half Bridge2/Triangle PWM modulation (with deadband)/Hit Crossing：ADC Sample Trigger Signal
+
+BLOCK: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/DC//AC Half Bridge2/Sample Trigger Output
+  Parent: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/DC//AC Half Bridge2
+  BlockType: Outport
+  MaskType: <empty>
+  ReferenceBlock: gmp_peripheral_utilities/Single Phase Half Bridge (Duty Model)/Sample Trigger Output
+  Connectivity entry 1:
+    Port type: 1
+    Source: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/DC//AC Half Bridge2/Triangle PWM modulation (with deadband)
+
+BLOCK: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/Ideal Inductor Current Measurement Module（ADC - Current）/Sample Trigger
+  Parent: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/Ideal Inductor Current Measurement Module（ADC - Current）
+  BlockType: Inport
+  MaskType: <empty>
+  ReferenceBlock: <empty>
+  Connectivity entry 1:
+    Port type: 1
+    Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/Ideal Inductor Current Measurement Module（ADC - Current）/Sample
+
+BLOCK: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/Trig
+  Parent: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)
+  BlockType: Outport
+  MaskType: <empty>
+  ReferenceBlock: <empty>
+  Connectivity entry 1:
+    Port type: 1
+    Source: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)/From5
+
+Signal lines found: 0
+
+Goto blocks found: 0
+
+From blocks found: 0
+
+==================================================
+SEARCH TERM: IDC
+==================================================
+
+Blocks found: 0
+
+Signal lines found: 0
+
+Goto blocks found: 0
+
+From blocks found: 0
+
+==================================================
+SEARCH TERM: VDC
+==================================================
+
+Blocks found: 0
+
+Signal lines found: 0
+
+Goto blocks found: 0
+
+From blocks found: 0
+
+==================================================
+SEARCH TERM: RLOAD
+==================================================
+
+Blocks found: 0
+
+Signal lines found: 0
+
+Goto blocks found: 0
+
+From blocks found: 0
+
+==================================================
+SEARCH TERM: RL
+==================================================
+
+Blocks found: 0
+
+Signal lines found: 0
+
+Goto blocks found: 0
+
+From blocks found: 0
+
+
+==================================================
+MODEL TOP-LEVEL BLOCKS
+==================================================
+
+BLOCK: PGS_STD_SINV_MODEL_RLOAD_2022b/Bus
+Selector
+  BlockType: BusSelector
+  MaskType: <empty>
+
+BLOCK: PGS_STD_SINV_MODEL_RLOAD_2022b/Bus
+Selector2
+  BlockType: BusSelector
+  MaskType: <empty>
+
+BLOCK: PGS_STD_SINV_MODEL_RLOAD_2022b/Bus
+Selector3
+  BlockType: BusSelector
+  MaskType: <empty>
+
+BLOCK: PGS_STD_SINV_MODEL_RLOAD_2022b/Bus
+Selector4
+  BlockType: BusSelector
+  MaskType: <empty>
+
+BLOCK: PGS_STD_SINV_MODEL_RLOAD_2022b/Bus
+Selector5
+  BlockType: BusSelector
+  MaskType: <empty>
+
+BLOCK: PGS_STD_SINV_MODEL_RLOAD_2022b/Bus
+Selector6
+  BlockType: BusSelector
+  MaskType: <empty>
+
+BLOCK: PGS_STD_SINV_MODEL_RLOAD_2022b/Bus
+Selector7
+  BlockType: BusSelector
+  MaskType: <empty>
+
+BLOCK: PGS_STD_SINV_MODEL_RLOAD_2022b/Bus
+Selector8
+  BlockType: BusSelector
+  MaskType: <empty>
+
+BLOCK: PGS_STD_SINV_MODEL_RLOAD_2022b/Bus
+Selector9
+  BlockType: BusSelector
+  MaskType: <empty>
+
+BLOCK: PGS_STD_SINV_MODEL_RLOAD_2022b/Constant
+  BlockType: Constant
+  MaskType: <empty>
+
+BLOCK: PGS_STD_SINV_MODEL_RLOAD_2022b/Enable
+  BlockType: Scope
+  MaskType: <empty>
+
+BLOCK: PGS_STD_SINV_MODEL_RLOAD_2022b/From
+  BlockType: From
+  MaskType: <empty>
+
+BLOCK: PGS_STD_SINV_MODEL_RLOAD_2022b/From1
+  BlockType: From
+  MaskType: <empty>
+
+BLOCK: PGS_STD_SINV_MODEL_RLOAD_2022b/From10
+  BlockType: From
+  MaskType: <empty>
+
+BLOCK: PGS_STD_SINV_MODEL_RLOAD_2022b/From12
+  BlockType: From
+  MaskType: <empty>
+
+BLOCK: PGS_STD_SINV_MODEL_RLOAD_2022b/From13
+  BlockType: From
+  MaskType: <empty>
+
+BLOCK: PGS_STD_SINV_MODEL_RLOAD_2022b/From14
+  BlockType: From
+  MaskType: <empty>
+
+BLOCK: PGS_STD_SINV_MODEL_RLOAD_2022b/From19
+  BlockType: From
+  MaskType: <empty>
+
+BLOCK: PGS_STD_SINV_MODEL_RLOAD_2022b/From2
+  BlockType: From
+  MaskType: <empty>
+
+BLOCK: PGS_STD_SINV_MODEL_RLOAD_2022b/From20
+  BlockType: From
+  MaskType: <empty>
+
+BLOCK: PGS_STD_SINV_MODEL_RLOAD_2022b/From5
+  BlockType: From
+  MaskType: <empty>
+
+BLOCK: PGS_STD_SINV_MODEL_RLOAD_2022b/From6
+  BlockType: From
+  MaskType: <empty>
+
+BLOCK: PGS_STD_SINV_MODEL_RLOAD_2022b/From7
+  BlockType: From
+  MaskType: <empty>
+
+BLOCK: PGS_STD_SINV_MODEL_RLOAD_2022b/From8
+  BlockType: From
+  MaskType: <empty>
+
+BLOCK: PGS_STD_SINV_MODEL_RLOAD_2022b/From9
+  BlockType: From
+  MaskType: <empty>
+
+BLOCK: PGS_STD_SINV_MODEL_RLOAD_2022b/GMP Stanrdard Digital Power Controller Panel (SIL) Pro Edition
+  BlockType: SubSystem
+  MaskType: GMP SIL Core for single Motor Controller (full edition)
+
+BLOCK: PGS_STD_SINV_MODEL_RLOAD_2022b/Goto
+  BlockType: Goto
+  MaskType: <empty>
+
+BLOCK: PGS_STD_SINV_MODEL_RLOAD_2022b/Goto17
+  BlockType: Goto
+  MaskType: <empty>
+
+BLOCK: PGS_STD_SINV_MODEL_RLOAD_2022b/Goto18
+  BlockType: Goto
+  MaskType: <empty>
+
+BLOCK: PGS_STD_SINV_MODEL_RLOAD_2022b/Goto19
+  BlockType: Goto
+  MaskType: <empty>
+
+BLOCK: PGS_STD_SINV_MODEL_RLOAD_2022b/Goto5
+  BlockType: Goto
+  MaskType: <empty>
+
+BLOCK: PGS_STD_SINV_MODEL_RLOAD_2022b/Goto9
+  BlockType: Goto
+  MaskType: <empty>
+
+BLOCK: PGS_STD_SINV_MODEL_RLOAD_2022b/Load
+  BlockType: PMComponent
+  MaskType: Series RLC Branch
+
+BLOCK: PGS_STD_SINV_MODEL_RLOAD_2022b/Load1
+  BlockType: PMComponent
+  MaskType: Series RLC Branch
+
+BLOCK: PGS_STD_SINV_MODEL_RLOAD_2022b/Mux2
+  BlockType: Mux
+  MaskType: <empty>
+
+BLOCK: PGS_STD_SINV_MODEL_RLOAD_2022b/Scope 1
+  BlockType: Scope
+  MaskType: <empty>
+
+BLOCK: PGS_STD_SINV_MODEL_RLOAD_2022b/Scope 2
+  BlockType: Scope
+  MaskType: <empty>
+
+BLOCK: PGS_STD_SINV_MODEL_RLOAD_2022b/Scope 3
+  BlockType: Scope
+  MaskType: <empty>
+
+BLOCK: PGS_STD_SINV_MODEL_RLOAD_2022b/Scope 4
+  BlockType: Scope
+  MaskType: <empty>
+
+BLOCK: PGS_STD_SINV_MODEL_RLOAD_2022b/Scope 5
+  BlockType: Scope
+  MaskType: <empty>
+
+BLOCK: PGS_STD_SINV_MODEL_RLOAD_2022b/Scope 6
+  BlockType: Scope
+  MaskType: <empty>
+
+BLOCK: PGS_STD_SINV_MODEL_RLOAD_2022b/Scope 7
+  BlockType: Scope
+  MaskType: <empty>
+
+BLOCK: PGS_STD_SINV_MODEL_RLOAD_2022b/Scope 8
+  BlockType: Scope
+  MaskType: <empty>
+
+BLOCK: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)
+  BlockType: SubSystem
+  MaskType: Standard Single Phase DC/AC inverter / rectifier
+
+BLOCK: PGS_STD_SINV_MODEL_RLOAD_2022b/Voltage Source1
+  BlockType: SubSystem
+  MaskType: Controlled Voltage Source
+
+BLOCK: PGS_STD_SINV_MODEL_RLOAD_2022b/powergui
+  BlockType: SubSystem
+  MaskType: PSB option menu block
+
+
+==================================================
+TOP-LEVEL SIGNAL LINES
+==================================================
+
+Signal name: <empty>
+  Source: PGS_STD_SINV_MODEL_RLOAD_2022b/Load1
+  Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)
+
+Signal name: <empty>
+  Source: PGS_STD_SINV_MODEL_RLOAD_2022b/Voltage Source1
+  Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Load1
+
+Signal name: <empty>
+  Source: PGS_STD_SINV_MODEL_RLOAD_2022b/Load
+  Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)
+
+Signal name: <empty>
+  Source: PGS_STD_SINV_MODEL_RLOAD_2022b/Load
+  Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)
+
+Signal name: <empty>
+  Source: PGS_STD_SINV_MODEL_RLOAD_2022b/Constant
+  Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Voltage Source1
+
+Signal name: <empty>
+  Source: PGS_STD_SINV_MODEL_RLOAD_2022b/Voltage Source1
+  Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)
+
+Signal name: <empty>
+  Source: PGS_STD_SINV_MODEL_RLOAD_2022b/Mux2
+  Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)
+
+Signal name: <PWM CH2>
+  Source: PGS_STD_SINV_MODEL_RLOAD_2022b/Bus
+Selector
+  Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Mux2
+
+Signal name: <empty>
+  Source: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)
+  Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Goto
+
+Signal name: <empty>
+  Source: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)
+  Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Goto5
+
+Signal name: <Monitor CH16>
+  Source: PGS_STD_SINV_MODEL_RLOAD_2022b/Bus
+Selector9
+  Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Scope 8
+
+Signal name: <empty>
+  Source: PGS_STD_SINV_MODEL_RLOAD_2022b/From14
+  Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Bus
+Selector9
+
+Signal name: <Monitor CH15>
+  Source: PGS_STD_SINV_MODEL_RLOAD_2022b/Bus
+Selector9
+  Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Scope 8
+
+Signal name: <empty>
+  Source: PGS_STD_SINV_MODEL_RLOAD_2022b/From5
+  Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Bus
+Selector
+
+Signal name: <PWM CH1>
+  Source: PGS_STD_SINV_MODEL_RLOAD_2022b/Bus
+Selector
+  Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Mux2
+
+Signal name: <Monitor CH10>
+  Source: PGS_STD_SINV_MODEL_RLOAD_2022b/Bus
+Selector6
+  Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Scope 5
+
+Signal name: <Monitor CH12>
+  Source: PGS_STD_SINV_MODEL_RLOAD_2022b/Bus
+Selector7
+  Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Scope 6
+
+Signal name: <empty>
+  Source: PGS_STD_SINV_MODEL_RLOAD_2022b/From7
+  Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Bus
+Selector2
+
+Signal name: <Monitor CH8>
+  Source: PGS_STD_SINV_MODEL_RLOAD_2022b/Bus
+Selector5
+  Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Scope 4
+
+Signal name: <Monitor CH9>
+  Source: PGS_STD_SINV_MODEL_RLOAD_2022b/Bus
+Selector6
+  Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Scope 5
+
+Signal name: <empty>
+  Source: PGS_STD_SINV_MODEL_RLOAD_2022b/From8
+  Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Bus
+Selector6
+
+Signal name: <empty>
+  Source: PGS_STD_SINV_MODEL_RLOAD_2022b/From2
+  Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Bus
+Selector8
+
+Signal name: <empty>
+  Source: PGS_STD_SINV_MODEL_RLOAD_2022b/From9
+  Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Bus
+Selector5
+
+Signal name: <Monitor CH11>
+  Source: PGS_STD_SINV_MODEL_RLOAD_2022b/Bus
+Selector7
+  Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Scope 6
+
+Signal name: <Monitor CH5>
+  Source: PGS_STD_SINV_MODEL_RLOAD_2022b/Bus
+Selector4
+  Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Scope 3
+
+Signal name: <Monitor CH4>
+  Source: PGS_STD_SINV_MODEL_RLOAD_2022b/Bus
+Selector3
+  Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Scope 2
+
+Signal name: <Monitor CH13>
+  Source: PGS_STD_SINV_MODEL_RLOAD_2022b/Bus
+Selector8
+  Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Scope 7
+
+Signal name: <empty>
+  Source: PGS_STD_SINV_MODEL_RLOAD_2022b/From12
+  Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Bus
+Selector3
+
+Signal name: <Monitor CH7>
+  Source: PGS_STD_SINV_MODEL_RLOAD_2022b/Bus
+Selector5
+  Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Scope 4
+
+Signal name: <Monitor CH1>
+  Source: PGS_STD_SINV_MODEL_RLOAD_2022b/Bus
+Selector2
+  Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Scope 1
+
+Signal name: <empty>
+  Source: PGS_STD_SINV_MODEL_RLOAD_2022b/From13
+  Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Bus
+Selector7
+
+Signal name: <empty>
+  Source: PGS_STD_SINV_MODEL_RLOAD_2022b/From1
+  Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Bus
+Selector4
+
+Signal name: <Monitor CH3>
+  Source: PGS_STD_SINV_MODEL_RLOAD_2022b/Bus
+Selector3
+  Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Scope 2
+
+Signal name: <Monitor CH6>
+  Source: PGS_STD_SINV_MODEL_RLOAD_2022b/Bus
+Selector4
+  Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Scope 3
+
+Signal name: <Monitor CH2>
+  Source: PGS_STD_SINV_MODEL_RLOAD_2022b/Bus
+Selector2
+  Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Scope 1
+
+Signal name: <Monitor CH14>
+  Source: PGS_STD_SINV_MODEL_RLOAD_2022b/Bus
+Selector8
+  Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Scope 7
+
+Signal name: <empty>
+  Source: PGS_STD_SINV_MODEL_RLOAD_2022b/From
+  Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Enable
+
+Signal name: <empty>
+  Source: PGS_STD_SINV_MODEL_RLOAD_2022b/From
+  Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)
+
+Signal name: <empty>
+  Source: PGS_STD_SINV_MODEL_RLOAD_2022b/From
+  Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Single Phase DC//AC Full Bridge Inverter, LC Filter (GMP STD MDL)
+  Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Enable
+
+Signal name: <empty>
+  Source: PGS_STD_SINV_MODEL_RLOAD_2022b/From20
+  Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/GMP Stanrdard Digital Power Controller Panel (SIL) Pro Edition
+
+Signal name: <empty>
+  Source: PGS_STD_SINV_MODEL_RLOAD_2022b/GMP Stanrdard Digital Power Controller Panel (SIL) Pro Edition
+  Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Goto18
+
+Signal name: <empty>
+  Source: PGS_STD_SINV_MODEL_RLOAD_2022b/GMP Stanrdard Digital Power Controller Panel (SIL) Pro Edition
+  Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Goto9
+
+Signal name: <empty>
+  Source: PGS_STD_SINV_MODEL_RLOAD_2022b/GMP Stanrdard Digital Power Controller Panel (SIL) Pro Edition
+  Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Goto19
+
+Signal name: <empty>
+  Source: PGS_STD_SINV_MODEL_RLOAD_2022b/From6
+  Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/GMP Stanrdard Digital Power Controller Panel (SIL) Pro Edition
+
+Signal name: <empty>
+  Source: PGS_STD_SINV_MODEL_RLOAD_2022b/GMP Stanrdard Digital Power Controller Panel (SIL) Pro Edition
+  Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/Goto17
+
+Signal name: <empty>
+  Source: PGS_STD_SINV_MODEL_RLOAD_2022b/From10
+  Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/GMP Stanrdard Digital Power Controller Panel (SIL) Pro Edition
+
+Signal name: <empty>
+  Source: PGS_STD_SINV_MODEL_RLOAD_2022b/From19
+  Destination: PGS_STD_SINV_MODEL_RLOAD_2022b/GMP Stanrdard Digital Power Controller Panel (SIL) Pro Edition

@@ -2,8 +2,10 @@ function configure_sinv_models()
 %CONFIGURE_SINV_MODELS Bind all SINV commissioning plants to generated SDPE data.
 
 root = fileparts(mfilename('fullpath'));
-models = {'PGS_STD_SINV_MODEL_RLOAD', 'PGS_STD_SINV_MODEL_Grid', ...
-          'PGS_STD_SINV_MODEL_Rectifier'};
+base_models = {'PGS_STD_SINV_MODEL_RLOAD', 'PGS_STD_SINV_MODEL_Grid', ...
+               'PGS_STD_SINV_MODEL_Rectifier'};
+models = cellfun(@(name) resolve_sinv_model(root, name), base_models, ...
+    'UniformOutput', false);
 common_init = 'sdpe_pgs_sinv_rc_common_settings_matlab_init.m';
 simulate_init = 'sdpe_pgs_sinv_rc_simulate_settings_matlab_init.m';
 callback = [ ...
@@ -22,6 +24,7 @@ run(fullfile(root, 'sdpe_mgr', simulate_init));
 
 for k = 1:numel(models)
     model = models{k};
+    base_model = base_models{k};
     load_system(fullfile(root, [model '.slx']));
     set_param(model, 'PreLoadFcn', '', 'PostLoadFcn', callback, ...
         'InitFcn', callback, ...
@@ -34,12 +37,12 @@ for k = 1:numel(models)
     if getSimulinkBlockHandle([model '/Constant']) ~= -1
         set_param([model '/Constant'], 'Value', 'CTRL_DCBUS_VOLTAGE');
     end
-    if strcmp(model, 'PGS_STD_SINV_MODEL_RLOAD')
+    if strcmp(base_model, 'PGS_STD_SINV_MODEL_RLOAD')
         set_param([model '/Load'], 'BranchType', 'R', 'Resistance', 'SINV_RLOAD_OHM');
         set_param(model, 'StopTime', '2.0');
     else
-        install_grid_source(model);
-        if strcmp(model, 'PGS_STD_SINV_MODEL_Grid')
+        install_grid_source(model, models{1}, root);
+        if strcmp(base_model, 'PGS_STD_SINV_MODEL_Grid')
             set_param(model, 'StopTime', '3.0');
         else
             set_param([model '/Load1'], 'BranchType', 'R', 'Resistance', 'SINV_RECTIFIER_RLOAD_OHM');
@@ -130,7 +133,7 @@ mask.Display = sprintf(['disp(''GMP STD SINV/AFE\\nSDPE configured'');\n' ...
     'port_label(''output'',1,''ADC bus''); port_label(''output'',2,''Sample'');']);
 end
 
-function install_grid_source(model)
+function install_grid_source(model, rload_model, root)
 load_block = [model '/Load'];
 source = [model '/Grid Voltage Source'];
 sine = [model '/Grid Voltage Command'];
@@ -152,8 +155,13 @@ pos = get_param(load_block, 'Position');
 delete_block(load_block);
 template = [model '/Voltage Source1'];
 if getSimulinkBlockHandle(template) == -1
-    load_system('PGS_STD_SINV_MODEL_RLOAD');
-    template = 'PGS_STD_SINV_MODEL_RLOAD/Voltage Source1';
+    close_template = false;
+    if ~bdIsLoaded(rload_model)
+        load_system(fullfile(root, [rload_model '.slx']));
+        close_template = true;
+    end
+    template_cleanup = onCleanup(@() close_template_model(rload_model, close_template)); %#ok<NASGU>
+    template = [rload_model '/Voltage Source1'];
 end
 add_block(template, source, 'Position', pos);
 source_ph = get_param(source, 'PortHandles');
@@ -168,6 +176,12 @@ add_block('simulink/Sources/Sine Wave', sine, ...
 sine_ph = get_param(sine, 'PortHandles');
 source_ph = get_param(source, 'PortHandles');
 add_line(model, sine_ph.Outport(1), source_ph.Inport(1), 'autorouting', 'on');
+end
+
+function close_template_model(model, should_close)
+if should_close && bdIsLoaded(model)
+    close_system(model, 0);
+end
 end
 
 function add_group(mask, name)

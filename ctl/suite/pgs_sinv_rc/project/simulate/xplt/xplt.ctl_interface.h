@@ -10,6 +10,7 @@ typedef enum _tag_sinv_adc_index_items {
     SINV_ADC_ID_IAC = 0,
     SINV_ADC_ID_VBUS = 2,
     SINV_ADC_ID_VAC = 4,
+    SINV_ADC_ID_ILOAD = 5,
     SINV_ADC_SENSOR_NUMBER = 6
 } sinv_adc_index_items;
 extern fast_gt g_sinv_sim_enable_pending;
@@ -19,6 +20,10 @@ GMP_STATIC_INLINE void ctl_input_callback(void)
     ctl_step_adc_channel(&adc_v_bus, simulink_rx_buffer.adc_result[SINV_ADC_ID_VBUS]);
     ctl_step_adc_channel(&adc_v_grid, simulink_rx_buffer.adc_result[SINV_ADC_ID_VAC]);
     ctl_step_adc_channel(&adc_i_ac, simulink_rx_buffer.adc_result[SINV_ADC_ID_IAC]);
+#ifdef SINV_2023A_SINGLE_MODE_ACTIVE
+    ctl_step_adc_channel(&adc_i_load,
+        simulink_rx_buffer.adc_result[SINV_ADC_ID_ILOAD]);
+#endif
 }
 
 GMP_STATIC_INLINE void ctl_output_callback(void)

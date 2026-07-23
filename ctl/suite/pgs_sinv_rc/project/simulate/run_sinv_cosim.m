@@ -5,7 +5,7 @@ arguments
     stop_time (1,1) double {mustBePositive} = NaN
 end
 root = fileparts(mfilename('fullpath'));
-model = model_for_level(build_level);
+model = resolve_sinv_model(root, model_for_level(build_level));
 exe = fullfile(root, 'x64', 'Debug', 'Motor_Control_Suite_SIL_Env.exe');
 if ~isfile(exe)
     error('SINV:SILExecutableMissing', 'Build Debug|x64 first: %s', exe);

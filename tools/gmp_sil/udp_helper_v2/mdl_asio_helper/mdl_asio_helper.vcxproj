@@ -44,7 +44,7 @@
     <OutDir>$(SolutionDir)bin\$(Platform)\$(Configuration)\</OutDir>
     <EmbedManifest>false</EmbedManifest>
     <IntDir>$(ProjectDir)build\$(Platform)\$(Configuration)\</IntDir>
-    <MatlabRoot>C:\Program Files\MATLAB\R2024b\</MatlabRoot>
+    <MatlabRoot>D:\MATLAB2024\</MatlabRoot>
     <Matlab_IncludePath>$(MatlabRoot)extern\include\;$(MatlabRoot)simulink\include\</Matlab_IncludePath>
     <Matlab_LibraryPath>$(MatlabRoot)extern\lib\win64\microsoft\</Matlab_LibraryPath>
     <Matlab_Dependencies>libmx.lib;libmex.lib;libmat.lib;libMatlabDataArray.lib;libMatlabEngine.lib</Matlab_Dependencies>
@@ -57,7 +57,7 @@
     <OutDir>$(SolutionDir)bin\$(Platform)\$(Configuration)\</OutDir>
     <EmbedManifest>false</EmbedManifest>
     <IntDir>$(ProjectDir)build\$(Platform)\$(Configuration)\</IntDir>
-    <MatlabRoot>C:\Program Files\MATLAB\R2024b\</MatlabRoot>
+    <MatlabRoot>D:\MATLAB2024\</MatlabRoot>
     <Matlab_IncludePath>$(MatlabRoot)extern\include\;$(MatlabRoot)simulink\include\</Matlab_IncludePath>
     <Matlab_LibraryPath>$(MatlabRoot)extern\lib\win64\microsoft\</Matlab_LibraryPath>
     <Matlab_Dependencies>libmx.lib;libmex.lib;libmat.lib;libMatlabDataArray.lib;libMatlabEngine.lib</Matlab_Dependencies>

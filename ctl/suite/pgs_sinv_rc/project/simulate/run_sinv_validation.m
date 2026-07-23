@@ -7,12 +7,13 @@ arguments
 end
 root = fileparts(mfilename('fullpath'));
 if build_level <= 2
-    model = 'PGS_STD_SINV_MODEL_RLOAD';
+    base_model = 'PGS_STD_SINV_MODEL_RLOAD';
 elseif build_level <= 4
-    model = 'PGS_STD_SINV_MODEL_Grid';
+    base_model = 'PGS_STD_SINV_MODEL_Grid';
 else
-    model = 'PGS_STD_SINV_MODEL_Rectifier';
+    base_model = 'PGS_STD_SINV_MODEL_Rectifier';
 end
+model = resolve_sinv_model(root, base_model);
 exe = fullfile(root, 'x64', 'Debug', 'Motor_Control_Suite_SIL_Env.exe');
 header = fileread(fullfile(root, 'sdpe_mgr', 'sdpe_pgs_sinv_rc_simulate_settings.h'));
 token = regexp(header, '#define\s+BUILD_LEVEL\s+\((\d)\)', 'tokens', 'once');

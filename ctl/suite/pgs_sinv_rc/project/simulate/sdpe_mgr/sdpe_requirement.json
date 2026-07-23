@@ -180,7 +180,7 @@
       "role": "2023a_load_current_ff_gain",
       "macro": "SINV_2023A_LOAD_CURRENT_FF_GAIN",
       "binding": {
-        "float": "1.0"
+        "float": "1.02"
       },
       "description": "Gain applied to measured load-current peak PU before adding it to the 2023A inductor-current reference."
     },
