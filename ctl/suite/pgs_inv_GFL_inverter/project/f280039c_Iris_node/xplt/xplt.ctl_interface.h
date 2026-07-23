@@ -112,7 +112,7 @@ GMP_STATIC_INLINE void ctl_output_callback(void)
 #elif BUILD_LEVEL == 2
 
     DAC_setShadowValue(IRIS_DACA_BASE, inv_ctrl.vab0.dat[phase_A] * 2048 + 2048);
-    DAC_setShadowValue(IRIS_DACB_BASE, inv_ctrl.pll.srf_pll.phasor.dat[phasor_cos] * 2048 + 2048);
+    DAC_setShadowValue(IRIS_DACB_BASE, inv_ctrl.pll.phasor.dat[phasor_cos] * 2048 + 2048);
 
 #elif BUILD_LEVEL == 3
 

@@ -95,12 +95,12 @@ extern "C"
 /**
  * @brief Rated and nominal DC-bus voltage.
  */
-#define CTRL_DCBUS_VOLTAGE (60.0f)
+#define CTRL_DCBUS_VOLTAGE (72.0f)
 
 /**
  * @brief Nominal grid/load RMS voltage.
  */
-#define CTRL_GRID_VOLTAGE_RMS (24.0f)
+#define CTRL_GRID_VOLTAGE_RMS (36.0f)
 
 /**
  * @brief Rated RMS AC current.
@@ -110,7 +110,7 @@ extern "C"
 /**
  * @brief Peak voltage PU base.
  */
-#define CTRL_VOLTAGE_BASE (34.0f)
+#define CTRL_VOLTAGE_BASE (50.9117f)
 
 /**
  * @brief Peak current PU base.
@@ -150,7 +150,7 @@ extern "C"
 /**
  * @brief DC-side load for level 5. At 60 V this draws 120 W, within the configured converter current rating.
  */
-#define SINV_RECTIFIER_RLOAD_OHM (30.0f)
+#define SINV_RECTIFIER_RLOAD_OHM (43.2f)
 
 /**
  * @brief AC voltage sensor sensitivity in V/V.

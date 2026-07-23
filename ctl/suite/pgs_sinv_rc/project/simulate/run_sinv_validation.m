@@ -67,13 +67,18 @@ metrics = struct('build_level', build_level, 'model', model, ...
     'active_errors_final', double(active_errors.Data(end)), ...
     'diverge_fault_value', double(diverge_fault.Data(end)), ...
     'vac_rms_v', tail_rms(vac, tail), 'iac_rms_a', tail_rms(iac, tail), ...
-    'vbus_mean_v', tail_mean(vbus, tail), 'iref_rms_a', tail_rms(iref, tail), ...
+    'vbus_mean_v', tail_mean(vbus, tail), ...
+    'vbus_pp_v', tail_peak_to_peak(vbus, tail), ...
+    'vbus_ripple_percent', 100 * tail_peak_to_peak(vbus, tail) / max(abs(tail_mean(vbus, tail)), eps), ...
+    'iref_rms_a', tail_rms(iref, tail), ...
     'current_error_rms_pu', tail_rms(error, tail), ...
     'active_power_pu', tail_mean(p_pu, tail), 'reactive_power_pu', tail_mean(q_pu, tail), ...
     'pll_frequency_hz', tail_mean(pll_hz, tail), ...
     'fdrc_enabled_final', double(fdrc_enabled.Data(end)), ...
     'fdrc_output_rms_pu', tail_rms(fdrc, tail), ...
-    'iac_thd_percent', signal_thd(iac, tail, 50.0));
+    'iac_thd_percent', signal_thd(iac, tail, 50.0), ...
+    'iac_cycle_rms_cv', cycle_rms_cv(iac, tail, 50.0), ...
+    'oscillation_detected', cycle_rms_cv(iac, tail, 50.0) > 0.02);
 
 result_dir = fullfile(root, 'validation');
 if ~isfolder(result_dir), mkdir(result_dir); end
@@ -114,6 +119,39 @@ end
 
 function value = tail_rms(series, start_time)
 d = double(series.Data(series.Time >= start_time,:)); value = sqrt(mean(d.^2,'all'));
+end
+
+function value = tail_peak_to_peak(series, start_time)
+d = double(series.Data(series.Time >= start_time,:)); value = max(d, [], 'all') - min(d, [], 'all');
+end
+
+function value = cycle_rms_cv(series, start_time, fundamental)
+% Compare RMS values in complete fundamental cycles. A stable sinusoidal
+% current has nearly identical cycle RMS values; a >2%% coefficient of
+% variation is reported as a sustained oscillation by the caller.
+t = double(series.Time(:)); x = double(series.Data(:));
+keep = t >= start_time;
+t = t(keep); x = x(keep);
+if numel(t) < 4
+    value = NaN;
+    return;
+end
+period = 1 / fundamental;
+cycles = floor((t(end) - t(1)) / period);
+if cycles < 2
+    value = NaN;
+    return;
+end
+rms_values = zeros(cycles, 1);
+for k = 1:cycles
+    mask = t >= t(1) + (k - 1) * period & t < t(1) + k * period;
+    if nnz(mask) < 2
+        value = NaN;
+        return;
+    end
+    rms_values(k) = sqrt(mean(x(mask).^2));
+end
+value = std(rms_values) / max(mean(rms_values), eps);
 end
 
 function thd_percent = signal_thd(series, start_time, fundamental)

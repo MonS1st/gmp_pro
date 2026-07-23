@@ -104,7 +104,7 @@
       "role": "dc_bus",
       "macro": "CTRL_DCBUS_VOLTAGE",
       "binding": {
-        "float": "60.0"
+        "float": "72.0"
       },
       "description": "Rated and nominal DC-bus voltage."
     },
@@ -112,7 +112,7 @@
       "role": "grid_rms",
       "macro": "CTRL_GRID_VOLTAGE_RMS",
       "binding": {
-        "float": "24.0"
+        "float": "36.0"
       },
       "description": "Nominal grid/load RMS voltage."
     },
@@ -128,7 +128,7 @@
       "role": "voltage_base",
       "macro": "CTRL_VOLTAGE_BASE",
       "binding": {
-        "float": "34.0"
+        "float": "50.9117"
       },
       "description": "Peak voltage PU base."
     },
@@ -192,7 +192,7 @@
       "role": "rectifier_load_r",
       "macro": "SINV_RECTIFIER_RLOAD_OHM",
       "binding": {
-        "float": "30.0"
+        "float": "43.2"
       },
       "description": "DC-side load for level 5. At 60 V this draws 120 W, within the configured converter current rating."
     },

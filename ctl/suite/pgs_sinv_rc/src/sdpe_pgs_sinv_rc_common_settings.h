@@ -138,7 +138,7 @@ extern "C"
 /**
  * @brief Plant-delay compensation in controller samples.
  */
-#define SINV_FDRC_LEAD_STEPS (3.0f)
+#define SINV_FDRC_LEAD_STEPS (3.5f)
 
 /**
  * @brief Current-error threshold above which RC learning is frozen.
@@ -183,7 +183,7 @@ extern "C"
 /**
  * @brief BUILD_LEVEL 5 physical DC bus voltage target.
  */
-#define SINV_DC_BUS_REF_V (60.0f)
+#define SINV_DC_BUS_REF_V (72.0f)
 
 /**
  * @brief DC-bus outer-loop proportional gain.

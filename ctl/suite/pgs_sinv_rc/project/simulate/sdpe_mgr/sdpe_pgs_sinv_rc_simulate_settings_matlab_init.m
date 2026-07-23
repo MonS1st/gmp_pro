@@ -49,16 +49,16 @@ CTRL_ADC_RESOLUTION = 12;
 CTRL_ADC_VOLTAGE_REF = 3.3;
 
 % Rated and nominal DC-bus voltage.
-CTRL_DCBUS_VOLTAGE = 60.0;
+CTRL_DCBUS_VOLTAGE = 72.0;
 
 % Nominal grid/load RMS voltage.
-CTRL_GRID_VOLTAGE_RMS = 24.0;
+CTRL_GRID_VOLTAGE_RMS = 36.0;
 
 % Rated RMS AC current.
 CTRL_RATED_CURRENT_RMS = 10.0;
 
 % Peak voltage PU base.
-CTRL_VOLTAGE_BASE = 34.0;
+CTRL_VOLTAGE_BASE = 50.9117;
 
 % Peak current PU base.
 CTRL_CURRENT_BASE = 14.14;
@@ -82,7 +82,7 @@ SINV_DC_CAPACITANCE_F = 2200e-6;
 SINV_RLOAD_OHM = 12.0;
 
 % DC-side load for level 5. At 60 V this draws 120 W, within the configured converter current rating.
-SINV_RECTIFIER_RLOAD_OHM = 30.0;
+SINV_RECTIFIER_RLOAD_OHM = 43.2;
 
 % AC voltage sensor sensitivity in V/V.
 CTRL_AC_VOLTAGE_SENSITIVITY = 0.020;

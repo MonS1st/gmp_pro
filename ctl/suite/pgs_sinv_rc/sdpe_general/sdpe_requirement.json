@@ -165,7 +165,7 @@
       "role": "fdrc_lead",
       "macro": "SINV_FDRC_LEAD_STEPS",
       "binding": {
-        "float": "3.0"
+        "float": 3.5
       },
       "description": "Plant-delay compensation in controller samples."
     },
@@ -237,7 +237,7 @@
       "role": "bus_ref",
       "macro": "SINV_DC_BUS_REF_V",
       "binding": {
-        "float": "60.0"
+        "float": "72.0"
       },
       "description": "BUILD_LEVEL 5 physical DC bus voltage target."
     },

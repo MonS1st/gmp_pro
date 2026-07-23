@@ -38,13 +38,14 @@
       "enabled": true,
       "value": "(3)",
       "options": [
+        "(0)",
         "(1)",
         "(2)",
         "(3)",
         "(4)",
         "(5)"
       ],
-      "description": "Incremental control level; level 5 enables the cascaded P/Q power loop."
+      "description": "Incremental control level; level 0 runs the PLL only and level 5 enables the cascaded P/Q power loop."
     },
     {
       "group": "Sampling",

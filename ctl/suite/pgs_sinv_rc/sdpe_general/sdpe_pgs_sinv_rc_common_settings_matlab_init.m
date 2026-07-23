@@ -75,7 +75,7 @@ SINV_FDRC_LEARNING_GAIN = 0.10;
 SINV_FDRC_Q_FILTER_HZ = 1000.0;
 
 % Plant-delay compensation in controller samples.
-SINV_FDRC_LEAD_STEPS = 3.0;
+SINV_FDRC_LEAD_STEPS = 3.5;
 
 % Current-error threshold above which RC learning is frozen.
 SINV_FDRC_FREEZE_ERROR_PU = 0.05;
@@ -102,7 +102,7 @@ SINV_POWER_LOOP_KP = 0.6;
 SINV_POWER_LOOP_KI = 8.0;
 
 % BUILD_LEVEL 5 physical DC bus voltage target.
-SINV_DC_BUS_REF_V = 60.0;
+SINV_DC_BUS_REF_V = 72.0;
 
 % DC-bus outer-loop proportional gain.
 SINV_DC_BUS_LOOP_KP = 0.8;

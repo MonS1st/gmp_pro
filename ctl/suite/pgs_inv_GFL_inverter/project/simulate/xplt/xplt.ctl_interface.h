@@ -61,8 +61,8 @@ GMP_STATIC_INLINE void ctl_input_callback(void)
     iuvw_src[phase_V] = 0;
     iuvw_src[phase_W] = 0;
 
-    udc_src = simulink_rx_buffer.adc_result[INV_ADC_ID_IDC];
-    idc_src = simulink_rx_buffer.adc_result[INV_ADC_ID_VDC];
+    udc_src = simulink_rx_buffer.adc_result[INV_ADC_ID_VDC];
+    idc_src = simulink_rx_buffer.adc_result[INV_ADC_ID_IDC];
 
     // invoke ADC p.u. routine
     ctl_step_tri_ptr_adc_channel(&iabc);
@@ -112,9 +112,13 @@ GMP_STATIC_INLINE void ctl_output_callback(void)
     simulink_tx_buffer.monitor[9] = inv_ctrl.pll.phasor.dat[phasor_cos];
 #endif // USING_DSOGI_PLL
 
-    // Scope 6
-    simulink_tx_buffer.monitor[10] = inv_ctrl.idq.dat[phase_d];
-    simulink_tx_buffer.monitor[11] = inv_ctrl.idq.dat[phase_q];
+    // Scope 6: PLL frequency (p.u.) and lock flag.
+#ifdef USING_DSOGI_PLL
+    simulink_tx_buffer.monitor[10] = inv_ctrl.pll.srf_pll.freq_pu;
+#else
+    simulink_tx_buffer.monitor[10] = inv_ctrl.pll.freq_pu;
+#endif // USING_DSOGI_PLL
+    simulink_tx_buffer.monitor[11] = ctl_check_pll_locked();
 
     // Scope 7
     simulink_tx_buffer.monitor[12] = inv_ctrl.vdq.dat[phase_d];

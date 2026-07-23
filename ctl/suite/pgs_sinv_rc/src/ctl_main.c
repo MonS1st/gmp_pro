@@ -8,6 +8,7 @@
 
 #include "ctl_main.h"
 
+#include "user_main.h"
 //=================================================================================================
 // global controller variables
 
@@ -76,7 +77,7 @@ void ctl_init(void)
     rc_init.fdrc_min_freq = CTRL_FDRC_MIN_FREQ;
     rc_init.fdrc_gain = SINV_FDRC_LEARNING_GAIN;
     rc_init.fdrc_q_fc = SINV_FDRC_Q_FILTER_HZ;
-    rc_init.fdrc_lead_steps = SINV_FDRC_LEAD_STEPS;
+    rc_init.fdrc_lead_steps = 3;
     rc_init.err_threshold = SINV_FDRC_FREEZE_ERROR_PU;
 
     ctl_auto_tuning_sinv_rc(&rc_init);

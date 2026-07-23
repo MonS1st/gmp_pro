@@ -159,7 +159,7 @@ extern "C"
 /**
  * @brief BUILD_LEVEL 3 grid-connected d-axis current command.
  */
-#define GFL_CURRENT_LEVEL3_ID_PU (0.1f)
+#define GFL_CURRENT_LEVEL3_ID_PU (0.05f)
 
 /**
  * @brief BUILD_LEVEL 3 grid-connected q-axis current command.
