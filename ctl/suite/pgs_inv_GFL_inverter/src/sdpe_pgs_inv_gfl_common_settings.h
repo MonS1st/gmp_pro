@@ -102,6 +102,11 @@ extern "C"
 #define GFL_PQ_LOOP_DIVIDER ((uint32_t)(CONTROLLER_FREQUENCY / GFL_PQ_LOOP_FREQUENCY_HZ))
 
 /**
+ * @brief Maximum d/q current-reference slew rate during grid connection.
+ */
+#define GFL_CURRENT_REF_SLEW_PU_S (0.5f)
+
+/**
  * @brief Active-power loop proportional gain from P error PU to d-axis current PU.
  */
 #define GFL_PQ_ACTIVE_KP (0.75f)
@@ -129,7 +134,7 @@ extern "C"
 /**
  * @brief Default active-power reference. Positive power exports energy to the grid.
  */
-#define GFL_ACTIVE_POWER_REF_PU (0.1f)
+#define GFL_ACTIVE_POWER_REF_PU (0.0f)
 
 /**
  * @brief Default reactive-power reference using Q = vq*id - vd*iq.
@@ -139,22 +144,22 @@ extern "C"
 /**
  * @brief BUILD_LEVEL 1 d-axis open-loop voltage command.
  */
-#define GFL_OPEN_LOOP_VD_PU (0.6f)
+#define GFL_OPEN_LOOP_VD_PU (0.05f)
 
 /**
  * @brief BUILD_LEVEL 1 q-axis open-loop voltage command.
  */
-#define GFL_OPEN_LOOP_VQ_PU (0.6f)
+#define GFL_OPEN_LOOP_VQ_PU (0.0f)
 
 /**
  * @brief BUILD_LEVEL 2 d-axis current command.
  */
-#define GFL_CURRENT_LEVEL2_ID_PU (0.1f)
+#define GFL_CURRENT_LEVEL2_ID_PU (0.05f)
 
 /**
  * @brief BUILD_LEVEL 2 q-axis current command.
  */
-#define GFL_CURRENT_LEVEL2_IQ_PU (0.1f)
+#define GFL_CURRENT_LEVEL2_IQ_PU (0.0f)
 
 /**
  * @brief BUILD_LEVEL 3 grid-connected d-axis current command.
@@ -169,12 +174,12 @@ extern "C"
 /**
  * @brief BUILD_LEVEL 4 d-axis current command.
  */
-#define GFL_CURRENT_LEVEL4_ID_PU (0.6f)
+#define GFL_CURRENT_LEVEL4_ID_PU (0.05f)
 
 /**
  * @brief BUILD_LEVEL 4 q-axis current command.
  */
-#define GFL_CURRENT_LEVEL4_IQ_PU (0.6f)
+#define GFL_CURRENT_LEVEL4_IQ_PU (0.0f)
 
 /**
  * @brief ADC offset calibrator filter cutoff frequency.

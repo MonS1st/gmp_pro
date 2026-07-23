@@ -87,50 +87,53 @@ GMP_STATIC_INLINE void ctl_output_callback(void)
     // monitor
     //
 
-    // Scope 1
+    // Common monitor layout:
+    // [Ia, Ib, Ic, I0, Id, Iq, Id_ref, Iq_ref, Vd_grid, Vq_grid,
+    //  Vd_cmd, Vq_cmd, PLL_error, PLL_frequency, level_specific_0,
+    //  level_specific_1].
     simulink_tx_buffer.monitor[0] = inv_ctrl.iabc.dat[phase_A];
     simulink_tx_buffer.monitor[1] = inv_ctrl.iabc.dat[phase_B];
-
-    // Scope 2
-    simulink_tx_buffer.monitor[2] = inv_ctrl.iabc.dat[phase_A];
-    simulink_tx_buffer.monitor[3] = 0;
-
-    // Scope 3
-    simulink_tx_buffer.monitor[4] = inv_ctrl.vab0.dat[phase_alpha];
-    simulink_tx_buffer.monitor[5] = inv_ctrl.vab0.dat[phase_beta];
-
-    // Scope 4
-    simulink_tx_buffer.monitor[6] = ctl_get_gfl_pll_error(&inv_ctrl);
-    simulink_tx_buffer.monitor[7] = inv_ctrl.angle;
-
-    // Scope 5
+    simulink_tx_buffer.monitor[2] = inv_ctrl.iabc.dat[phase_C];
+    simulink_tx_buffer.monitor[3] = inv_ctrl.iab0.dat[phase_0];
+    simulink_tx_buffer.monitor[4] = inv_ctrl.idq.dat[phase_d];
+    simulink_tx_buffer.monitor[5] = inv_ctrl.idq.dat[phase_q];
+    simulink_tx_buffer.monitor[6] = inv_ctrl.idq_set.dat[phase_d];
+    simulink_tx_buffer.monitor[7] = inv_ctrl.idq_set.dat[phase_q];
+    simulink_tx_buffer.monitor[8] = inv_ctrl.vdq.dat[phase_d];
+    simulink_tx_buffer.monitor[9] = inv_ctrl.vdq.dat[phase_q];
+    simulink_tx_buffer.monitor[10] = inv_ctrl.vdq_out_comp.dat[phase_d];
+    simulink_tx_buffer.monitor[11] = inv_ctrl.vdq_out_comp.dat[phase_q];
+    simulink_tx_buffer.monitor[12] = ctl_get_gfl_pll_error(&inv_ctrl);
 #ifdef USING_DSOGI_PLL
-    simulink_tx_buffer.monitor[8] = inv_ctrl.pll.srf_pll.phasor.dat[phasor_sin];
-    simulink_tx_buffer.monitor[9] = inv_ctrl.pll.srf_pll.phasor.dat[phasor_cos];
+    simulink_tx_buffer.monitor[13] = inv_ctrl.pll.srf_pll.freq_pu;
 #else
-    simulink_tx_buffer.monitor[8] = inv_ctrl.pll.phasor.dat[phasor_sin];
-    simulink_tx_buffer.monitor[9] = inv_ctrl.pll.phasor.dat[phasor_cos];
+    simulink_tx_buffer.monitor[13] = inv_ctrl.pll.freq_pu;
 #endif // USING_DSOGI_PLL
-
-    // Scope 6: PLL frequency (p.u.) and lock flag.
-#ifdef USING_DSOGI_PLL
-    simulink_tx_buffer.monitor[10] = inv_ctrl.pll.srf_pll.freq_pu;
-#else
-    simulink_tx_buffer.monitor[10] = inv_ctrl.pll.freq_pu;
-#endif // USING_DSOGI_PLL
-    simulink_tx_buffer.monitor[11] = ctl_check_pll_locked();
-
-    // Scope 7
-    simulink_tx_buffer.monitor[12] = inv_ctrl.vdq.dat[phase_d];
-    simulink_tx_buffer.monitor[13] = inv_ctrl.vdq.dat[phase_q];
+#if BUILD_LEVEL == 0
+    simulink_tx_buffer.monitor[14] = inv_ctrl.angle;
+    simulink_tx_buffer.monitor[15] = ctl_check_pll_locked();
+#elif BUILD_LEVEL == 1
+    simulink_tx_buffer.monitor[14] = inv_ctrl.angle;
+    simulink_tx_buffer.monitor[15] = inv_ctrl.flag_enable_system;
+#elif BUILD_LEVEL == 2
+    simulink_tx_buffer.monitor[14] = ctl_check_pll_locked();
+    simulink_tx_buffer.monitor[15] = inv_ctrl.flag_enable_system;
+#elif BUILD_LEVEL == 3
+    simulink_tx_buffer.monitor[14] = neg_current_ctrl.idqn.dat[phase_d];
+    simulink_tx_buffer.monitor[15] = neg_current_ctrl.idqn.dat[phase_q];
+#elif BUILD_LEVEL == 4
+    simulink_tx_buffer.monitor[14] = inv_ctrl.vdq_ff_external.dat[phase_d];
+    simulink_tx_buffer.monitor[15] = inv_ctrl.vdq_ff_decouple.dat[phase_d];
+#elif BUILD_LEVEL == 5
+    simulink_tx_buffer.monitor[14] = pq_ctrl.pq_meas.dat[0];
+    simulink_tx_buffer.monitor[15] = pq_ctrl.pq_meas.dat[1];
+#endif // BUILD_LEVEL
 }
 
 // Enable Motor Controller
 // Enable Output
 GMP_STATIC_INLINE void ctl_fast_enable_output()
 {
-    ctl_enable_gfl_inv(&inv_ctrl);
-
     csp_sl_enable_output();
 
     // The host simulation CSP owns the physical-output state.

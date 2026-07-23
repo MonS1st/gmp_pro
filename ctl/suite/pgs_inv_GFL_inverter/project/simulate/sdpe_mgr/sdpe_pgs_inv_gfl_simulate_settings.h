@@ -34,8 +34,7 @@ extern "C"
  */
 
 /**
- * @brief Incremental control level; level 0 runs the PLL only and level 5
- *        enables the cascaded P/Q power loop.
+ * @brief Incremental control level; level 0 runs the PLL only and level 5 enables the cascaded P/Q power loop.
  *        Options: (0), (1), (2), (3), (4), (5)
  */
 #define BUILD_LEVEL (0)
@@ -52,10 +51,10 @@ extern "C"
 #define GFL_CURRENT_SAMPLE_PHASE_MODE (3)
 
 /**
- * @brief Simulation supplies two independent phase-voltage samples.
- *        Options: (2), (3)
+ * @brief Simulation supplies two independent line-voltage samples Uab/Ubc.
+ *        Options: (1), (2), (3)
  */
-#define GFL_VOLTAGE_SAMPLE_PHASE_MODE (2)
+#define GFL_VOLTAGE_SAMPLE_PHASE_MODE (1)
 
 //=================================================================================================
 /**
@@ -173,6 +172,10 @@ extern "C"
 #define CTRL_DC_VOLTAGE_BIAS (0.0f)
 
 // User project tail code
+#if defined(GMP_BUILD_LEVEL_OVERRIDE)
+#undef BUILD_LEVEL
+#define BUILD_LEVEL GMP_BUILD_LEVEL_OVERRIDE
+#endif
 #if (BUILD_LEVEL < 0) || (BUILD_LEVEL > 5)
 #error BUILD_LEVEL_must_be_between_0_and_5
 #endif

@@ -98,8 +98,6 @@ GMP_STATIC_INLINE void ctl_fast_enable_output()
 		
 		htim1.Instance->CCER |= TIM_CCER_MASK;
 
-    ctl_enable_gfl_inv(&inv_ctrl);
-
     // PWM enable
 		HAL_GPIO_WritePin(PWM_DISABLE_GPIO_Port, PWM_DISABLE_Pin, GPIO_PIN_SET);
 		
@@ -116,8 +114,6 @@ GMP_STATIC_INLINE void ctl_fast_disable_output()
     // Disables the PWM device
     htim1.Instance->CCER &= ~TIM_CCER_MASK;
 				
-    ctl_disable_gfl_inv(&inv_ctrl);
-
     // PWM disable
 		HAL_GPIO_WritePin(PWM_DISABLE_GPIO_Port, PWM_DISABLE_Pin, GPIO_PIN_RESET);
 }

@@ -52,6 +52,9 @@ GFL_PQ_LOOP_FREQUENCY_HZ = 1000.0;
 % Current-ISR to P/Q-loop execution divider.
 GFL_PQ_LOOP_DIVIDER = CONTROLLER_FREQUENCY / GFL_PQ_LOOP_FREQUENCY_HZ;
 
+% Maximum d/q current-reference slew rate during grid connection.
+GFL_CURRENT_REF_SLEW_PU_S = 0.5;
+
 % Active-power loop proportional gain from P error PU to d-axis current PU.
 GFL_PQ_ACTIVE_KP = 0.75;
 
@@ -68,34 +71,34 @@ GFL_PQ_REACTIVE_KI = 0.001;
 GFL_PQ_CURRENT_LIMIT_PU = 1.0;
 
 % Default active-power reference. Positive power exports energy to the grid.
-GFL_ACTIVE_POWER_REF_PU = 0.1;
+GFL_ACTIVE_POWER_REF_PU = 0.0;
 
 % Default reactive-power reference using Q = vq*id - vd*iq.
 GFL_REACTIVE_POWER_REF_PU = 0.0;
 
 % BUILD_LEVEL 1 d-axis open-loop voltage command.
-GFL_OPEN_LOOP_VD_PU = 0.6;
+GFL_OPEN_LOOP_VD_PU = 0.05;
 
 % BUILD_LEVEL 1 q-axis open-loop voltage command.
-GFL_OPEN_LOOP_VQ_PU = 0.6;
+GFL_OPEN_LOOP_VQ_PU = 0.0;
 
 % BUILD_LEVEL 2 d-axis current command.
-GFL_CURRENT_LEVEL2_ID_PU = 0.1;
+GFL_CURRENT_LEVEL2_ID_PU = 0.05;
 
 % BUILD_LEVEL 2 q-axis current command.
-GFL_CURRENT_LEVEL2_IQ_PU = 0.1;
+GFL_CURRENT_LEVEL2_IQ_PU = 0.0;
 
 % BUILD_LEVEL 3 grid-connected d-axis current command.
-GFL_CURRENT_LEVEL3_ID_PU = 0.1;
+GFL_CURRENT_LEVEL3_ID_PU = 0.05;
 
 % BUILD_LEVEL 3 grid-connected q-axis current command.
 GFL_CURRENT_LEVEL3_IQ_PU = 0.0;
 
 % BUILD_LEVEL 4 d-axis current command.
-GFL_CURRENT_LEVEL4_ID_PU = 0.6;
+GFL_CURRENT_LEVEL4_ID_PU = 0.05;
 
 % BUILD_LEVEL 4 q-axis current command.
-GFL_CURRENT_LEVEL4_IQ_PU = 0.6;
+GFL_CURRENT_LEVEL4_IQ_PU = 0.0;
 
 % ADC offset calibrator filter cutoff frequency.
 GFL_ADC_CALIBRATOR_FC_HZ = 20.0;

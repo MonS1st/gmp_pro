@@ -40,15 +40,16 @@ IRIS 和 LaunchXL-F280049C 平台均在 SDPE 中选择以下功率硬件：
 |---|---:|---:|---|
 | F280039C IRIS Node | 3 | 20 kHz | 已调通，保持原默认值 |
 | LaunchXL-F280049C | 1 | 10 kHz | 已调通，保持原默认值 |
-| PC simulate | 2 | 20 kHz | 可编译仿真 |
+| PC simulate | 0 | 20 kHz | 可编译仿真 |
 | STM32G431 | 1 | 10 kHz | 待实机增量验证 |
 
 ## 增量调试级别
 
 `BUILD_LEVEL` 现在由各平台 SDPE 工程选择：
 
+0. 仅运行采样、Clarke/Park 和 PLL；PWM 硬禁止。
 1. 电压开环，验证采样、PWM 极性、死区和门极驱动。
-2. 离网电流闭环，验证 dq 电流调节器。
+2. 使用 PLL 角度的正序并网电流闭环。
 3. PLL 并网与正/负序电流闭环。
 4. 在级别 3 的基础上启用解耦、主动阻尼和超前补偿。
 5. 完整功率闭环：P/Q 外环生成 dq 电流给定，内层电流环继续按 PWM 频率执行。
@@ -99,3 +100,27 @@ pgs_inv_GFL_inverter/
       ├─ sdpe_mgr/              平台 SDPE requirement 与生成头文件
       └─ xplt/                  平台外设适配层
 ```
+
+## SIL 分级验证
+
+PC 工程支持通过 MSBuild 属性临时覆盖生成配置中的 `BUILD_LEVEL`，无需反复修改 SDPE JSON：
+
+```powershell
+msbuild DigialPower_simulink.vcxproj /t:Build /p:Configuration=Debug /p:Platform=x64 `
+  /p:GflBuildLevel=2 /p:OutDir=validation_build\bl2\
+```
+
+构建完成后，可在 `project/simulate` 中运行隔离端口的批处理仿真和分析：
+
+```matlab
+result = run_bl_simulation(2, 0.40);
+stats = analyze_bl_result(result);
+```
+
+`run_bl_simulation` 按模型内真实的 GMP SIL mask 参数设置四个 UDP 端口，启动对应级别的控制器，并从 `logsout` 记录 Monitor、Enable 和 PWM 总线；它不会保存或覆盖 `.slx`。默认结果写入系统临时目录。
+
+当前 `DP_STD_MDL_DCAC_3ph_2level_gridconn.slx` 的三条 `Series RLC Branch` 是逆变器与电网之间的滤波支路，模型没有独立并网断路器，也没有三相三线不平衡三角形负载。因此：
+
+- BL1 开环调制只能在人工断开电网后评估，不能把当前直接并网结果作为安全的开环验证；
+- BL3～BL5 的现有自动结果只能验证平衡工况下的调用链和稳定性；
+- 负序和不平衡切换验证需在模型副本中增加不接中性线的 `Zab/Zbc/Zca` 三角形支路，并在指定时刻切换其中一条附加阻抗。

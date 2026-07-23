@@ -82,8 +82,8 @@ extern "C"
  */
 
 /**
- * @brief Incremental control level; level 5 enables the cascaded P/Q power loop.
- *        Options: (1), (2), (3), (4), (5)
+ * @brief Incremental control level; level 0 runs the PLL only and level 5 enables the cascaded P/Q power loop.
+ *        Options: (0), (1), (2), (3), (4), (5)
  */
 #define BUILD_LEVEL (3)
 
@@ -230,8 +230,8 @@ extern "C"
 #define CTRL_DC_VOLTAGE_BIAS (0.0f)
 
 // User project tail code
-#if (BUILD_LEVEL < 1) || (BUILD_LEVEL > 5)
-#error BUILD_LEVEL_must_be_between_1_and_5
+#if (BUILD_LEVEL < 0) || (BUILD_LEVEL > 5)
+#error BUILD_LEVEL_must_be_between_0_and_5
 #endif
 
 #ifdef __cplusplus

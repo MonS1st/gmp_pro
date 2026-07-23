@@ -114,8 +114,6 @@ GMP_STATIC_INLINE void ctl_fast_enable_output()
     EPWM_clearTripZoneFlag(PHASE_V_BASE, EPWM_TZ_FORCE_EVENT_OST);
     EPWM_clearTripZoneFlag(PHASE_W_BASE, EPWM_TZ_FORCE_EVENT_OST);
 
-    ctl_enable_gfl_inv(&inv_ctrl);
-
     // PWM enable
     GPIO_WritePin(PWM_ENABLE_PORT, 1);
 
@@ -131,8 +129,6 @@ GMP_STATIC_INLINE void ctl_fast_disable_output()
     EPWM_forceTripZoneEvent(PHASE_U_BASE, EPWM_TZ_FORCE_EVENT_OST);
     EPWM_forceTripZoneEvent(PHASE_V_BASE, EPWM_TZ_FORCE_EVENT_OST);
     EPWM_forceTripZoneEvent(PHASE_W_BASE, EPWM_TZ_FORCE_EVENT_OST);
-
-    ctl_disable_gfl_inv(&inv_ctrl);
 
     // PWM disable
     GPIO_WritePin(PWM_ENABLE_PORT, 0);
@@ -176,8 +172,10 @@ GMP_STATIC_INLINE void ctl_input_callback_pil(const gmp_sim_rx_buf_t* rx)
     iuvw_src[phase_V] = 0;
     iuvw_src[phase_W] = 0;
 
-    udc_src = rx->adc_result[INV_ADC_ID_IDC];
-    idc_src = rx->adc_result[INV_ADC_ID_VDC];
+    // Keep the PIL buffer ABI aligned with the simulation enum:
+    // [IDC, VDC, UAB, UBC, IA, IB, IC].
+    udc_src = rx->adc_result[INV_ADC_ID_VDC];
+    idc_src = rx->adc_result[INV_ADC_ID_IDC];
 
     // invoke ADC p.u. routine
     ctl_step_tri_ptr_adc_channel(&iabc);
@@ -196,29 +194,43 @@ GMP_STATIC_INLINE void ctl_output_callback_pil(gmp_sim_tx_buf_t* tx)
     tx->pwm_cmp[1] = spwm.pwm_out[phase_V];
     tx->pwm_cmp[2] = spwm.pwm_out[phase_W];
 
-    // Monitor Port
-#if BUILD_LEVEL == 1
-
-    //
-    // monitor
-    //
-
-    // Scope 1
+    // Monitor layout matches the Windows SIL target.
     tx->monitor[0] = inv_ctrl.iabc.dat[phase_A];
     tx->monitor[1] = inv_ctrl.iabc.dat[phase_B];
-
-    // Scope 2
-    tx->monitor[2] = inv_ctrl.vab_pos.dat[phase_alpha];
-    tx->monitor[3] = inv_ctrl.vab_pos.dat[phase_beta];
-
-    // Scope 3
-    tx->monitor[4] = inv_ctrl.vab0.dat[phase_alpha];
-    tx->monitor[5] = inv_ctrl.vab0.dat[phase_beta];
-
-    // Scope 4
-    tx->monitor[6] = ctl_get_gfl_pll_error(&inv_ctrl);
-    tx->monitor[7] = inv_ctrl.angle;
-
+    tx->monitor[2] = inv_ctrl.iabc.dat[phase_C];
+    tx->monitor[3] = inv_ctrl.iab0.dat[phase_0];
+    tx->monitor[4] = inv_ctrl.idq.dat[phase_d];
+    tx->monitor[5] = inv_ctrl.idq.dat[phase_q];
+    tx->monitor[6] = inv_ctrl.idq_set.dat[phase_d];
+    tx->monitor[7] = inv_ctrl.idq_set.dat[phase_q];
+    tx->monitor[8] = inv_ctrl.vdq.dat[phase_d];
+    tx->monitor[9] = inv_ctrl.vdq.dat[phase_q];
+    tx->monitor[10] = inv_ctrl.vdq_out_comp.dat[phase_d];
+    tx->monitor[11] = inv_ctrl.vdq_out_comp.dat[phase_q];
+    tx->monitor[12] = ctl_get_gfl_pll_error(&inv_ctrl);
+#ifdef USING_DSOGI_PLL
+    tx->monitor[13] = inv_ctrl.pll.srf_pll.freq_pu;
+#else
+    tx->monitor[13] = inv_ctrl.pll.freq_pu;
+#endif // USING_DSOGI_PLL
+#if BUILD_LEVEL == 0
+    tx->monitor[14] = inv_ctrl.angle;
+    tx->monitor[15] = ctl_check_pll_locked();
+#elif BUILD_LEVEL == 1
+    tx->monitor[14] = inv_ctrl.angle;
+    tx->monitor[15] = inv_ctrl.flag_enable_system;
+#elif BUILD_LEVEL == 2
+    tx->monitor[14] = ctl_check_pll_locked();
+    tx->monitor[15] = inv_ctrl.flag_enable_system;
+#elif BUILD_LEVEL == 3
+    tx->monitor[14] = neg_current_ctrl.idqn.dat[phase_d];
+    tx->monitor[15] = neg_current_ctrl.idqn.dat[phase_q];
+#elif BUILD_LEVEL == 4
+    tx->monitor[14] = inv_ctrl.vdq_ff_external.dat[phase_d];
+    tx->monitor[15] = inv_ctrl.vdq_ff_decouple.dat[phase_d];
+#elif BUILD_LEVEL == 5
+    tx->monitor[14] = pq_ctrl.pq_meas.dat[0];
+    tx->monitor[15] = pq_ctrl.pq_meas.dat[1];
 #endif // BUILD_LEVEL
 }
 

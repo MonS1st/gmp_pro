@@ -56,9 +56,12 @@ def run_src_sync():
         pat_obj = Path(resolved_pat)
         matched_files = []
         if pat_obj.is_absolute():
-            anchor = pat_obj.anchor
-            rest = str(pat_obj.relative_to(anchor))
-            matched_files = [f.resolve() for f in Path(anchor).glob(rest) if f.is_file()]
+            # `Path(anchor).glob(rest)` returns no matches on Windows when
+            # `anchor` is a drive root (for example ``C:\\``).  Resolve the
+            # pattern from its actual parent instead; this keeps absolute
+            # wildcard patterns portable while preserving the source-of-
+            # truth paths from the registry.
+            matched_files = [f.resolve() for f in pat_obj.parent.glob(pat_obj.name) if f.is_file()]
         else:
             matched_files = [f.resolve() for f in gmp_base.glob(resolved_pat) if f.is_file()]
             

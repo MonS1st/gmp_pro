@@ -20,7 +20,7 @@
   ],
   "code_sections": {
     "after_extern_open": "#include <sdpe_pgs_inv_gfl_common_settings.h>",
-    "before_footer": "#if (BUILD_LEVEL < 1) || (BUILD_LEVEL > 5)\n#error BUILD_LEVEL_must_be_between_1_and_5\n#endif"
+    "before_footer": "#if (BUILD_LEVEL < 0) || (BUILD_LEVEL > 5)\n#error BUILD_LEVEL_must_be_between_0_and_5\n#endif"
   },
   "feature_macros": [],
   "option_macros": [
@@ -30,6 +30,7 @@
       "enabled": true,
       "value": "(1)",
       "options": [
+        "(0)",
         "(1)",
         "(2)",
         "(3)",

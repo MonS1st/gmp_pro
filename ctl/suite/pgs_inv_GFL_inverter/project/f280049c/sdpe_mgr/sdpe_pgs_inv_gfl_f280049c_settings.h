@@ -73,7 +73,7 @@ extern "C"
 
 /**
  * @brief Incremental control level; level 5 enables the cascaded P/Q power loop.
- *        Options: (1), (2), (3), (4), (5)
+ *        Options: (0), (1), (2), (3), (4), (5)
  */
 #define BUILD_LEVEL (1)
 
@@ -220,8 +220,8 @@ extern "C"
 #define CTRL_STARTUP_DELAY (100)
 
 // User project tail code
-#if (BUILD_LEVEL < 1) || (BUILD_LEVEL > 5)
-#error BUILD_LEVEL_must_be_between_1_and_5
+#if (BUILD_LEVEL < 0) || (BUILD_LEVEL > 5)
+#error BUILD_LEVEL_must_be_between_0_and_5
 #endif
 
 #ifdef __cplusplus

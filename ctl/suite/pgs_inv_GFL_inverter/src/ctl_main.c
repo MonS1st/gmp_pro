@@ -56,8 +56,127 @@ volatile fast_gt flag_enable_adc_calibrator = 0;
 #endif
 volatile fast_gt index_adc_calibrator = 0;
 uint32_t pq_loop_tick = 0;
+ctl_vector2_t gfl_current_ref_target;
+ctl_slope_limiter_t gfl_current_ref_ramp[2];
 
 // User commands
+
+//=================================================================================================
+// BUILD_LEVEL lifecycle helpers
+
+static void ctl_reset_control_state(void)
+{
+    // Keep every stop path deterministic: no stale integrator, reference, or
+    // compensation state may survive the next commissioning attempt.
+    ctl_disable_gfl_inv(&inv_ctrl);
+    ctl_disable_gfl_inv_pll(&inv_ctrl);
+    ctl_disable_gfl_inv_decouple(&inv_ctrl);
+    ctl_disable_gfl_inv_active_damp(&inv_ctrl);
+    ctl_disable_gfl_inv_lead_compensator(&inv_ctrl);
+    ctl_disable_neg_inv(&neg_current_ctrl);
+    ctl_disable_gfl_pq_ctrl(&pq_ctrl);
+
+    ctl_clear_gfl_inv_with_PLL(&inv_ctrl);
+    ctl_clear_neg_inv(&neg_current_ctrl);
+    ctl_clear_gfl_pq(&pq_ctrl);
+
+    inv_ctrl.flag_enable_current_ctrl = 0;
+    ctl_set_gfl_inv_current(&inv_ctrl, 0, 0);
+    ctl_vector2_clear(&neg_current_ctrl.idqn_set);
+    ctl_vector2_clear(&neg_current_ctrl.vdqn_set);
+    ctl_set_gfl_pq_ref(&pq_ctrl, 0, 0);
+    ctl_vector2_clear(&gfl_current_ref_target);
+    ctl_clear_slope_limiter(&gfl_current_ref_ramp[phase_d]);
+    ctl_clear_slope_limiter(&gfl_current_ref_ramp[phase_q]);
+    pq_loop_tick = 0;
+}
+
+static void ctl_set_gfl_current_target(ctrl_gt id, ctrl_gt iq)
+{
+    gfl_current_ref_target.dat[phase_d] = id;
+    gfl_current_ref_target.dat[phase_q] = iq;
+}
+
+static void ctl_configure_build_level(fast_gt enable_algorithms)
+{
+    // PLL synchronisation is prepared before the final output gate.  Current,
+    // negative-sequence, compensation and P/Q algorithms remain stopped until
+    // ctl_enable_pwm() calls this helper with enable_algorithms=1.
+#if BUILD_LEVEL == 0
+    // PLL-only commissioning: update Vd/Vq and PLL diagnostics, never output.
+    ctl_set_gfl_inv_openloop_mode(&inv_ctrl);
+    ctl_set_gfl_inv_grid_connect(&inv_ctrl);
+    ctl_enable_gfl_inv_pll(&inv_ctrl);
+
+#elif BUILD_LEVEL == 1
+    ctl_set_gfl_inv_openloop_mode(&inv_ctrl);
+    ctl_set_gfl_inv_voltage_openloop(&inv_ctrl, float2ctrl(GFL_OPEN_LOOP_VD_PU),
+                                     float2ctrl(GFL_OPEN_LOOP_VQ_PU));
+
+#elif BUILD_LEVEL == 2
+    // Basic PLL-synchronised positive-sequence current loop.
+    ctl_set_gfl_inv_current_mode(&inv_ctrl);
+    ctl_set_gfl_current_target(float2ctrl(GFL_CURRENT_LEVEL2_ID_PU),
+                               float2ctrl(GFL_CURRENT_LEVEL2_IQ_PU));
+    ctl_enable_gfl_inv_pll(&inv_ctrl);
+    ctl_set_gfl_inv_grid_connect(&inv_ctrl);
+
+#elif BUILD_LEVEL == 3
+    ctl_set_gfl_inv_current_mode(&inv_ctrl);
+    ctl_set_gfl_current_target(float2ctrl(GFL_CURRENT_LEVEL3_ID_PU),
+                               float2ctrl(GFL_CURRENT_LEVEL3_IQ_PU));
+    ctl_enable_gfl_inv_pll(&inv_ctrl);
+    ctl_set_gfl_inv_grid_connect(&inv_ctrl);
+
+#elif BUILD_LEVEL == 4
+    ctl_set_gfl_inv_current_mode(&inv_ctrl);
+    ctl_set_gfl_current_target(float2ctrl(GFL_CURRENT_LEVEL4_ID_PU),
+                               float2ctrl(GFL_CURRENT_LEVEL4_IQ_PU));
+    ctl_enable_gfl_inv_pll(&inv_ctrl);
+    ctl_set_gfl_inv_grid_connect(&inv_ctrl);
+
+#elif BUILD_LEVEL == 5
+    ctl_set_gfl_inv_current_mode(&inv_ctrl);
+    ctl_set_gfl_current_target(0, 0);
+    ctl_enable_gfl_inv_pll(&inv_ctrl);
+    ctl_set_gfl_inv_grid_connect(&inv_ctrl);
+#endif // BUILD_LEVEL
+
+    if (!enable_algorithms)
+    {
+        inv_ctrl.flag_enable_system = 0;
+        inv_ctrl.flag_enable_current_ctrl = 0;
+        ctl_disable_neg_inv(&neg_current_ctrl);
+        ctl_disable_gfl_pq_ctrl(&pq_ctrl);
+        ctl_disable_gfl_inv_decouple(&inv_ctrl);
+        ctl_disable_gfl_inv_active_damp(&inv_ctrl);
+        ctl_disable_gfl_inv_lead_compensator(&inv_ctrl);
+        ctl_set_gfl_inv_current(&inv_ctrl, 0, 0);
+        ctl_vector2_clear(&gfl_current_ref_target);
+    }
+    else
+    {
+#if BUILD_LEVEL >= 1
+        ctl_enable_gfl_inv(&inv_ctrl);
+#endif
+#if BUILD_LEVEL >= 2
+        inv_ctrl.flag_enable_current_ctrl = 1;
+#endif
+#if BUILD_LEVEL >= 3
+        ctl_enable_neg_current_inv(&neg_current_ctrl);
+#endif
+#if BUILD_LEVEL >= 4
+        ctl_enable_gfl_inv_decouple(&inv_ctrl);
+        ctl_enable_gfl_inv_active_damp(&inv_ctrl);
+        ctl_enable_gfl_inv_lead_compensator(&inv_ctrl);
+#endif
+#if BUILD_LEVEL == 5
+        ctl_enable_gfl_pq_ctrl(&pq_ctrl);
+        ctl_set_gfl_pq_ref(&pq_ctrl, float2ctrl(GFL_ACTIVE_POWER_REF_PU),
+                           float2ctrl(GFL_REACTIVE_POWER_REF_PU));
+#endif
+    }
+}
 
 //=================================================================================================
 // CTL initialize routine
@@ -105,57 +224,17 @@ void ctl_init()
     ctl_init_gfl_pq(&pq_ctrl, GFL_PQ_ACTIVE_KP, GFL_PQ_ACTIVE_KI, GFL_PQ_REACTIVE_KP, GFL_PQ_REACTIVE_KI,
                     GFL_PQ_CURRENT_LIMIT_PU, GFL_PQ_LOOP_FREQUENCY_HZ);
     ctl_attach_gfl_pq_to_core(&pq_ctrl, &inv_ctrl);
-    ctl_set_gfl_pq_ref(&pq_ctrl, float2ctrl(GFL_ACTIVE_POWER_REF_PU), float2ctrl(GFL_REACTIVE_POWER_REF_PU));
+    ctl_init_slope_limiter(&gfl_current_ref_ramp[phase_d], GFL_CURRENT_REF_SLEW_PU_S,
+                           -GFL_CURRENT_REF_SLEW_PU_S, CONTROLLER_FREQUENCY);
+    ctl_init_slope_limiter(&gfl_current_ref_ramp[phase_q], GFL_CURRENT_REF_SLEW_PU_S,
+                           -GFL_CURRENT_REF_SLEW_PU_S, CONTROLLER_FREQUENCY);
+    ctl_vector2_clear(&gfl_current_ref_target);
     pq_loop_tick = 0;
 
-#if BUILD_LEVEL == 1
-    // Voltage open loop, inverter
-    ctl_set_gfl_inv_openloop_mode(&inv_ctrl);
-    ctl_set_gfl_inv_voltage_openloop(&inv_ctrl, float2ctrl(GFL_OPEN_LOOP_VD_PU), float2ctrl(GFL_OPEN_LOOP_VQ_PU));
-
-#elif BUILD_LEVEL == 2
-    // Basic current close loop, inverter
-    ctl_set_gfl_inv_current_mode(&inv_ctrl);
-    ctl_set_gfl_inv_current(&inv_ctrl, float2ctrl(GFL_CURRENT_LEVEL2_ID_PU), float2ctrl(GFL_CURRENT_LEVEL2_IQ_PU));
-
-#elif BUILD_LEVEL == 3
-    // Basic current close loop, inverter
-    ctl_set_gfl_inv_current_mode(&inv_ctrl);
-    ctl_set_gfl_inv_current(&inv_ctrl, float2ctrl(GFL_CURRENT_LEVEL3_ID_PU), float2ctrl(GFL_CURRENT_LEVEL3_IQ_PU));
-
-    ctl_enable_neg_current_inv(&neg_current_ctrl);
-
-    ctl_enable_gfl_inv_pll(&inv_ctrl);
-    ctl_set_gfl_inv_grid_connect(&inv_ctrl);
-
-#elif BUILD_LEVEL == 4
-    // current close loop with feed forward, inverter
-    ctl_set_gfl_inv_current_mode(&inv_ctrl);
-    ctl_set_gfl_inv_current(&inv_ctrl, float2ctrl(GFL_CURRENT_LEVEL4_ID_PU), float2ctrl(GFL_CURRENT_LEVEL4_IQ_PU));
-
-    ctl_enable_neg_current_inv(&neg_current_ctrl);
-
-    ctl_enable_gfl_inv_pll(&inv_ctrl);
-    ctl_set_gfl_inv_grid_connect(&inv_ctrl);
-
-    ctl_enable_gfl_inv_decouple(&inv_ctrl);
-    ctl_enable_gfl_inv_active_damp(&inv_ctrl);
-    ctl_enable_gfl_inv_lead_compensator(&inv_ctrl);
-
-#elif BUILD_LEVEL == 5
-    // Cascaded P/Q power loop -> d/q current loop, grid connected.
-    ctl_set_gfl_inv_current_mode(&inv_ctrl);
-    ctl_set_gfl_inv_current(&inv_ctrl, 0, 0);
-
-    ctl_enable_neg_current_inv(&neg_current_ctrl);
-    ctl_enable_gfl_inv_pll(&inv_ctrl);
-    ctl_set_gfl_inv_grid_connect(&inv_ctrl);
-    ctl_enable_gfl_inv_decouple(&inv_ctrl);
-    ctl_enable_gfl_inv_active_damp(&inv_ctrl);
-    ctl_enable_gfl_inv_lead_compensator(&inv_ctrl);
-    ctl_enable_gfl_pq_ctrl(&pq_ctrl);
-
-#endif // BUILD_LEVEL
+    // All levels start from one safe baseline, then select only the
+    // algorithms assigned to the requested BUILD_LEVEL.
+    ctl_reset_control_state();
+    ctl_configure_build_level(0);
 
     //
     // init and config CiA402 standard state machine
@@ -222,18 +301,31 @@ time_gt gmp_base_get_ctrl_tick(void)
 
 void ctl_enable_pwm()
 {
+#if BUILD_LEVEL == 0
+    // BL0 is a measurement/PLL-only level.  Refuse the final PWM enable
+    // request even if CiA402 reaches Operation Enabled automatically in SIL.
+    ctl_fast_disable_output();
+    ctl_disable_gfl_inv(&inv_ctrl);
+#else
+    ctl_configure_build_level(1);
     ctl_fast_enable_output();
+#endif // BUILD_LEVEL
 }
 
 void ctl_disable_pwm()
 {
     ctl_fast_disable_output();
 
-    // clear controller here
-    ctl_clear_gfl_inv(&inv_ctrl);
-    ctl_clear_neg_inv(&neg_current_ctrl);
-    ctl_clear_gfl_pq(&pq_ctrl);
-    pq_loop_tick = 0;
+    // Disable every algorithm independently of the physical output gate,
+    // then clear all dynamic state and references.
+    ctl_reset_control_state();
+
+    // Keep the synchronising PLL alive while the power stage is stopped so
+    // the next CiA402 enable request can still wait for a real lock event.
+#if BUILD_LEVEL == 0 || BUILD_LEVEL >= 2
+    ctl_set_gfl_inv_grid_connect(&inv_ctrl);
+    ctl_enable_gfl_inv_pll(&inv_ctrl);
+#endif
 }
 
 fast_gt ctl_check_pll_locked(void)

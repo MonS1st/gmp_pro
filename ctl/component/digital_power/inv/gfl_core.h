@@ -358,8 +358,11 @@ GMP_STATIC_INLINE void ctl_step_gfl_inv_ctrl(gfl_inv_ctrl_t* gfl)
 #endif // USING_DSOGI_PLL
     }
 
-    // --- 3. Main Control Logic ---
-    if (gfl->flag_enable_system)
+    // --- 3. Angle/measurement path ---
+    // Keep the PLL-derived phasor and Vd/Vq measurements alive while the
+    // power stage is disabled. BUILD_LEVEL 0 deliberately runs this path
+    // for commissioning, but must not produce a PWM command.
+    if (gfl->flag_enable_system || gfl->flag_enable_pll)
     {
         // --- 3a. Angle and Phasor Generation ---
         if (gfl->flag_enable_offgrid)
@@ -388,7 +391,11 @@ GMP_STATIC_INLINE void ctl_step_gfl_inv_ctrl(gfl_inv_ctrl_t* gfl)
         // --- 3b. Park Transformation ---
         ctl_ct_park2((ctl_vector2_t*)&gfl->iab0, &gfl->phasor, &gfl->idq);
         ctl_ct_park2((ctl_vector2_t*)&gfl->vab0, &gfl->phasor, &gfl->vdq);
+    }
 
+    // --- 4. Main Control Logic ---
+    if (gfl->flag_enable_system)
+    {
         // --- 3c. current controller ---
         // if current controller is disabled the vdq_out would output directly.
         if (gfl->flag_enable_current_ctrl)
@@ -401,8 +408,12 @@ GMP_STATIC_INLINE void ctl_step_gfl_inv_ctrl(gfl_inv_ctrl_t* gfl)
             // decouple
             if (gfl->flag_enable_decouple)
             {
-                gfl->vdq_ff_decouple.dat[phase_d] = gfl->coef_ff_decouple * gfl->idq.dat[phase_q];
-                gfl->vdq_ff_decouple.dat[phase_q] = -gfl->coef_ff_decouple * gfl->idq.dat[phase_d];
+                // With the Park convention used by coord_trans/Park.h and a
+                // positive grid-current direction from the converter toward
+                // the grid, the L-filter cross terms are cancelled by
+                // Vd -= omega*L*Iq and Vq += omega*L*Id.
+                gfl->vdq_ff_decouple.dat[phase_d] = -gfl->coef_ff_decouple * gfl->idq.dat[phase_q];
+                gfl->vdq_ff_decouple.dat[phase_q] = gfl->coef_ff_decouple * gfl->idq.dat[phase_d];
             }
             else
             {
@@ -413,7 +424,7 @@ GMP_STATIC_INLINE void ctl_step_gfl_inv_ctrl(gfl_inv_ctrl_t* gfl)
             // active damping
             if (gfl->flag_enable_active_damping)
             {
-                // 计算微分量 (代表电容电流 trend)
+                // active damping input derivative (voltage trend)
                 ctrl_gt diff_d = gfl->vdq.dat[phase_d] - gfl->vdq_last.dat[phase_d];
                 ctrl_gt diff_q = gfl->vdq.dat[phase_q] - gfl->vdq_last.dat[phase_q];
 
@@ -432,8 +443,15 @@ GMP_STATIC_INLINE void ctl_step_gfl_inv_ctrl(gfl_inv_ctrl_t* gfl)
             }
 
             // mix all vdq up
-            gfl->vdq_out.dat[phase_d] += gfl->vdq_ff_decouple.dat[phase_d] + gfl->vdq_ff_damping.dat[phase_d];
-            gfl->vdq_out.dat[phase_q] += gfl->vdq_ff_decouple.dat[phase_q] + gfl->vdq_ff_damping.dat[phase_q];
+            // vdq_ff_external is populated by the suite when grid-voltage
+            // feed-forward is commissioned.  Keep it inside the current
+            // controller path so open-loop mode does not accumulate it.
+            gfl->vdq_out.dat[phase_d] +=
+                gfl->vdq_ff_external.dat[phase_d] + gfl->vdq_ff_decouple.dat[phase_d] +
+                gfl->vdq_ff_damping.dat[phase_d];
+            gfl->vdq_out.dat[phase_q] +=
+                gfl->vdq_ff_external.dat[phase_q] + gfl->vdq_ff_decouple.dat[phase_q] +
+                gfl->vdq_ff_damping.dat[phase_q];
         }
 
         // --- 3d. lead compensator ---
@@ -537,11 +555,23 @@ GMP_STATIC_INLINE void ctl_set_gfl_inv_grid_connect(gfl_inv_ctrl_t* inv)
 /** @brief Enable inverter decoupling */
 GMP_STATIC_INLINE void ctl_enable_gfl_inv_decouple(gfl_inv_ctrl_t* inv)
 {
+    inv->flag_enable_decouple = 1;
+}
+
+/** @brief Disable inverter decoupling. */
+GMP_STATIC_INLINE void ctl_disable_gfl_inv_decouple(gfl_inv_ctrl_t* inv)
+{
     inv->flag_enable_decouple = 0;
 }
 
 /** @brief Enable inverter active damping */
 GMP_STATIC_INLINE void ctl_enable_gfl_inv_active_damp(gfl_inv_ctrl_t* inv)
+{
+    inv->flag_enable_active_damping = 1;
+}
+
+/** @brief Disable inverter active damping. */
+GMP_STATIC_INLINE void ctl_disable_gfl_inv_active_damp(gfl_inv_ctrl_t* inv)
 {
     inv->flag_enable_active_damping = 0;
 }
@@ -549,7 +579,13 @@ GMP_STATIC_INLINE void ctl_enable_gfl_inv_active_damp(gfl_inv_ctrl_t* inv)
 /** @brief Enable inverter lead compensator */
 GMP_STATIC_INLINE void ctl_enable_gfl_inv_lead_compensator(gfl_inv_ctrl_t* inv)
 {
-    inv->flag_enable_active_damping = 0;
+    inv->flag_enable_lead_compensator = 1;
+}
+
+/** @brief Disable inverter lead compensator. */
+GMP_STATIC_INLINE void ctl_disable_gfl_inv_lead_compensator(gfl_inv_ctrl_t* inv)
+{
+    inv->flag_enable_lead_compensator = 0;
 }
 
 /** @brief Get PLL error */

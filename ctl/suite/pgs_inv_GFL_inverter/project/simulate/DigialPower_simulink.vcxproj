@@ -164,6 +164,11 @@
       </Version>
     </Link>
   </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(GflBuildLevel)' != ''">
+    <ClCompile>
+      <PreprocessorDefinitions>GMP_BUILD_LEVEL_OVERRIDE=$(GflBuildLevel);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+  </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\..\src\ctl_main.c" />
     <ClCompile Include="..\..\src\user_main.c" />

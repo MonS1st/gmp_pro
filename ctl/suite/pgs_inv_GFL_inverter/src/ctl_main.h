@@ -23,6 +23,7 @@
 #include <ctl/component/digital_power/inv/inv_neg_ctrl.h>
 
 #include <ctl/component/interface/spwm_modulator.h>
+#include <ctl/component/intrinsic/basic/slope_limiter.h>
 
 #include <ctl/framework/cia402_state_machine.h>
 
@@ -63,6 +64,8 @@ extern adc_bias_calibrator_t adc_calibrator;
 extern volatile fast_gt flag_enable_adc_calibrator;
 extern volatile fast_gt index_adc_calibrator;
 extern uint32_t pq_loop_tick;
+extern ctl_vector2_t gfl_current_ref_target;
+extern ctl_slope_limiter_t gfl_current_ref_ramp[2];
 
 // User commands
 
@@ -92,6 +95,34 @@ GMP_STATIC_INLINE void ctl_dispatch(void)
     // normal controller routine
     else
     {
+        // Apply the commissioning reference through a rate limiter.  The
+        // limiter is held at zero while the algorithm is stopped, so a
+        // CiA402 restart never inherits a stale or instantaneous current step.
+        if (inv_ctrl.flag_enable_system)
+        {
+            ctl_set_gfl_inv_current(
+                &inv_ctrl,
+                ctl_step_slope_limiter(&gfl_current_ref_ramp[phase_d],
+                                       gfl_current_ref_target.dat[phase_d]),
+                ctl_step_slope_limiter(&gfl_current_ref_ramp[phase_q],
+                                       gfl_current_ref_target.dat[phase_q]));
+        }
+        else
+        {
+            ctl_clear_slope_limiter(&gfl_current_ref_ramp[phase_d]);
+            ctl_clear_slope_limiter(&gfl_current_ref_ramp[phase_q]);
+            ctl_set_gfl_inv_current(&inv_ctrl, 0, 0);
+        }
+
+        // The common GFL core accepts the measured grid voltage as an
+        // externally supplied dq feed-forward term.  It is only populated for
+        // BL4/BL5; lower levels remain a pure current-loop baseline.
+#if BUILD_LEVEL >= 4
+        ctl_vector2_copy(&inv_ctrl.vdq_ff_external, &inv_ctrl.vdq);
+#else
+        ctl_vector2_clear(&inv_ctrl.vdq_ff_external);
+#endif
+
         // run controller body
         ctl_step_gfl_inv_ctrl(&inv_ctrl);
         ctl_step_neg_inv_ctrl(&neg_current_ctrl);
@@ -106,8 +137,8 @@ GMP_STATIC_INLINE void ctl_dispatch(void)
 
             if (pq_ctrl.flag_enable)
             {
-                ctl_set_gfl_inv_current(&inv_ctrl, pq_ctrl.idq_set_out.dat[phase_d],
-                                        pq_ctrl.idq_set_out.dat[phase_q]);
+                gfl_current_ref_target.dat[phase_d] = pq_ctrl.idq_set_out.dat[phase_d];
+                gfl_current_ref_target.dat[phase_q] = pq_ctrl.idq_set_out.dat[phase_q];
             }
         }
 
