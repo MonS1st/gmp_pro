@@ -87,6 +87,10 @@
         },
         {
             "root": "ctl",
+            "module": "component|digital_power|inv|rectifier_dc_voltage_ctrl"
+        },
+        {
+            "root": "ctl",
             "module": "component|digital_power|inv|gfm_droop"
         },
         {

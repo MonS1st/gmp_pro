@@ -35,6 +35,27 @@ const gmp_param_item_t dict_m1[] = {
     {&pq_ctrl.pq_set.dat[1], GMP_PARAM_TYPE_F32, GMP_PARAM_PERM_RW},
     {&pq_ctrl.pq_meas.dat[0], GMP_PARAM_TYPE_F32, GMP_PARAM_PERM_RO},
     {&pq_ctrl.pq_meas.dat[1], GMP_PARAM_TYPE_F32, GMP_PARAM_PERM_RO},
+    /* BL6 entries are appended so the existing dictionary indices remain stable. */
+    {&rectifier_cmd.enable, GMP_PARAM_TYPE_U16, GMP_PARAM_PERM_RW},
+    {&rectifier_cmd.clear_fault, GMP_PARAM_TYPE_U16, GMP_PARAM_PERM_RW},
+    {&rectifier_cmd.udc_ref_v, GMP_PARAM_TYPE_F32, GMP_PARAM_PERM_RW},
+    {&rectifier_cmd.iq_ref_pu, GMP_PARAM_TYPE_F32, GMP_PARAM_PERM_RW},
+    {&rectifier_cmd.current_limit_pu, GMP_PARAM_TYPE_F32, GMP_PARAM_PERM_RW},
+    {&rectifier_cmd.manual_current_mode, GMP_PARAM_TYPE_U16, GMP_PARAM_PERM_RW},
+    {&rectifier_cmd.manual_id_ref_pu, GMP_PARAM_TYPE_F32, GMP_PARAM_PERM_RW},
+    {&rectifier_cmd.manual_iq_ref_pu, GMP_PARAM_TYPE_F32, GMP_PARAM_PERM_RW},
+    {&rectifier_status.state, GMP_PARAM_TYPE_U16, GMP_PARAM_PERM_RO},
+    {&rectifier_status.fault_bits, GMP_PARAM_TYPE_U32, GMP_PARAM_PERM_RO},
+    {&rectifier_status.udc_ref_v, GMP_PARAM_TYPE_F32, GMP_PARAM_PERM_RO},
+    {&rectifier_status.udc_meas_v, GMP_PARAM_TYPE_F32, GMP_PARAM_PERM_RO},
+    {&rectifier_status.udc_error_v, GMP_PARAM_TYPE_F32, GMP_PARAM_PERM_RO},
+    {&rectifier_status.id_ref_pu, GMP_PARAM_TYPE_F32, GMP_PARAM_PERM_RO},
+    {&rectifier_status.iq_ref_pu, GMP_PARAM_TYPE_F32, GMP_PARAM_PERM_RO},
+    {&rectifier_status.id_meas_pu, GMP_PARAM_TYPE_F32, GMP_PARAM_PERM_RO},
+    {&rectifier_status.iq_meas_pu, GMP_PARAM_TYPE_F32, GMP_PARAM_PERM_RO},
+    {&rectifier_status.pll_freq_pu, GMP_PARAM_TYPE_F32, GMP_PARAM_PERM_RO},
+    {&rectifier_status.pll_error, GMP_PARAM_TYPE_F32, GMP_PARAM_PERM_RO},
+    {&rectifier_dc_voltage_ctrl.voltage_pi.i_term, GMP_PARAM_TYPE_F32, GMP_PARAM_PERM_RO},
 };
 const uint16_t var_tunable_count = sizeof(dict_m1) / sizeof(dict_m1[0]);
 gmp_param_tunable_t tunable;

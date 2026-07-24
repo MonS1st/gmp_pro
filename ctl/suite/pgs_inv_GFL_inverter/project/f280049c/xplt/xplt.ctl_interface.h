@@ -231,6 +231,18 @@ GMP_STATIC_INLINE void ctl_output_callback_pil(gmp_sim_tx_buf_t* tx)
 #elif BUILD_LEVEL == 5
     tx->monitor[14] = pq_ctrl.pq_meas.dat[0];
     tx->monitor[15] = pq_ctrl.pq_meas.dat[1];
+#elif BUILD_LEVEL == 6
+    tx->monitor[3] = rectifier_status.udc_meas_v;
+    tx->monitor[8] = rectifier_status.pll_freq_pu;
+    tx->monitor[9] = rectifier_status.pll_error;
+    tx->monitor[10] = rectifier_status.state;
+    tx->monitor[11] = rectifier_status.fault_bits;
+    tx->monitor[12] = rectifier_dc_voltage_ctrl.voltage_pi.i_term;
+    tx->monitor[13] = rectifier_dc_voltage_ctrl.voltage_pi.out;
+    tx->monitor[14] =
+        rectifier_status.pll_locked + 2 * rectifier_status.pwm_enabled +
+        4 * rectifier_status.current_limited + 8 * rectifier_status.voltage_pi_saturated;
+    tx->monitor[15] = rectifier_dc_voltage_ctrl.udc_ref_v;
 #endif // BUILD_LEVEL
 }
 

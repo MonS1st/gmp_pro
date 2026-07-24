@@ -20,7 +20,7 @@
   ],
   "code_sections": {
     "after_extern_open": "#include <sdpe_pgs_inv_gfl_common_settings.h>",
-    "before_footer": "#if (BUILD_LEVEL < 0) || (BUILD_LEVEL > 5)\n#error BUILD_LEVEL_must_be_between_0_and_5\n#endif"
+    "before_footer": "#if (BUILD_LEVEL < 0) || (BUILD_LEVEL > 6)\n#error BUILD_LEVEL_must_be_between_0_and_6\n#endif"
   },
   "feature_macros": [],
   "option_macros": [
@@ -35,7 +35,8 @@
         "(2)",
         "(3)",
         "(4)",
-        "(5)"
+        "(5)",
+        "(6)"
       ],
       "description": "Incremental control level; level 5 enables the cascaded P/Q power loop."
     },

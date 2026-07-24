@@ -35,7 +35,7 @@ extern "C"
 
 /**
  * @brief Incremental control level; level 0 runs the PLL only and level 5 enables the cascaded P/Q power loop.
- *        Options: (0), (1), (2), (3), (4), (5)
+ *        Options: (0), (1), (2), (3), (4), (5), (6)
  */
 #define BUILD_LEVEL (0)
 
@@ -176,8 +176,8 @@ extern "C"
 #undef BUILD_LEVEL
 #define BUILD_LEVEL GMP_BUILD_LEVEL_OVERRIDE
 #endif
-#if (BUILD_LEVEL < 0) || (BUILD_LEVEL > 5)
-#error BUILD_LEVEL_must_be_between_0_and_5
+#if (BUILD_LEVEL < 0) || (BUILD_LEVEL > 6)
+#error BUILD_LEVEL_must_be_between_0_and_6
 #endif
 
 #ifdef __cplusplus

@@ -46,6 +46,51 @@ GFL_GRID_VOLTAGE_PU = 0.33;
 % Nominal grid frequency in hertz.
 GFL_GRID_FREQUENCY_HZ = 50.0;
 
+% Default BUILD_LEVEL 6 DC-link voltage reference in volts.
+RECTIFIER_DC_VOLTAGE_REF_V = 36.0;
+
+% BUILD_LEVEL 6 DC-link voltage-loop proportional gain from voltage error PU to d-axis current PU.
+RECTIFIER_DC_VOLTAGE_KP = 0.4;
+
+% BUILD_LEVEL 6 DC-link voltage-loop integral gain in inverse seconds.
+RECTIFIER_DC_VOLTAGE_KI = 5.0;
+
+% BUILD_LEVEL 6 DC-link voltage-loop execution frequency in hertz.
+RECTIFIER_DC_VOLTAGE_LOOP_FREQUENCY_HZ = 1000.0;
+
+% Current-ISR to BUILD_LEVEL 6 voltage-loop execution divider.
+RECTIFIER_DC_VOLTAGE_LOOP_DIVIDER = CONTROLLER_FREQUENCY / RECTIFIER_DC_VOLTAGE_LOOP_FREQUENCY_HZ;
+
+% Maximum circular d/q current-reference magnitude for BUILD_LEVEL 6.
+RECTIFIER_CURRENT_LIMIT_PU = 0.20;
+
+% Maximum BUILD_LEVEL 6 d-axis current-reference slew rate in per-unit per second.
+RECTIFIER_ID_REF_SLEW_PU_S = 0.50;
+
+% Internal BUILD_LEVEL 6 DC-link reference ramp rate in volts per second.
+RECTIFIER_UDC_REF_SLEW_V_S = 10.0;
+
+% Default BUILD_LEVEL 6 q-axis current reference in per-unit.
+RECTIFIER_IQ_REF_PU = 0.0;
+
+% BUILD_LEVEL 6 DC-voltage-loop Id polarity; only +1 and -1 are valid.
+RECTIFIER_ID_POLARITY = 1;
+
+% Continuous PLL-lock time required before BUILD_LEVEL 6 enables zero-current PWM.
+RECTIFIER_PLL_LOCK_HOLD_MS = 20;
+
+% Zero-current stabilization time before the BUILD_LEVEL 6 voltage reference starts ramping.
+RECTIFIER_ZERO_CURRENT_HOLD_MS = 20;
+
+% Conservative BUILD_LEVEL 6 software DC-link overvoltage trip threshold in volts.
+RECTIFIER_DC_OVERVOLTAGE_V = 60.0;
+
+% Minimum precharged DC-link voltage accepted before BUILD_LEVEL 6 operation.
+RECTIFIER_DC_UNDERVOLTAGE_V = 5.0;
+
+% Conservative instantaneous phase-current software trip threshold in per-unit.
+RECTIFIER_SOFTWARE_OVERCURRENT_PU = 0.35;
+
 % P/Q outer-loop execution frequency in hertz.
 GFL_PQ_LOOP_FREQUENCY_HZ = 1000.0;
 

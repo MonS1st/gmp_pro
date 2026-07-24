@@ -92,6 +92,81 @@ extern "C"
 #define GFL_GRID_FREQUENCY_HZ (50.0f)
 
 /**
+ * @brief Default BUILD_LEVEL 6 DC-link voltage reference in volts.
+ */
+#define RECTIFIER_DC_VOLTAGE_REF_V (36.0f)
+
+/**
+ * @brief BUILD_LEVEL 6 DC-link voltage-loop proportional gain from voltage error PU to d-axis current PU.
+ */
+#define RECTIFIER_DC_VOLTAGE_KP (0.4f)
+
+/**
+ * @brief BUILD_LEVEL 6 DC-link voltage-loop integral gain in inverse seconds.
+ */
+#define RECTIFIER_DC_VOLTAGE_KI (5.0f)
+
+/**
+ * @brief BUILD_LEVEL 6 DC-link voltage-loop execution frequency in hertz.
+ */
+#define RECTIFIER_DC_VOLTAGE_LOOP_FREQUENCY_HZ (1000.0f)
+
+/**
+ * @brief Current-ISR to BUILD_LEVEL 6 voltage-loop execution divider.
+ */
+#define RECTIFIER_DC_VOLTAGE_LOOP_DIVIDER ((uint32_t)(CONTROLLER_FREQUENCY / RECTIFIER_DC_VOLTAGE_LOOP_FREQUENCY_HZ))
+
+/**
+ * @brief Maximum circular d/q current-reference magnitude for BUILD_LEVEL 6.
+ */
+#define RECTIFIER_CURRENT_LIMIT_PU (0.20f)
+
+/**
+ * @brief Maximum BUILD_LEVEL 6 d-axis current-reference slew rate in per-unit per second.
+ */
+#define RECTIFIER_ID_REF_SLEW_PU_S (0.50f)
+
+/**
+ * @brief Internal BUILD_LEVEL 6 DC-link reference ramp rate in volts per second.
+ */
+#define RECTIFIER_UDC_REF_SLEW_V_S (10.0f)
+
+/**
+ * @brief Default BUILD_LEVEL 6 q-axis current reference in per-unit.
+ */
+#define RECTIFIER_IQ_REF_PU (0.0f)
+
+/**
+ * @brief BUILD_LEVEL 6 DC-voltage-loop Id polarity; only +1 and -1 are valid.
+ */
+#define RECTIFIER_ID_POLARITY (1)
+
+/**
+ * @brief Continuous PLL-lock time required before BUILD_LEVEL 6 enables zero-current PWM.
+ */
+#define RECTIFIER_PLL_LOCK_HOLD_MS (20)
+
+/**
+ * @brief Zero-current stabilization time before the BUILD_LEVEL 6 voltage reference starts ramping.
+ */
+#define RECTIFIER_ZERO_CURRENT_HOLD_MS (20)
+
+/**
+ * @brief Conservative BUILD_LEVEL 6 software DC-link overvoltage trip threshold in volts.
+ */
+#define RECTIFIER_DC_OVERVOLTAGE_V (60.0f)
+
+/**
+ * @brief Minimum precharged DC-link voltage accepted before BUILD_LEVEL 6 operation.
+ */
+#define RECTIFIER_DC_UNDERVOLTAGE_V (5.0f)
+
+/**
+ * @brief Conservative instantaneous phase-current software trip threshold in per-unit.
+ */
+#define RECTIFIER_SOFTWARE_OVERCURRENT_PU (0.35f)
+
+/**
  * @brief P/Q outer-loop execution frequency in hertz.
  */
 #define GFL_PQ_LOOP_FREQUENCY_HZ (1000.0f)

@@ -71,6 +71,20 @@ GMP_STATIC_INLINE void ctl_input_callback(void)
     ctl_step_tri_ptr_adc_channel(&uuvw);
     ctl_step_ptr_adc_channel(&idc);
     ctl_step_ptr_adc_channel(&udc);
+
+#if BUILD_LEVEL == 6
+    // Reuse the existing 16-channel SIL panel ABI for BL6 commands.  The
+    // validation model supplies these channels; hardware targets retain the
+    // same command object through the Datalink tunable dictionary.
+    rectifier_cmd.enable = simulink_rx_buffer.panel[0] >= 0.5;
+    rectifier_cmd.clear_fault = simulink_rx_buffer.panel[1] >= 0.5;
+    rectifier_cmd.udc_ref_v = float2ctrl((float)simulink_rx_buffer.panel[2]);
+    rectifier_cmd.iq_ref_pu = float2ctrl((float)simulink_rx_buffer.panel[3]);
+    rectifier_cmd.current_limit_pu = float2ctrl((float)simulink_rx_buffer.panel[4]);
+    rectifier_cmd.manual_current_mode = simulink_rx_buffer.panel[5] >= 0.5;
+    rectifier_cmd.manual_id_ref_pu = float2ctrl((float)simulink_rx_buffer.panel[6]);
+    rectifier_cmd.manual_iq_ref_pu = float2ctrl((float)simulink_rx_buffer.panel[7]);
+#endif
 }
 
 // Output Callback
@@ -127,6 +141,23 @@ GMP_STATIC_INLINE void ctl_output_callback(void)
 #elif BUILD_LEVEL == 5
     simulink_tx_buffer.monitor[14] = pq_ctrl.pq_meas.dat[0];
     simulink_tx_buffer.monitor[15] = pq_ctrl.pq_meas.dat[1];
+#elif BUILD_LEVEL == 6
+    // BL6 level-specific diagnostic layout:
+    // [Ia, Ib, Ic, Udc_V, Id, Iq, Id_ref, Iq_ref, PLL_f_pu,
+    //  PLL_error, state, fault_bits, Udc_PI_i, Udc_PI_out,
+    //  flags(bit0 PLL, bit1 PWM, bit2 current-limit, bit3 PI-sat),
+    //  internal_Udc_ref_V].
+    simulink_tx_buffer.monitor[3] = rectifier_status.udc_meas_v;
+    simulink_tx_buffer.monitor[8] = rectifier_status.pll_freq_pu;
+    simulink_tx_buffer.monitor[9] = rectifier_status.pll_error;
+    simulink_tx_buffer.monitor[10] = rectifier_status.state;
+    simulink_tx_buffer.monitor[11] = rectifier_status.fault_bits;
+    simulink_tx_buffer.monitor[12] = rectifier_dc_voltage_ctrl.voltage_pi.i_term;
+    simulink_tx_buffer.monitor[13] = rectifier_dc_voltage_ctrl.voltage_pi.out;
+    simulink_tx_buffer.monitor[14] =
+        rectifier_status.pll_locked + 2 * rectifier_status.pwm_enabled +
+        4 * rectifier_status.current_limited + 8 * rectifier_status.voltage_pi_saturated;
+    simulink_tx_buffer.monitor[15] = rectifier_dc_voltage_ctrl.udc_ref_v;
 #endif // BUILD_LEVEL
 }
 

@@ -99,6 +99,9 @@
   <PropertyGroup Label="Vcpkg">
     <VcpkgEnableManifest>true</VcpkgEnableManifest>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(GflDependencyInclude)' != ''">
+    <IncludePath>$(GflDependencyInclude);$(IncludePath)</IncludePath>
+  </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
@@ -169,6 +172,11 @@
       <PreprocessorDefinitions>GMP_BUILD_LEVEL_OVERRIDE=$(GflBuildLevel);%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
   </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(GflFeatureFlags)' != ''">
+    <ClCompile>
+      <PreprocessorDefinitions>$(GflFeatureFlags);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+  </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\..\src\ctl_main.c" />
     <ClCompile Include="..\..\src\user_main.c" />
@@ -215,6 +223,7 @@
     <ClCompile Include="gmp_src_mgr\gmp_src\ctl_dp_pll_ddsrf.c" />
     <ClCompile Include="gmp_src_mgr\gmp_src\ctl_dp_pll_dsogi.c" />
     <ClCompile Include="gmp_src_mgr\gmp_src\ctl_dp_pll_srf.c" />
+    <ClCompile Include="gmp_src_mgr\gmp_src\ctl_rectifier_dc_voltage_ctrl.c" />
     <ClCompile Include="gmp_src_mgr\gmp_src\ctl_dp_sinv_core.c" />
     <ClCompile Include="gmp_src_mgr\gmp_src\ctl_dp_spfc.c" />
     <ClCompile Include="gmp_src_mgr\gmp_src\ctl_dp_spll_sogi.c" />

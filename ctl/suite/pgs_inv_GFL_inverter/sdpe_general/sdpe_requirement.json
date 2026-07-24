@@ -88,6 +88,126 @@
       "description": "Nominal grid frequency in hertz."
     },
     {
+      "role": "rectifier_dc_voltage_ref",
+      "macro": "RECTIFIER_DC_VOLTAGE_REF_V",
+      "binding": {
+        "float": "36.0"
+      },
+      "description": "Default BUILD_LEVEL 6 DC-link voltage reference in volts."
+    },
+    {
+      "role": "rectifier_dc_voltage_kp",
+      "macro": "RECTIFIER_DC_VOLTAGE_KP",
+      "binding": {
+        "float": "0.4"
+      },
+      "description": "BUILD_LEVEL 6 DC-link voltage-loop proportional gain from voltage error PU to d-axis current PU."
+    },
+    {
+      "role": "rectifier_dc_voltage_ki",
+      "macro": "RECTIFIER_DC_VOLTAGE_KI",
+      "binding": {
+        "float": "5.0"
+      },
+      "description": "BUILD_LEVEL 6 DC-link voltage-loop integral gain in inverse seconds."
+    },
+    {
+      "role": "rectifier_dc_voltage_loop_frequency",
+      "macro": "RECTIFIER_DC_VOLTAGE_LOOP_FREQUENCY_HZ",
+      "binding": {
+        "float": "1000.0"
+      },
+      "description": "BUILD_LEVEL 6 DC-link voltage-loop execution frequency in hertz."
+    },
+    {
+      "role": "rectifier_dc_voltage_loop_divider",
+      "macro": "RECTIFIER_DC_VOLTAGE_LOOP_DIVIDER",
+      "binding": {
+        "literal": "((uint32_t)(CONTROLLER_FREQUENCY / RECTIFIER_DC_VOLTAGE_LOOP_FREQUENCY_HZ))"
+      },
+      "description": "Current-ISR to BUILD_LEVEL 6 voltage-loop execution divider."
+    },
+    {
+      "role": "rectifier_current_limit",
+      "macro": "RECTIFIER_CURRENT_LIMIT_PU",
+      "binding": {
+        "float": "0.20"
+      },
+      "description": "Maximum circular d/q current-reference magnitude for BUILD_LEVEL 6."
+    },
+    {
+      "role": "rectifier_id_ref_slew",
+      "macro": "RECTIFIER_ID_REF_SLEW_PU_S",
+      "binding": {
+        "float": "0.50"
+      },
+      "description": "Maximum BUILD_LEVEL 6 d-axis current-reference slew rate in per-unit per second."
+    },
+    {
+      "role": "rectifier_udc_ref_slew",
+      "macro": "RECTIFIER_UDC_REF_SLEW_V_S",
+      "binding": {
+        "float": "10.0"
+      },
+      "description": "Internal BUILD_LEVEL 6 DC-link reference ramp rate in volts per second."
+    },
+    {
+      "role": "rectifier_iq_ref",
+      "macro": "RECTIFIER_IQ_REF_PU",
+      "binding": {
+        "float": "0.0"
+      },
+      "description": "Default BUILD_LEVEL 6 q-axis current reference in per-unit."
+    },
+    {
+      "role": "rectifier_id_polarity",
+      "macro": "RECTIFIER_ID_POLARITY",
+      "binding": {
+        "number": "1"
+      },
+      "description": "BUILD_LEVEL 6 DC-voltage-loop Id polarity; only +1 and -1 are valid."
+    },
+    {
+      "role": "rectifier_pll_lock_hold",
+      "macro": "RECTIFIER_PLL_LOCK_HOLD_MS",
+      "binding": {
+        "number": "20"
+      },
+      "description": "Continuous PLL-lock time required before BUILD_LEVEL 6 enables zero-current PWM."
+    },
+    {
+      "role": "rectifier_zero_current_hold",
+      "macro": "RECTIFIER_ZERO_CURRENT_HOLD_MS",
+      "binding": {
+        "number": "20"
+      },
+      "description": "Zero-current stabilization time before the BUILD_LEVEL 6 voltage reference starts ramping."
+    },
+    {
+      "role": "rectifier_dc_overvoltage",
+      "macro": "RECTIFIER_DC_OVERVOLTAGE_V",
+      "binding": {
+        "float": "60.0"
+      },
+      "description": "Conservative BUILD_LEVEL 6 software DC-link overvoltage trip threshold in volts."
+    },
+    {
+      "role": "rectifier_dc_undervoltage",
+      "macro": "RECTIFIER_DC_UNDERVOLTAGE_V",
+      "binding": {
+        "float": "5.0"
+      },
+      "description": "Minimum precharged DC-link voltage accepted before BUILD_LEVEL 6 operation."
+    },
+    {
+      "role": "rectifier_software_overcurrent",
+      "macro": "RECTIFIER_SOFTWARE_OVERCURRENT_PU",
+      "binding": {
+        "float": "0.35"
+      },
+      "description": "Conservative instantaneous phase-current software trip threshold in per-unit."
+    },
+    {
       "role": "pq_loop_frequency",
       "macro": "GFL_PQ_LOOP_FREQUENCY_HZ",
       "binding": {
@@ -280,6 +400,26 @@
         "open_loop_vd",
         "open_loop_vq",
         "pll_lock_epsilon"
+      ]
+    },
+    {
+      "name": "BUILD_LEVEL 6 Rectifier",
+      "requirements": [
+        "rectifier_dc_voltage_ref",
+        "rectifier_dc_voltage_kp",
+        "rectifier_dc_voltage_ki",
+        "rectifier_dc_voltage_loop_frequency",
+        "rectifier_dc_voltage_loop_divider",
+        "rectifier_current_limit",
+        "rectifier_id_ref_slew",
+        "rectifier_udc_ref_slew",
+        "rectifier_iq_ref",
+        "rectifier_id_polarity",
+        "rectifier_pll_lock_hold",
+        "rectifier_zero_current_hold",
+        "rectifier_dc_overvoltage",
+        "rectifier_dc_undervoltage",
+        "rectifier_software_overcurrent"
       ]
     },
     {
